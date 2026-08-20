@@ -2,21 +2,22 @@ const SHEET_NAME = 'Guild Audit';
 const TALENTS_SHEET_NAME = 'Talents & Builds';
 const LOOT_SHEET_NAME = 'Loot & Chase Items';
 
-// --- VAULT & SEASON CONFIGURATION (Midnight Season 2 - Verified) ---
+// --- VAULT & SEASON CONFIGURATION (Midnight Season 2 - Patch 12.1 Verified) ---
 const VAULT_MAPPING = {
   raid: {
-      mythic: 331,
-      heroic: 318,
-      normal: 305,
-      lfr: 292
+      mythic: 334, // (Most) Mythic is 334; Last 2 Mythic Bosses is 344
+      heroic: 318, // Heroic Raid Vault is 318
+      normal: 305, // Normal Raid Vault is 305
+      lfr: 292     // LFR Raid Vault is 292
   },
   mplus: {
       20: 318, 19: 318, 18: 318, 17: 318, 16: 318, 15: 318, 14: 318,
-      13: 318, 12: 318, 11: 318, 10: 318, // Caps at 318 (Myth 1/6) for +10 and above
-      9: 315, 8: 315,                     // 315 (Hero 4/6)
-      7: 312, 6: 312,                     // 312 (Hero 3/6)
-      5: 308, 4: 308,                     // 308 (Hero 2/6)
-      3: 305, 2: 305                      // 305 (Hero 1/6)
+      13: 318, 12: 318, 11: 318, 10: 318, // Caps at 318 for M+ 10 and above
+      9: 315, 8: 315, 7: 315,             // 315 for M+ 7 to 9
+      6: 311,                             // 311 for M+ 6
+      5: 308, 4: 308,                     // 308 for M+ 4 to 5
+      3: 305, 2: 305,                     // 305 for M+ 2 to 3
+      0: 302                              // 302 for Mythic 0 / M0
   }
 };
 
@@ -75,17 +76,17 @@ function createConfigSheet() {
   }
   sheet = ss.insertSheet('Config', 0);
   const setupData = [
-      ['Configuration', 'Value', '', 'Midnight S2 Great Vault Reference', 'Vault ilvl', 'Track'],
-      ['Region', 'us', '', 'Raid Mythic (6/6)', 331, 'Mythic'],
-      ['Realm Slug', 'kiljaeden', '', 'Raid Heroic (4/6)', 318, 'Hero'],
-      ['Guild Slug', 'prey', '', 'Raid Normal (2/6)', 305, 'Champion'],
-      ['', '', '', 'Raid LFR (2/4/6)', 292, 'Veteran'],
-      ['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If different)', 'Mythic+ 10+', 318, 'Myth 1/6'],
-      ['Jevo', 'Protection', '', 'Mythic+ 8-9', 315, 'Hero 4/6'],
-      ['Lyci', 'Balance', '', 'Mythic+ 6-7', 312, 'Hero 3/6'],
-      ['Aemonnd', 'Unholy', '', 'Mythic+ 4-5', 308, 'Hero 2/6'],
-      ['', '', '', 'Mythic+ 2-3', 305, 'Hero 1/6'],
-      ['Alt Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If different)', 'World / Delves Tier 8', 305, 'Champion/Hero'],
+      ['Configuration', 'Value', '', 'Midnight S2 Great Vault Reference (12.1)', 'Vault ilvl', 'Track'],
+      ['Region', 'us', '', 'Raid Mythic (Most)', 334, 'Myth'],
+      ['Realm Slug', 'kiljaeden', '', 'Raid Heroic', 318, 'Hero'],
+      ['Guild Slug', 'prey', '', 'Raid Normal', 305, 'Hero'],
+      ['', '', '', 'Raid LFR', 292, 'Champion'],
+      ['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If different)', 'Mythic+ 10+', 318, 'Hero'],
+      ['Jevo', 'Protection', '', 'Mythic+ 7-9', 315, 'Hero'],
+      ['Lyci', 'Balance', '', 'Mythic+ 6', 311, 'Hero'],
+      ['Aemonnd', 'Unholy', '', 'Mythic+ 4-5', 308, 'Hero'],
+      ['', '', '', 'Mythic+ 2-3 / Delves T8-11', 305, 'Hero'],
+      ['Alt Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If different)', 'Mythic 0 / M0', 302, 'Champion'],
       ['Altcharone', '', '', '', '', ''],
       ['Altchartwo', '', '', '', '', '']
   ];
@@ -97,11 +98,11 @@ function createConfigSheet() {
   
   // Reference Table Header Formatting
   sheet.getRange("D1:F1").setFontWeight('bold').setBackground('#202124').setFontColor('#ffffff').setHorizontalAlignment('center');
-  sheet.getRange("D2:F10").setHorizontalAlignment('center');
+  sheet.getRange("D2:F11").setHorizontalAlignment('center');
   sheet.autoResizeColumns(1, 6);
   
   applyConfigDropdowns(sheet);
-  SpreadsheetApp.getUi().alert('"Config" sheet created with interactive spec dropdowns.');
+  SpreadsheetApp.getUi().alert('"Config" sheet created with Midnight Season 2 (Patch 12.1) Great Vault reference.');
 }
 
 function getConfigurationFromSheet() {
