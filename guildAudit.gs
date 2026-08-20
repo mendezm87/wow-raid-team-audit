@@ -1,15 +1,15 @@
 const SHEET_NAME = 'Guild Audit'; 
 const VAULT_MAPPING = {
   raid: {
-      mythic: 710 ,
-      heroic: 704 ,
-      normal: 694 ,
-      lfr: 678
+      mythic: 325 ,
+      heroic: 312 ,
+      normal: 299 ,
+      lfr: 286
   },
   mplus: {
-      20: 707, 19: 707, 18: 707, 17: 707, 16: 707, 15: 707, 14: 707,
-      13: 707, 12: 707, 11: 707, 10: 707, 9: 704, 8: 704, 7: 704, 6: 701,
-      5: 697, 4: 697, 3: 694, 2: 694
+      20: 272, 19: 272, 18: 272, 17: 272, 16: 272, 15: 272, 14: 272,
+      13: 272, 12: 272, 11: 272, 10: 272, 9: 269, 8: 269, 7: 269, 6: 266,
+      5: 263, 4: 263, 3: 259, 2: 259
   }
 };
 
@@ -281,15 +281,15 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
       'Name': member.character.name, 'Class': '', 'Spec': '', 'iLvl': 0,  'M+ Rating': 0, 
       'Total Sockets': 0, 'Crafted Items': 0, 'Raid Buff (%)': 0, 'Imperfect Gems': 0,
       'Embellishment 1': '-', 'Embellishment 2': '-',
-      'Reshii Wraps Rank': '-', 'Reshii Boots': '-',
+      //'Reshii Wraps Rank': '-', 'Reshii Boots': '-',
       'Tier Set': '0/5', 'Tier Helm': '-', 'Tier Shoulder': '-', 'Tier Chest': '-', 'Tier Gloves': '-', 'Tier Legs': '-', 'Main Hand': '-', 'Off Hand': '-',  'Trinket 1': '-', 'Trinket 2': '-',
-       'Neck': '-', 'Back': '-', 'Wrists': '-', 'Wasit': '-', 'Ring 1': '-', 'Ring 2': '-',
+       'Neck': '-', 'Back': '-', 'Wrists': '-', 'Wasit': '-', 'Feet': '-', 'Ring 1': '-', 'Ring 2': '-',
       'Enchant Main Hand': 'Missing', 'Enchant Off Hand': 'Missing', 'Enchant Cloak': 'Missing', 'Enchant Chest': 'Missing', 'Enchant Wrists': 'Missing', 'Enchant Legs': 'Missing', 'Enchant Feet': 'Missing', 'Enchant Ring 1': 'Missing', 'Enchant Ring 2': 'Missing',
-      'K\'aresh Trust Renown': 0, 'Manaforge Vandals Renown': 0, 
+      //'K\'aresh Trust Renown': 0, 'Manaforge Vandals Renown': 0, 
       'GV Slots Unlocked': 0,
       'GV Raid 1': '-', 'GV Raid 2': '-', 'GV Raid 3': '-',
       'GV M+ 1': '-', 'GV M+ 2': '-', 'GV M+ 3': '-'
-    };
+      };
 
     // --- Fetch all character data ---
     const profileData = fetchBlizzardEndpoint(`${apiHost}/profile/wow/character/${charRealm}/${charName}?locale=en_US`, headers);
@@ -321,20 +321,45 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
 
         // Raid Slots (using the calculated timestamps)
         if (raidData) {
-            const latestRaid = raidData.expansions?.slice(-1)[0]?.instances?.slice(-1)[0];
-            if (latestRaid) {
+            // Target latest raid
+            //const latestRaid = raidData.expansions?.slice(-1)[0]?.instances?.slice(-1)[0];
+            // Target the entire latest expansion instead of just the last instance
+            const latestExpansion = raidData.expansions?.slice(-2)[0];
+            //if (latestRaid) {
+            if (latestExpansion && latestExpansion.instances) {
                 let weeklyMythicKills = 0;
                 let weeklyHeroicKills = 0;
                 let weeklyNormalKills = 0;
                 let weeklyLFRKills = 0;
-
-                for (const mode of latestRaid.modes) {
+                // Loop logic for single instanced raid seasons
+                /*for (const mode of latestRaid.modes) {
                     for (const boss of mode.progress.encounters) {
                         if (boss.last_kill_timestamp >= weekStartTimestamp && boss.last_kill_timestamp < weekEndTimestamp) {
                             if (mode.difficulty.type === 'MYTHIC') weeklyMythicKills++;
                             if (mode.difficulty.type === 'HEROIC') weeklyHeroicKills++;
                             if (mode.difficulty.type === 'NORMAL') weeklyNormalKills++;
                             if (mode.difficulty.type === 'LFR') weeklyLFRKills++;
+                        }
+                    }
+                }*/
+                // Logic for multi-instance raid seasons
+                for (const raidInstance of latestExpansion.instances) {
+                  // ADD THIS LINE: Log the name of the instance being checked
+                  Logger.log(`Checking Raid Instance: ${raidInstance.instance.name}`);
+                    if (raidInstance.modes) {
+                        for (const mode of raidInstance.modes) {
+                            // Added an optional chain/check to safely catch missing progress
+                            if (mode.progress && mode.progress.encounters) {
+                                for (const boss of mode.progress.encounters) {
+                                    // Check if the kill falls within the current week's timestamps
+                                    if (boss.last_kill_timestamp >= weekStartTimestamp && boss.last_kill_timestamp < weekEndTimestamp) {
+                                        if (mode.difficulty.type === 'MYTHIC') weeklyMythicKills++;
+                                        if (mode.difficulty.type === 'HEROIC') weeklyHeroicKills++;
+                                        if (mode.difficulty.type === 'NORMAL') weeklyNormalKills++;
+                                        if (mode.difficulty.type === 'LFR') weeklyLFRKills++;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -383,7 +408,8 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
         if (rep.faction.name === "The K'aresh Trust") {
           charRow['K\'aresh Trust Renown'] = rep.standing.renown_level || 0;
         }
-        if (rep.faction.name === "Manaforge Vandals") {
+        // Fill in faction name e.g.: "Manaforge Vandals"
+        if (rep.faction.name === "") {
           const renown = rep.standing.renown_level || 0;
           charRow['Manaforge Vandals Renown'] = renown;
           // Calculate Raid Buff
@@ -460,17 +486,6 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
           }
         }
         
-        // Track Reshii Wraps specifically
-        if (item.item.id === 235499) { // Item ID for Reshii Wraps
-          if (item.bonus_list) {
-            for (const bonusId of item.bonus_list) {
-              const bonus = bonusData[bonusId];
-              if(bonus && bonus.tag && bonus.tag.includes("Rank")){
-                charRow['Reshii Wraps Rank'] = bonus.tag;
-              }
-            }
-         }
-        }
 
         //Find weapons
         if (item.slot.type === 'MAIN_HAND') charRow['Main Hand'] = `${item.name} ${item.level.value} (${upgradeInfo})`;
@@ -487,9 +502,6 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
         if(item.slot.type === 'TRINKET_1') charRow['Trinket 1'] = `${item.name} ${item.level.value} (${upgradeInfo})`
         if(item.slot.type === 'TRINKET_2') charRow['Trinket 2'] = `${item.name} ${item.level.value} (${upgradeInfo})`
 
-        if (item.slot.type === 'FEET' && item.name.includes('Interloper')){
-          charRow['Reshii Boots'] = `${item.level.value} (${upgradeInfo})`;
-        }
         if (item.set) { 
           if (item.slot.type === 'HEAD') charRow['Tier Helm'] = `${item.level.value} (${upgradeInfo})`, tierCount++;
           if (item.slot.type === 'SHOULDER') charRow['Tier Shoulder'] = `${item.level.value} (${upgradeInfo})`, tierCount++;
@@ -539,11 +551,11 @@ function updateAllCharacterDataWithBonuses() {
     'Name', 'Class', 'Spec', 'iLvl', 'M+ Rating', 
     'Total Sockets', 'Crafted Items', 'Raid Buff (%)', 'Imperfect Gems',
     'Embellishment 1', 'Embellishment 2',
-    'Reshii Wraps Rank', 'Reshii Boots',
+    //'Reshii Wraps Rank', 'Reshii Boots',
     'Tier Set', 'Tier Helm', 'Tier Shoulder', 'Tier Chest', 'Tier Gloves', 'Tier Legs', 'Main Hand', 'Off Hand', 'Trinket 1', 'Trinket 2', 
-    'Neck', 'Back', 'Wrist', 'Waist', 'Ring 1', 'Ring 2',
+    'Neck', 'Back', 'Wrist', 'Waist', 'Feet', 'Ring 1', 'Ring 2',
     'Enchant Main Hand', 'Enchant Off Hand', 'Enchant Cloak', 'Enchant Chest', 'Enchant Wrists', 'Enchant Legs', 'Enchant Feet', 'Enchant Ring 1', 'Enchant Ring 2',
-    'K\'aresh Trust Renown', 'Manaforge Vandals Renown', 
+    //'K\'aresh Trust Renown', 'Manaforge Vandals Renown', 
     'GV Slots Unlocked', 
     'GV Raid 1', 'GV Raid 2', 'GV Raid 3',
     'GV M+ 1', 'GV M+ 2', 'GV M+ 3'
@@ -669,17 +681,17 @@ function applyFormatting(sheet, headers, characterDataObjects) {
   };
 
   // Rules for Upgrade Tracks
-  const tierCols = ['Tier Helm', 'Tier Shoulder', 'Tier Chest', 'Tier Gloves', 'Tier Legs', 'Main Hand', 'Off Hand', 'Trinket 1', 'Trinket 2', 'Reshii Boots', 'Neck', 'Back', 'Wrist', 'Waist', 'Ring 1', 'Ring 2',];
+  const tierCols = ['Tier Helm', 'Tier Shoulder', 'Tier Chest', 'Tier Gloves', 'Tier Legs', 'Main Hand', 'Off Hand', 'Trinket 1', 'Trinket 2', 'Feet', 'Neck', 'Back', 'Wrist', 'Waist', 'Ring 1', 'Ring 2',];
   tierCols.forEach(colName => {
     const colIdx = headers.indexOf(colName);
     addRule(colIdx, "Myth", "#ff8000"); // Orange
     addRule(colIdx, "Hero", "#a335ee");   // Purple
     addRule(colIdx, "Champion", "#0070dd"); // Blue
     addRule(colIdx, "Veteran", "#1eff00"); // Green
-    addRule(colIdx, "720 (-)", "#ff8000"); // Orange crafted
-    addRule(colIdx, "704 (-)", "#a335ee");   // Purple crafted
-    addRule(colIdx, "691 (-)", "#0070dd"); // Blue crafted
-    addRule(colIdx, "675 (-)", "#1eff00"); // Green crafted
+    addRule(colIdx, "285 (-)", "#ff8000"); // Orange crafted
+    addRule(colIdx, "272 (-)", "#a335ee");   // Purple crafted
+    addRule(colIdx, "259 (-)", "#0070dd"); // Blue crafted
+    addRule(colIdx, "246 (-)", "#1eff00"); // Green crafted
     addRule(colIdx, "-", "#bbbbbb"); //Gray for blanks
   });
 
@@ -696,9 +708,9 @@ function applyFormatting(sheet, headers, characterDataObjects) {
   const enchantCols = ['Enchant Main Hand', 'Enchant Off Hand', 'Enchant Cloak', 'Enchant Chest', 'Enchant Wrists', 'Enchant Legs', 'Enchant Feet', 'Enchant Ring 1', 'Enchant Ring 2'];
   enchantCols.forEach(colName => {
       const colIdx = headers.indexOf(colName);
-      addRule(colIdx, "Tier3", "#34a853"); // Green for Rank 3
-      addRule(colIdx, "Tier2", "#fff200"); // Yellow for Rank 2
-      addRule(colIdx, "Tier1", "#ff0000"); // Red for Rank 1
+      addRule(colIdx, "Tier2", "#34a853"); // Green for Rank 3
+      addRule(colIdx, "Tier1", "#fff200"); // Yellow for Rank 2
+      //addRule(colIdx, "Tier1", "#ff0000"); // Red for Rank 1
       addRule(colIdx, "Rune of", "#34a853"); //Green for DK
       if(colName !== 'Enchant Off Hand'){
         addRule(colIdx, "Missing", "#ff0000"); //Red for missing
