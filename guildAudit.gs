@@ -40,39 +40,68 @@ function onOpen() {
       .addToUi();
 }
 
+const ALL_WOW_SPECS = [
+  'Affliction', 'Arcane', 'Arms', 'Assassination', 'Augmentation',
+  'Balance', 'Beast Mastery', 'Blood', 'Brewmaster', 'Demonology',
+  'Destruction', 'Devastation', 'Discipline', 'Elemental', 'Enhancement',
+  'Feral', 'Fire', 'Frost', 'Fury', 'Guardian',
+  'Havoc', 'Holy', 'Marksmanship', 'Mistweaver', 'Outlaw',
+  'Preservation', 'Protection', 'Restoration', 'Retribution', 'Shadow',
+  'Subtlety', 'Survival', 'Unholy', 'Vengeance', 'Windwalker'
+];
+
+/**
+ * Applies Google Sheets interactive dropdown validation for WoW specs on the Config sheet.
+ */
+function applyConfigDropdowns(sheet) {
+  if (!sheet) return;
+  const specRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(ALL_WOW_SPECS, true)
+    .setAllowInvalid(true)
+    .build();
+
+  // Apply dropdown to Column B for character rows
+  sheet.getRange('B7:B50').setDataValidation(specRule);
+  sheet.getRange('B52:B100').setDataValidation(specRule);
+}
+
 function createConfigSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (ss.getSheetByName('Config')) {
-    SpreadsheetApp.getUi().alert('The "Config" sheet already exists.');
+  let sheet = ss.getSheetByName('Config');
+  if (sheet) {
+    applyConfigDropdowns(sheet);
+    SpreadsheetApp.getUi().alert('The "Config" sheet already exists. Interactive spec dropdowns have been refreshed!');
     return;
   }
-  const sheet = ss.insertSheet('Config', 0);
+  sheet = ss.insertSheet('Config', 0);
   const setupData = [
       ['Configuration', 'Value', '', 'Midnight S2 Great Vault Reference', 'Vault ilvl', 'Track'],
       ['Region', 'us', '', 'Raid Mythic (6/6)', 331, 'Mythic'],
       ['Realm Slug', 'kiljaeden', '', 'Raid Heroic (4/6)', 318, 'Hero'],
       ['Guild Slug', 'prey', '', 'Raid Normal (2/6)', 305, 'Champion'],
       ['', '', '', 'Raid LFR (2/4/6)', 292, 'Veteran'],
-      ['Main Characters to Track', '', '', 'Mythic+ 10+', 318, 'Myth 1/6'],
-      ['Jevo', '', '', 'Mythic+ 8-9', 315, 'Hero 4/6'],
-      ['Lyci', '', '', 'Mythic+ 6-7', 312, 'Hero 3/6'],
-      ['Aemonnd', '', '', 'Mythic+ 4-5', 308, 'Hero 2/6'],
+      ['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If different)', 'Mythic+ 10+', 318, 'Myth 1/6'],
+      ['Jevo', 'Protection', '', 'Mythic+ 8-9', 315, 'Hero 4/6'],
+      ['Lyci', 'Balance', '', 'Mythic+ 6-7', 312, 'Hero 3/6'],
+      ['Aemonnd', 'Unholy', '', 'Mythic+ 4-5', 308, 'Hero 2/6'],
       ['', '', '', 'Mythic+ 2-3', 305, 'Hero 1/6'],
-      ['Alts to Track', '', '', 'World / Delves Tier 8', 305, 'Champion/Hero'],
+      ['Alt Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If different)', 'World / Delves Tier 8', 305, 'Champion/Hero'],
       ['Altcharone', '', '', '', '', ''],
       ['Altchartwo', '', '', '', '', '']
   ];
   sheet.getRange(1, 1, setupData.length, 6).setValues(setupData);
   sheet.getRange("A1:B1").merge().setHorizontalAlignment('center').setFontWeight('bold').setBackground('#202124').setFontColor('#ffffff');
   sheet.getRange("A2:A4").setFontWeight('bold');
-  sheet.getRange("A6").merge().setHorizontalAlignment('center').setFontWeight('bold').setBackground('#e8eaed');
-  sheet.getRange("A11").merge().setHorizontalAlignment('center').setFontWeight('bold').setBackground('#e8eaed');
+  sheet.getRange("A6:C6").setFontWeight('bold').setBackground('#e8eaed').setHorizontalAlignment('center');
+  sheet.getRange("A11:C11").setFontWeight('bold').setBackground('#e8eaed').setHorizontalAlignment('center');
   
   // Reference Table Header Formatting
   sheet.getRange("D1:F1").setFontWeight('bold').setBackground('#202124').setFontColor('#ffffff').setHorizontalAlignment('center');
   sheet.getRange("D2:F10").setHorizontalAlignment('center');
   sheet.autoResizeColumns(1, 6);
-  SpreadsheetApp.getUi().alert('"Config" sheet created with Midnight Season 2 Great Vault reference.');
+  
+  applyConfigDropdowns(sheet);
+  SpreadsheetApp.getUi().alert('"Config" sheet created with interactive spec dropdowns.');
 }
 
 function getConfigurationFromSheet() {
@@ -82,6 +111,9 @@ function getConfigurationFromSheet() {
     SpreadsheetApp.getUi().alert('Configuration sheet not found!', 'Please create a sheet named "Config" using the "Guild Audit > Create Config Sheet" menu.', SpreadsheetApp.getUi().ButtonSet.OK);
     return null;
   }
+
+  // Ensure dropdown rules are always present
+  applyConfigDropdowns(configSheet);
 
   const region = configSheet.getRange('B2').getValue().toString().trim().toLowerCase();
   const realmSlug = configSheet.getRange('B3').getValue().toString().trim().toLowerCase();
@@ -95,20 +127,28 @@ function getConfigurationFromSheet() {
 
   for (const row of data) {
       const header = row[0].toString().toLowerCase().trim();
-      if (header.includes('main characters')) {
+      if (header.includes('main character')) {
           readingMains = true;
           readingAlts = false;
           continue;
-      } else if (header.includes('alts to track')) {
+      } else if (header.includes('alt character') || header.includes('alts to track')) {
           readingMains = false;
           readingAlts = true;
           continue;
       }
 
       if (readingMains && row[0]) {
-          members.push(row[0].toString().trim());
+          members.push({
+            name: row[0].toString().trim(),
+            expectedSpec: row[1] ? row[1].toString().trim() : '',
+            realm: row[2] ? row[2].toString().trim() : ''
+          });
       } else if (readingAlts && row[0]) {
-          alts.push(row[0].toString().trim());
+          alts.push({
+            name: row[0].toString().trim(),
+            expectedSpec: row[1] ? row[1].toString().trim() : '',
+            realm: row[2] ? row[2].toString().trim() : ''
+          });
       }
 
       if ((readingMains || readingAlts) && !row[0]) {
@@ -359,25 +399,33 @@ function calculateRaidReadyStatus(charRow) {
 function processCharacterSet(characterNames, guildRosterMembers, config, token, enchantAndGemData, bonusData) {
   const filteredRoster = [];
 
-  characterNames.forEach(rawInput => {
-    const raw = rawInput.trim();
-    if (!raw) return;
-
-    let targetName = raw;
-    let targetRealm = '';
+  characterNames.forEach(entry => {
+    let rawInput = '';
     let expectedSpec = '';
+    let targetRealm = '';
+
+    if (typeof entry === 'object' && entry !== null) {
+      rawInput = (entry.name || '').toString().trim();
+      expectedSpec = (entry.expectedSpec || '').toString().trim();
+      targetRealm = (entry.realm || '').toString().trim().toLowerCase().replace(/\s+/g, '-').replace(/'/g, '');
+    } else {
+      rawInput = (entry || '').toString().trim();
+    }
+    if (!rawInput) return;
+
+    let targetName = rawInput;
 
     // Check for Expected Spec (e.g. Jevo:Protection or Jevo-Kiljaeden:Protection)
     if (targetName.includes(':')) {
       const specParts = targetName.split(':');
       targetName = specParts[0].trim();
-      expectedSpec = specParts[1].trim();
+      if (!expectedSpec) expectedSpec = specParts[1].trim();
     }
 
     if (targetName.includes('-')) {
       const parts = targetName.split('-');
       targetName = parts[0].trim();
-      targetRealm = parts.slice(1).join('-').trim().toLowerCase().replace(/\s+/g, '-').replace(/'/g, '');
+      if (!targetRealm) targetRealm = parts.slice(1).join('-').trim().toLowerCase().replace(/\s+/g, '-').replace(/'/g, '');
     }
 
     // Match in guild roster
@@ -410,12 +458,48 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
     return [];
   }
 
-  Logger.log(`Batch fetching data for ${filteredRoster.length} characters...`);
-  const batchedPayloads = fetchAllCharacterDataBatched(filteredRoster, config, token);
-  const characterDataObjects = [];
+  // --- PASS 1: Batch fetch all Blizzard API payloads in parallel ---
+  const requests = [];
+  filteredRoster.forEach(char => {
+    const realm = char.realmSlug || config.GUILD_REALM_SLUG;
+    const name = char.name.toLowerCase();
+    const region = config.REGION || 'us';
+    const baseUrl = `https://${region}.api.blizzard.com/profile/wow/character/${realm}/${name}`;
 
-  // --- PASS 1: Roster-Wide Discovery of Active Season Tier Set IDs ---
-  // In WoW, all tier sets in a new season share a higher numerical ID range (within 15 of each other).
+    requests.push({ url: `${baseUrl}?namespace=profile-${region}&locale=en_US`, headers: { 'Authorization': `Bearer ${token}` }, muteHttpExceptions: true });
+    requests.push({ url: `${baseUrl}/equipment?namespace=profile-${region}&locale=en_US`, headers: { 'Authorization': `Bearer ${token}` }, muteHttpExceptions: true });
+    requests.push({ url: `${baseUrl}/reputations?namespace=profile-${region}&locale=en_US`, headers: { 'Authorization': `Bearer ${token}` }, muteHttpExceptions: true });
+    requests.push({ url: `${baseUrl}/mythic-keystone-profile?namespace=profile-${region}&locale=en_US`, headers: { 'Authorization': `Bearer ${token}` }, muteHttpExceptions: true });
+    requests.push({ url: `${baseUrl}/encounters/raids?namespace=profile-${region}&locale=en_US`, headers: { 'Authorization': `Bearer ${token}` }, muteHttpExceptions: true });
+    requests.push({ url: `${baseUrl}/specializations?namespace=profile-${region}&locale=en_US`, headers: { 'Authorization': `Bearer ${token}` }, muteHttpExceptions: true });
+  });
+
+  const responses = UrlFetchApp.fetchAll(requests);
+  const batchedPayloads = [];
+
+  for (let i = 0; i < filteredRoster.length; i++) {
+    const char = filteredRoster[i];
+    const offset = i * 6;
+
+    const profileResp = responses[offset];
+    const equipResp = responses[offset + 1];
+    const repResp = responses[offset + 2];
+    const mplusResp = responses[offset + 3];
+    const raidResp = responses[offset + 4];
+    const specResp = responses[offset + 5];
+
+    batchedPayloads.push({
+      character: char,
+      profileData: (profileResp && profileResp.getResponseCode() === 200) ? JSON.parse(profileResp.getContentText()) : null,
+      equipmentData: (equipResp && equipResp.getResponseCode() === 200) ? JSON.parse(equipResp.getContentText()) : null,
+      reputationsData: (repResp && repResp.getResponseCode() === 200) ? JSON.parse(repResp.getContentText()) : null,
+      mplusData: (mplusResp && mplusResp.getResponseCode() === 200) ? JSON.parse(mplusResp.getContentText()) : null,
+      raidData: (raidResp && raidResp.getResponseCode() === 200) ? JSON.parse(raidResp.getContentText()) : null,
+      specializationsData: (specResp && specResp.getResponseCode() === 200) ? JSON.parse(specResp.getContentText()) : null
+    });
+  }
+
+  // Find the current season's maximum tier set ID across all characters
   let globalMaxSetId = 0;
   const classToMaxSetId = {};
 
@@ -451,6 +535,7 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
       'Name': charName,
       'Class': '',
       'Spec': '',
+      'Expected Spec': character.expectedSpec || '',
       'iLvl': 0,
       'Raid Ready': 'Checking...',
       'M+ Rating': 0,
@@ -877,6 +962,29 @@ function updateAllCharacterDataWithBonuses() {
 
   // 5. Update Loot & Chase Items Sheet with live equipped gear upgrades
   createLootAndChaseItemsSheet(mainCharacterData);
+
+  // 6. Auto-populate detected specs in Config sheet if empty, and refresh interactive dropdowns
+  const configSheet = ss.getSheetByName('Config');
+  if (configSheet) {
+    const configData = configSheet.getDataRange().getValues();
+    let configUpdated = false;
+    for (let r = 0; r < configData.length; r++) {
+      const rowName = configData[r][0] ? configData[r][0].toString().trim().toLowerCase() : '';
+      const currentSpecVal = configData[r][1] ? configData[r][1].toString().trim() : '';
+      if (rowName && !currentSpecVal) {
+        const found = mainCharacterData.find(c => c['Name'] && c['Name'].toLowerCase() === rowName) || 
+                      (altCharacterData && altCharacterData.find(c => c['Name'] && c['Name'].toLowerCase() === rowName));
+        if (found && found['Spec']) {
+          configData[r][1] = found['Spec'];
+          configUpdated = true;
+        }
+      }
+    }
+    if (configUpdated) {
+      configSheet.getDataRange().setValues(configData);
+    }
+    applyConfigDropdowns(configSheet);
+  }
 
   SpreadsheetApp.getUi().alert('Audit Complete!', `Successfully updated ${mainCharacterData.length} mains and ${altCharacterData.length} alts across Audit, Talents, and Loot sheets.`, SpreadsheetApp.getUi().ButtonSet.OK);
 }
