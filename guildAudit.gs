@@ -528,6 +528,7 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
   const seasonMinSetIdThreshold = globalMaxSetId > 0 ? (globalMaxSetId - 15) : 0;
 
   // --- PASS 2: Process Character Rows ---
+  const characterDataObjects = [];
   for (const item of batchedPayloads) {
     const { character, profileData, equipmentData, reputationsData, mplusData, raidData, specializationsData } = item;
     const charName = character.name;
