@@ -392,7 +392,7 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
 
   // --- PASS 2: Process Character Rows ---
   for (const item of batchedPayloads) {
-    const { character, profileData, equipmentData, reputationsData, mplusData, raidData } = item;
+    const { character, profileData, equipmentData, reputationsData, mplusData, raidData, specializationsData } = item;
     const charName = character.name;
 
     let charRow = {
