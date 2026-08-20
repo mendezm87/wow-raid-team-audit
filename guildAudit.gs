@@ -64,6 +64,14 @@ function applyConfigDropdowns(sheet) {
   // Apply dropdown to Column B for character rows
   sheet.getRange('B7:B50').setDataValidation(specRule);
   sheet.getRange('B52:B100').setDataValidation(specRule);
+
+  // Set generous column widths
+  sheet.setColumnWidth(1, 190); // Main Character Name
+  sheet.setColumnWidth(2, 240); // Assigned Raid Spec (Dropdown)
+  sheet.setColumnWidth(3, 160); // Realm
+  sheet.setColumnWidth(4, 280); // Vault Reference
+  sheet.setColumnWidth(5, 90);  // Vault ilvl
+  sheet.setColumnWidth(6, 110); // Track
 }
 
 function createConfigSheet() {
@@ -1170,22 +1178,22 @@ function applyFormatting(sheet, headers, characterDataObjects) {
 
   // Set column widths directly (Fast 1-pass execution without getColumnWidth overhead)
   const minWidths = {
-    'Name': 120, 'Class': 110, 'Spec': 120, 'iLvl': 65,
-    'Raid Ready': 300, 'M+ Rating': 90, 'Tier Set': 120,
-    'Total Sockets': 105, 'Empty Sockets': 105, 'Imperfect Gems': 115, 'Crafted Items': 105,
-    'Embellishment 1': 170, 'Embellishment 2': 170,
-    'Head': 290, 'Shoulders': 290, 'Chest': 290, 'Hands': 290, 'Legs': 290,
-    'Main Hand': 290, 'Off Hand': 290, 'Trinket 1': 290, 'Trinket 2': 290,
-    'Neck': 290, 'Back': 290, 'Wrist': 290, 'Waist': 290, 'Feet': 290,
-    'Ring 1': 290, 'Ring 2': 290,
-    'Enchant Main Hand': 170, 'Enchant Off Hand': 170, 'Enchant Head': 170, 'Enchant Shoulder': 170,
-    'Enchant Chest': 170, 'Enchant Legs': 170, 'Enchant Feet': 170, 'Enchant Ring 1': 170, 'Enchant Ring 2': 170,
-    'GV Slots Unlocked': 125, 'GV Raid 1': 95, 'GV Raid 2': 95, 'GV Raid 3': 95,
-    'GV M+ 1': 95, 'GV M+ 2': 95, 'GV M+ 3': 95
+    'Name': 130, 'Class': 110, 'Spec': 130, 'iLvl': 70,
+    'Raid Ready': 360, 'M+ Rating': 95, 'Tier Set': 140,
+    'Total Sockets': 110, 'Empty Sockets': 110, 'Imperfect Gems': 120, 'Crafted Items': 110,
+    'Embellishment 1': 230, 'Embellishment 2': 230,
+    'Head': 320, 'Shoulders': 320, 'Chest': 320, 'Hands': 320, 'Legs': 320,
+    'Main Hand': 320, 'Off Hand': 320, 'Trinket 1': 320, 'Trinket 2': 320,
+    'Neck': 320, 'Back': 320, 'Wrist': 320, 'Waist': 320, 'Feet': 320,
+    'Ring 1': 320, 'Ring 2': 320,
+    'Enchant Main Hand': 210, 'Enchant Off Hand': 210, 'Enchant Head': 210, 'Enchant Shoulder': 210,
+    'Enchant Chest': 210, 'Enchant Legs': 210, 'Enchant Feet': 210, 'Enchant Ring 1': 210, 'Enchant Ring 2': 210,
+    'GV Slots Unlocked': 130, 'GV Raid 1': 100, 'GV Raid 2': 100, 'GV Raid 3': 100,
+    'GV M+ 1': 100, 'GV M+ 2': 100, 'GV M+ 3': 100
   };
 
   headers.forEach((header, idx) => {
-    sheet.setColumnWidth(idx + 1, minWidths[header] || 110);
+    sheet.setColumnWidth(idx + 1, minWidths[header] || 120);
   });
 }
 
@@ -1212,8 +1220,8 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
     const archonMythicFormula = (obj['Archon Mythic Link'] && obj['Archon Mythic Link'] !== '-') 
       ? `=HYPERLINK("${obj['Archon Mythic Link']}", "Mythic Build")`
       : '-';
-    const wowheadFormula = (obj['Wowhead Link'] && obj['Wowhead Link'] !== '-') 
-      ? `=HYPERLINK("${obj['Wowhead Link']}", "Wowhead Guide")`
+    const wowheadFormula = (obj['Wowhead Guide Link'] && obj['Wowhead Guide Link'] !== '-') 
+      ? `=HYPERLINK("${obj['Wowhead Guide Link']}", "Wowhead Guide")`
       : '-';
     const droptimizerFormula = (obj['Droptimizer Link'] && obj['Droptimizer Link'] !== '-')
       ? `=HYPERLINK("${obj['Droptimizer Link']}", "1-Click Sim Link")`
@@ -1292,14 +1300,14 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   sheet.setColumnWidth(1, 130); // Name
   sheet.setColumnWidth(2, 110); // Class
   sheet.setColumnWidth(3, 130); // Spec
-  sheet.setColumnWidth(4, 200); // Hero Talents
-  sheet.setColumnWidth(5, 380); // Talent String
+  sheet.setColumnWidth(4, 230); // Hero Talents
+  sheet.setColumnWidth(5, 480); // Talent String
   sheet.setColumnWidth(6, 140); // Archon Heroic
   sheet.setColumnWidth(7, 140); // Archon Mythic
-  sheet.setColumnWidth(8, 160); // Wowhead Guide
+  sheet.setColumnWidth(8, 150); // Wowhead Guide
   sheet.setColumnWidth(9, 160); // Raidbots Droptimizer
   sheet.setColumnWidth(10, 80); // ilvl
-  sheet.setColumnWidth(11, 280);// Raid Ready
+  sheet.setColumnWidth(11, 360);// Raid Ready
 }
 
 /**
@@ -1550,19 +1558,19 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
   sheet.setConditionalFormatRules(rules);
 
   // Set widths
-  sheet.setColumnWidth(1, 230); // Boss
-  sheet.setColumnWidth(2, 240); // Item Name
+  sheet.setColumnWidth(1, 240); // Boss
+  sheet.setColumnWidth(2, 260); // Item Name
   sheet.setColumnWidth(3, 110); // Slot
   sheet.setColumnWidth(4, 100); // Difficulty
   sheet.setColumnWidth(5, 85);  // Drop ilvl
-  sheet.setColumnWidth(6, 240); // Target Specs
-  sheet.setColumnWidth(7, 180); // Top Contender
-  sheet.setColumnWidth(8, 260); // Equipped Item
+  sheet.setColumnWidth(6, 280); // Target Specs
+  sheet.setColumnWidth(7, 190); // Top Contender
+  sheet.setColumnWidth(8, 320); // Equipped Item
   sheet.setColumnWidth(9, 100); // Equipped ilvl
-  sheet.setColumnWidth(10, 140);// Upgrade Delta
+  sheet.setColumnWidth(10, 150);// Upgrade Delta
   sheet.setColumnWidth(11, 180);// Priority / BiS Tier
-  sheet.setColumnWidth(12, 190);// Sim Status / Last Updated
-  sheet.setColumnWidth(13, 380);// Notes
+  sheet.setColumnWidth(12, 200);// Sim Status / Last Updated
+  sheet.setColumnWidth(13, 550);// Notes
 }
 
 /**
