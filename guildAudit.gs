@@ -456,6 +456,7 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
     let wowheadGuideLink = '-';
     let archonHeroicLink = '-';
     let archonMythicLink = '-';
+    let droptimizerLink = '-';
 
     if (specializationsData) {
       let activeSpecObj = null;
@@ -483,11 +484,14 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
       archonMythicLink = `https://www.archon.gg/wow/builds/${specSlug}/${classSlug}/raid/overview/mythic/all-bosses`;
     }
 
+    droptimizerLink = `https://www.raidbots.com/simbot/droptimizer?region=${config.region || 'us'}&realm=${config.realmSlug || 'kiljaeden'}&name=${encodeURIComponent(charName)}`;
+
     charRow['Hero Talents'] = heroTreeName;
     charRow['Talent Code'] = talentCode;
     charRow['Wowhead Link'] = wowheadGuideLink;
     charRow['Archon Heroic Link'] = archonHeroicLink;
     charRow['Archon Mythic Link'] = archonMythicLink;
+    charRow['Droptimizer Link'] = droptimizerLink;
 
     // --- 2. Process Great Vault & Raids ---
     if (mplusData) {
@@ -1031,7 +1035,7 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   const talentHeaders = [
     'Name', 'Class', 'Active Spec', 'Hero Talents', 
     'Talent Loadout Code (Import String)', 'Archon (Heroic)', 'Archon (Mythic)', 'Wowhead Guide', 
-    'iLvl', 'Raid Ready'
+    'Raidbots Droptimizer', 'iLvl', 'Raid Ready'
   ];
 
   const formatTalentRow = (obj) => {
@@ -1044,6 +1048,9 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
     const wowheadFormula = (obj['Wowhead Link'] && obj['Wowhead Link'] !== '-') 
       ? `=HYPERLINK("${obj['Wowhead Link']}", "Wowhead Guide")`
       : '-';
+    const droptimizerFormula = (obj['Droptimizer Link'] && obj['Droptimizer Link'] !== '-')
+      ? `=HYPERLINK("${obj['Droptimizer Link']}", "1-Click Sim Link")`
+      : '-';
     return [
       obj['Name'] || '',
       obj['Class'] || '',
@@ -1053,6 +1060,7 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
       archonHeroicFormula,
       archonMythicFormula,
       wowheadFormula,
+      droptimizerFormula,
       obj['iLvl'] || 0,
       obj['Raid Ready'] || '-'
     ];
@@ -1122,8 +1130,9 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   sheet.setColumnWidth(6, 140); // Archon Heroic
   sheet.setColumnWidth(7, 140); // Archon Mythic
   sheet.setColumnWidth(8, 160); // Wowhead Guide
-  sheet.setColumnWidth(9, 80);  // ilvl
-  sheet.setColumnWidth(10, 280);// Raid Ready
+  sheet.setColumnWidth(9, 160); // Raidbots Droptimizer
+  sheet.setColumnWidth(10, 80); // ilvl
+  sheet.setColumnWidth(11, 280);// Raid Ready
 }
 
 /**
