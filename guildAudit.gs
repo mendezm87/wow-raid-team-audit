@@ -370,7 +370,7 @@ function calculateRaidReadyStatus(charRow) {
   // Check if character logged out in an unexpected off-spec
   if (charRow['Expected Spec'] && charRow['Spec']) {
     if (charRow['Expected Spec'].toLowerCase() !== charRow['Spec'].toLowerCase()) {
-      issues.push(`⚠️ Off-Spec Logout: ${charRow['Spec']} (Assigned: ${charRow['Expected Spec']})`);
+      issues.push(`⚠️ Off-Spec: ${charRow['Spec']} (Need: ${charRow['Expected Spec']})`);
     }
   }
   
@@ -1179,21 +1179,21 @@ function applyFormatting(sheet, headers, characterDataObjects) {
   // Set column widths directly (Fast 1-pass execution without getColumnWidth overhead)
   const minWidths = {
     'Name': 130, 'Class': 110, 'Spec': 130, 'iLvl': 70,
-    'Raid Ready': 360, 'M+ Rating': 95, 'Tier Set': 140,
+    'Raid Ready': 460, 'M+ Rating': 95, 'Tier Set': 140,
     'Total Sockets': 110, 'Empty Sockets': 110, 'Imperfect Gems': 120, 'Crafted Items': 110,
-    'Embellishment 1': 230, 'Embellishment 2': 230,
-    'Head': 320, 'Shoulders': 320, 'Chest': 320, 'Hands': 320, 'Legs': 320,
-    'Main Hand': 320, 'Off Hand': 320, 'Trinket 1': 320, 'Trinket 2': 320,
-    'Neck': 320, 'Back': 320, 'Wrist': 320, 'Waist': 320, 'Feet': 320,
-    'Ring 1': 320, 'Ring 2': 320,
-    'Enchant Main Hand': 210, 'Enchant Off Hand': 210, 'Enchant Head': 210, 'Enchant Shoulder': 210,
-    'Enchant Chest': 210, 'Enchant Legs': 210, 'Enchant Feet': 210, 'Enchant Ring 1': 210, 'Enchant Ring 2': 210,
+    'Embellishment 1': 240, 'Embellishment 2': 240,
+    'Head': 360, 'Shoulders': 360, 'Chest': 360, 'Hands': 360, 'Legs': 360,
+    'Main Hand': 360, 'Off Hand': 360, 'Trinket 1': 360, 'Trinket 2': 360,
+    'Neck': 360, 'Back': 360, 'Wrist': 360, 'Waist': 360, 'Feet': 360,
+    'Ring 1': 360, 'Ring 2': 360,
+    'Enchant Main Hand': 220, 'Enchant Off Hand': 220, 'Enchant Head': 220, 'Enchant Shoulder': 220,
+    'Enchant Chest': 220, 'Enchant Legs': 220, 'Enchant Feet': 220, 'Enchant Ring 1': 220, 'Enchant Ring 2': 220,
     'GV Slots Unlocked': 130, 'GV Raid 1': 100, 'GV Raid 2': 100, 'GV Raid 3': 100,
     'GV M+ 1': 100, 'GV M+ 2': 100, 'GV M+ 3': 100
   };
 
   headers.forEach((header, idx) => {
-    sheet.setColumnWidth(idx + 1, minWidths[header] || 120);
+    sheet.setColumnWidth(idx + 1, minWidths[header] || 130);
   });
 }
 
@@ -1307,7 +1307,7 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   sheet.setColumnWidth(8, 150); // Wowhead Guide
   sheet.setColumnWidth(9, 160); // Raidbots Droptimizer
   sheet.setColumnWidth(10, 80); // ilvl
-  sheet.setColumnWidth(11, 360);// Raid Ready
+  sheet.setColumnWidth(11, 460);// Raid Ready
 }
 
 /**
