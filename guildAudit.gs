@@ -477,7 +477,7 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
     const specSlug = (charRow['Spec'] || '').toLowerCase().replace(/\s+/g, '-');
     if (classSlug && specSlug) {
       wowheadGuideLink = `https://www.wowhead.com/guide/classes/${classSlug}/${specSlug}/overview`;
-      archonBuildLink = `https://www.archon.gg/wow/builds/${specSlug}-${classSlug}/raid/overview`;
+      archonBuildLink = `https://www.archon.gg/wow/builds/${classSlug}/${specSlug}/raid/overview`;
     }
 
     charRow['Hero Talents'] = heroTreeName;
