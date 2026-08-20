@@ -454,7 +454,8 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
     let heroTreeName = '-';
     let talentCode = '-';
     let wowheadGuideLink = '-';
-    let archonBuildLink = '-';
+    let archonHeroicLink = '-';
+    let archonMythicLink = '-';
 
     if (specializationsData) {
       let activeSpecObj = null;
@@ -478,13 +479,15 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
     const specSlug = (charRow['Spec'] || '').toLowerCase().replace(/\s+/g, '-');
     if (classSlug && specSlug) {
       wowheadGuideLink = `https://www.wowhead.com/guide/classes/${classSlug}/${specSlug}/overview`;
-      archonBuildLink = `https://www.archon.gg/wow/builds/${classSlug}/${specSlug}/raid/overview`;
+      archonHeroicLink = `https://www.archon.gg/wow/builds/${specSlug}/${classSlug}/raid/overview/heroic/all-bosses`;
+      archonMythicLink = `https://www.archon.gg/wow/builds/${specSlug}/${classSlug}/raid/overview/mythic/all-bosses`;
     }
 
     charRow['Hero Talents'] = heroTreeName;
     charRow['Talent Code'] = talentCode;
     charRow['Wowhead Link'] = wowheadGuideLink;
-    charRow['Archon Link'] = archonBuildLink;
+    charRow['Archon Heroic Link'] = archonHeroicLink;
+    charRow['Archon Mythic Link'] = archonMythicLink;
 
     // --- 2. Process Great Vault & Raids ---
     if (mplusData) {
@@ -1027,16 +1030,19 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
 
   const talentHeaders = [
     'Name', 'Class', 'Active Spec', 'Hero Talents', 
-    'Talent Loadout Code (Import String)', 'Archon Meta Build', 'Wowhead Guide', 
+    'Talent Loadout Code (Import String)', 'Archon (Heroic)', 'Archon (Mythic)', 'Wowhead Guide', 
     'iLvl', 'Raid Ready'
   ];
 
   const formatTalentRow = (obj) => {
-    const archonFormula = (obj['Archon Link'] && obj['Archon Link'] !== '-') 
-      ? `=HYPERLINK("${obj['Archon Link']}", "View Archon Build")`
+    const archonHeroicFormula = (obj['Archon Heroic Link'] && obj['Archon Heroic Link'] !== '-') 
+      ? `=HYPERLINK("${obj['Archon Heroic Link']}", "Heroic Build")`
+      : '-';
+    const archonMythicFormula = (obj['Archon Mythic Link'] && obj['Archon Mythic Link'] !== '-') 
+      ? `=HYPERLINK("${obj['Archon Mythic Link']}", "Mythic Build")`
       : '-';
     const wowheadFormula = (obj['Wowhead Link'] && obj['Wowhead Link'] !== '-') 
-      ? `=HYPERLINK("${obj['Wowhead Link']}", "View Wowhead Guide")`
+      ? `=HYPERLINK("${obj['Wowhead Link']}", "Wowhead Guide")`
       : '-';
     return [
       obj['Name'] || '',
@@ -1044,7 +1050,8 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
       obj['Spec'] || '',
       obj['Hero Talents'] || '-',
       obj['Talent Code'] || '-',
-      archonFormula,
+      archonHeroicFormula,
+      archonMythicFormula,
       wowheadFormula,
       obj['iLvl'] || 0,
       obj['Raid Ready'] || '-'
@@ -1112,10 +1119,11 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   sheet.setColumnWidth(3, 130); // Spec
   sheet.setColumnWidth(4, 200); // Hero Talents
   sheet.setColumnWidth(5, 380); // Talent String
-  sheet.setColumnWidth(6, 180); // Archon Build
-  sheet.setColumnWidth(7, 180); // Wowhead Guide
-  sheet.setColumnWidth(8, 80);  // ilvl
-  sheet.setColumnWidth(9, 280); // Raid Ready
+  sheet.setColumnWidth(6, 140); // Archon Heroic
+  sheet.setColumnWidth(7, 140); // Archon Mythic
+  sheet.setColumnWidth(8, 160); // Wowhead Guide
+  sheet.setColumnWidth(9, 80);  // ilvl
+  sheet.setColumnWidth(10, 280);// Raid Ready
 }
 
 /**
