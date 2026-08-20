@@ -317,6 +317,13 @@ function fetchAllCharacterDataBatched(characterList, config, token) {
  */
 function calculateRaidReadyStatus(charRow) {
   const issues = [];
+
+  // Check if character logged out in an unexpected off-spec
+  if (charRow['Expected Spec'] && charRow['Spec']) {
+    if (charRow['Expected Spec'].toLowerCase() !== charRow['Spec'].toLowerCase()) {
+      issues.push(`⚠️ Off-Spec Logout: ${charRow['Spec']} (Assigned: ${charRow['Expected Spec']})`);
+    }
+  }
   
   // Tier set check (warn if less than 4pc of current tier)
   const tierSetText = charRow['Tier Set'] || '';
@@ -358,8 +365,17 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
 
     let targetName = raw;
     let targetRealm = '';
-    if (raw.includes('-')) {
-      const parts = raw.split('-');
+    let expectedSpec = '';
+
+    // Check for Expected Spec (e.g. Jevo:Protection or Jevo-Kiljaeden:Protection)
+    if (targetName.includes(':')) {
+      const specParts = targetName.split(':');
+      targetName = specParts[0].trim();
+      expectedSpec = specParts[1].trim();
+    }
+
+    if (targetName.includes('-')) {
+      const parts = targetName.split('-');
       targetName = parts[0].trim();
       targetRealm = parts.slice(1).join('-').trim().toLowerCase().replace(/\s+/g, '-').replace(/'/g, '');
     }
@@ -377,13 +393,15 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
     if (match) {
       filteredRoster.push({
         name: match.character.name,
-        realmSlug: match.character.realm.slug
+        realmSlug: match.character.realm.slug,
+        expectedSpec: expectedSpec
       });
     } else {
       // If not found in guild roster directly (e.g. cross-realm alt or trial), add directly
       filteredRoster.push({
         name: targetName,
-        realmSlug: targetRealm || config.GUILD_REALM_SLUG
+        realmSlug: targetRealm || config.GUILD_REALM_SLUG,
+        expectedSpec: expectedSpec
       });
     }
   });
@@ -1189,49 +1207,50 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
   const lootHeaders = [
     'Boss / Source', 'Chase Item / Drop', 'Slot', 'Difficulty', 'Drop ilvl',
     'Target Specs / Roles', 'Top Contender (Assigned)', 'Current Equipped Item',
-    'Equipped ilvl', 'Upgrade Delta (+ilvl)', 'Priority / BiS Tier', 'Loot Council Notes'
+    'Equipped ilvl', 'Upgrade Delta (+ilvl / %DPS)', 'Priority / BiS Tier', 
+    'Sim Status / Last Updated', 'Loot Council Notes'
   ];
 
   const chaseItemsCatalog = [
     // Boss 1: Nek'zali the Soulcoiler
-    ['Boss 1: Nek\'zali the Soulcoiler', 'Soulcoil Siphon', 'Trinket 1', 'Heroic', 318, 'Intellect / Agility DPS', '', '', '', '', 'BiS S-Tier', 'On-use secondary stat siphon burst'],
-    ['Boss 1: Nek\'zali the Soulcoiler', 'Soulcoiler\'s Spinecleaver', 'Main Hand', 'Heroic', 318, '2H Strength / Agi', '', '', '', '', 'Major Weapon', 'High weapon damage stat polearm/axe'],
-    ['Boss 1: Nek\'zali the Soulcoiler', 'Helm of Coiling Serpents', 'Head', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Helm', 'Unlocks tier 2pc/4pc bonus'],
+    ['Boss 1: Nek\'zali the Soulcoiler', 'Soulcoil Siphon', 'Trinket 1', 'Heroic', 318, 'Intellect / Agility DPS', '', '', '', '', 'BiS S-Tier', '⚡ Live Armory ilvl', 'On-use secondary stat siphon burst'],
+    ['Boss 1: Nek\'zali the Soulcoiler', 'Soulcoiler\'s Spinecleaver', 'Main Hand', 'Heroic', 318, '2H Strength / Agi', '', '', '', '', 'Major Weapon', '⚡ Live Armory ilvl', 'High weapon damage stat polearm/axe'],
+    ['Boss 1: Nek\'zali the Soulcoiler', 'Helm of Coiling Serpents', 'Head', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Helm', '⚡ Live Armory ilvl', 'Unlocks tier 2pc/4pc bonus'],
 
     // Boss 2: Entombed Sentinels
-    ['Boss 2: Entombed Sentinels', 'Sentinel\'s Petrified Core', 'Trinket 1', 'Heroic', 318, 'Tanks (All)', '', '', '', '', 'Tank BiS', 'Massive passive armor and on-use shield'],
-    ['Boss 2: Entombed Sentinels', 'Sentinel\'s Stonecarver', 'Main Hand', 'Heroic', 318, '1H Strength / Agi (War, Pal, DK, DH)', '', '', '', '', 'Major Weapon', '1H Weapon with haste proc'],
-    ['Boss 2: Entombed Sentinels', 'Pauldrons of the Entombed', 'Shoulders', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Shoulders', 'Unlocks tier 2pc/4pc bonus'],
+    ['Boss 2: Entombed Sentinels', 'Sentinel\'s Petrified Core', 'Trinket 1', 'Heroic', 318, 'Tanks (All)', '', '', '', '', 'Tank BiS', '⚡ Live Armory ilvl', 'Massive passive armor and on-use shield'],
+    ['Boss 2: Entombed Sentinels', 'Sentinel\'s Stonecarver', 'Main Hand', 'Heroic', 318, '1H Strength / Agi (War, Pal, DK, DH)', '', '', '', '', 'Major Weapon', '⚡ Live Armory ilvl', '1H Weapon with haste proc'],
+    ['Boss 2: Entombed Sentinels', 'Pauldrons of the Entombed', 'Shoulders', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Shoulders', '⚡ Live Armory ilvl', 'Unlocks tier 2pc/4pc bonus'],
 
     // Boss 3: The Lost Explorers
-    ['Boss 3: The Lost Explorers', 'Explorer\'s Compass of Doom', 'Trinket 2', 'Heroic', 318, 'All DPS Specs', '', '', '', '', 'BiS S-Tier', 'Stacking crit proc on periodic damage'],
-    ['Boss 3: The Lost Explorers', 'Lost Explorer\'s Signet', 'Ring 1', 'Heroic', 318, 'All Specs (Rare Cantrip)', '', '', '', '', 'Rare Ring Proc', 'Cantrip speed and mastery burst proc'],
-    ['Boss 3: The Lost Explorers', 'Hauberk of the Lost Expedition', 'Chest', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Chest', 'Tier chest piece token'],
+    ['Boss 3: The Lost Explorers', 'Explorer\'s Compass of Doom', 'Trinket 2', 'Heroic', 318, 'All DPS Specs', '', '', '', '', 'BiS S-Tier', '⚡ Live Armory ilvl', 'Stacking crit proc on periodic damage'],
+    ['Boss 3: The Lost Explorers', 'Lost Explorer\'s Signet', 'Ring 1', 'Heroic', 318, 'All Specs (Rare Cantrip)', '', '', '', '', 'Rare Ring Proc', '⚡ Live Armory ilvl', 'Cantrip speed and mastery burst proc'],
+    ['Boss 3: The Lost Explorers', 'Hauberk of the Lost Expedition', 'Chest', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Chest', '⚡ Live Armory ilvl', 'Tier chest piece token'],
 
     // Boss 4: Vashnik the Malignant
-    ['Boss 4: Vashnik the Malignant', 'Malignant Spore Pod', 'Trinket 1', 'Heroic', 318, 'Healers / Caster DPS', '', '', '', '', 'Healer BiS', 'Smart group burst heal and mana return'],
-    ['Boss 4: Vashnik the Malignant', 'Vashnik\'s Toxic Bulwark', 'Off Hand', 'Heroic', 318, 'Prot Pal, Prot War, Resto/Ele Sham', '', '', '', '', 'Shield BiS', 'High block value shield with damage reflect'],
-    ['Boss 4: Vashnik the Malignant', 'Gauntlets of Malignancy', 'Hands', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Gloves', 'Tier gloves token'],
+    ['Boss 4: Vashnik the Malignant', 'Malignant Spore Pod', 'Trinket 1', 'Heroic', 318, 'Healers / Caster DPS', '', '', '', '', 'Healer BiS', '⚡ Live Armory ilvl', 'Smart group burst heal and mana return'],
+    ['Boss 4: Vashnik the Malignant', 'Vashnik\'s Toxic Bulwark', 'Off Hand', 'Heroic', 318, 'Prot Pal, Prot War, Resto/Ele Sham', '', '', '', '', 'Shield BiS', '⚡ Live Armory ilvl', 'High block value shield with damage reflect'],
+    ['Boss 4: Vashnik the Malignant', 'Gauntlets of Malignancy', 'Hands', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Gloves', '⚡ Live Armory ilvl', 'Tier gloves token'],
 
     // Boss 5: Sszorak
-    ['Boss 5: Sszorak', 'Font of Venomous Rage', 'Trinket 2', 'Heroic', 318, 'Strength / Agility DPS', '', '', '', '', 'God-Tier Trinket', 'Primary stat surge and attack speed aura'],
-    ['Boss 5: Sszorak', 'Staff of the Venom Brood', 'Main Hand', 'Heroic', 318, 'Intellect Casters / Healers', '', '', '', '', 'Major Weapon', '2H Caster Staff with mastery proc'],
-    ['Boss 5: Sszorak', 'Leggings of the Broodmother', 'Legs', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Legs', 'Tier legs token'],
+    ['Boss 5: Sszorak', 'Font of Venomous Rage', 'Trinket 2', 'Heroic', 318, 'Strength / Agility DPS', '', '', '', '', 'God-Tier Trinket', '⚡ Live Armory ilvl', 'Primary stat surge and attack speed aura'],
+    ['Boss 5: Sszorak', 'Staff of the Venom Brood', 'Main Hand', 'Heroic', 318, 'Intellect Casters / Healers', '', '', '', '', 'Major Weapon', '⚡ Live Armory ilvl', '2H Caster Staff with mastery proc'],
+    ['Boss 5: Sszorak', 'Leggings of the Broodmother', 'Legs', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Legs', '⚡ Live Armory ilvl', 'Tier legs token'],
 
     // Boss 6: The Twin Fangs
-    ['Boss 6: The Twin Fangs', 'Twin Fang Venom Vial', 'Trinket 1', 'Heroic', 318, 'Melee DPS / Hunters', '', '', '', '', 'BiS A-Tier', 'Venom stacking DoT that executes at 20%'],
-    ['Boss 6: The Twin Fangs', 'Fang of the Left Twin', 'Main Hand', 'Heroic', 318, 'Rogues, DH, Monks', '', '', '', '', 'Major Weapon', 'Fast 1.8 Agi Dagger/Fist weapon'],
-    ['Boss 6: The Twin Fangs', 'Cloak of Shifting Fangs', 'Back', 'Heroic', 318, 'All Specs', '', '', '', '', 'BiS Back', 'Max item level cloak with avoidance'],
+    ['Boss 6: The Twin Fangs', 'Twin Fang Venom Vial', 'Trinket 1', 'Heroic', 318, 'Melee DPS / Hunters', '', '', '', '', 'BiS A-Tier', '⚡ Live Armory ilvl', 'Venom stacking DoT that executes at 20%'],
+    ['Boss 6: The Twin Fangs', 'Fang of the Left Twin', 'Main Hand', 'Heroic', 318, 'Rogues, DH, Monks', '', '', '', '', 'Major Weapon', '⚡ Live Armory ilvl', 'Fast 1.8 Agi Dagger/Fist weapon'],
+    ['Boss 6: The Twin Fangs', 'Cloak of Shifting Fangs', 'Back', 'Heroic', 318, 'All Specs', '', '', '', '', 'BiS Back', '⚡ Live Armory ilvl', 'Max item level cloak with avoidance'],
 
     // Boss 7: The Coiled Altar
-    ['Boss 7: The Coiled Altar', 'Coiled Altar Relic', 'Trinket 2', 'Mythic', 344, 'All Roles (Very Rare)', '', '', '', '', 'Very Rare BiS', 'Special 344 item level altar proc trinket'],
-    ['Boss 7: The Coiled Altar', 'Altar-Keeper\'s Greatbow', 'Main Hand', 'Mythic', 344, 'Hunters (Very Rare)', '', '', '', '', 'Very Rare Weapon', 'Mythic 344 ilvl Ranged Weapon with void shot'],
-    ['Boss 7: The Coiled Altar', 'Band of the Coiled Ritual', 'Ring 2', 'Mythic', 344, 'All Specs', '', '', '', '', 'BiS Ring', 'Mythic 344 ilvl ring with custom socket'],
+    ['Boss 7: The Coiled Altar', 'Coiled Altar Relic', 'Trinket 2', 'Mythic', 344, 'All Roles (Very Rare)', '', '', '', '', 'Very Rare BiS', '⚡ Live Armory ilvl', 'Special 344 item level altar proc trinket'],
+    ['Boss 7: The Coiled Altar', 'Altar-Keeper\'s Greatbow', 'Main Hand', 'Mythic', 344, 'Hunters (Very Rare)', '', '', '', '', 'Very Rare Weapon', '⚡ Live Armory ilvl', 'Mythic 344 ilvl Ranged Weapon with void shot'],
+    ['Boss 7: The Coiled Altar', 'Band of the Coiled Ritual', 'Ring 2', 'Mythic', 344, 'All Specs', '', '', '', '', 'BiS Ring', '⚡ Live Armory ilvl', 'Mythic 344 ilvl ring with custom socket'],
 
     // Boss 8: Ula'tek (Final Boss)
-    ['Boss 8: Ula\'tek', 'Slumbering Coil Curio', 'Omni-Token', 'Mythic', 344, 'All Classes (Any Tier Slot)', '', '', '', '', 'Omni Tier Token', 'Can be turned in for ANY tier piece'],
-    ['Boss 8: Ula\'tek', 'Hex Lord\'s Dooming Idol', 'Trinket 1', 'Mythic', 344, 'All DPS / Healers (Very Rare)', '', '', '', '', 'God-Tier Trinket', 'Top trinket in the game with stacking execute doom'],
-    ['Boss 8: Ula\'tek', 'Fang of Ula\'tek', 'Main Hand', 'Mythic', 344, 'All Weapon Classes (Very Rare)', '', '', '', '', 'Mythic Weapon', 'Top-tier 344 ilvl weapon with cantrip shadow strike']
+    ['Boss 8: Ula\'tek', 'Slumbering Coil Curio', 'Omni-Token', 'Mythic', 344, 'All Classes (Any Tier Slot)', '', '', '', '', 'Omni Tier Token', '⚡ Live Armory ilvl', 'Can be turned in for ANY tier piece'],
+    ['Boss 8: Ula\'tek', 'Hex Lord\'s Dooming Idol', 'Trinket 1', 'Mythic', 344, 'All DPS / Healers (Very Rare)', '', '', '', '', 'God-Tier Trinket', '⚡ Live Armory ilvl', 'Top trinket in the game with stacking execute doom'],
+    ['Boss 8: Ula\'tek', 'Fang of Ula\'tek', 'Main Hand', 'Mythic', 344, 'All Weapon Classes (Very Rare)', '', '', '', '', 'Mythic Weapon', '⚡ Live Armory ilvl', 'Top-tier 344 ilvl weapon with cantrip shadow strike']
   ];
 
   // Helper to extract numerical ilvl from formatted gear slot strings e.g. "[Tier] 298 (Hero 4/6) - Item"
@@ -1247,15 +1266,17 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     const existingValues = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
     existingValues.forEach(row => {
       const itemName = (row[1] || '').toString().toLowerCase().trim();
-      const notes = (row[11] || '').toString();
-      const upgradeDelta = (row[9] || '').toString();
       const topContender = (row[6] || '').toString();
+      const upgradeDelta = (row[9] || '').toString();
+      const simStatus = (row[11] || '').toString();
+      const notes = (row[12] || '').toString();
 
       // If this item was previously simmed with Raidbots
-      if (notes.includes('Raidbots Sim Upgrades:') || upgradeDelta.includes('% DPS')) {
+      if (notes.includes('Raidbots Sim Upgrades:') || upgradeDelta.includes('% DPS') || simStatus.includes('Simmed')) {
         existingSimData[itemName] = {
           topContender: topContender,
           upgradeDelta: upgradeDelta,
+          simStatus: simStatus || '✅ Simmed',
           notes: notes
         };
       }
@@ -1269,13 +1290,14 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
       const slot = row[2];
       const dropIlvl = Number(row[4]) || 318;
       const targetRole = (row[5] || '').toLowerCase();
-      const baseNotes = row[11];
+      const baseNotes = row[12];
 
       // 1. PRIORITIZE SIMS: If item already has Raidbots Sim data, preserve the % DPS sim priority!
       if (existingSimData[cleanItemName]) {
         row[6] = existingSimData[cleanItemName].topContender;
         row[9] = existingSimData[cleanItemName].upgradeDelta;
-        row[11] = existingSimData[cleanItemName].notes;
+        row[11] = existingSimData[cleanItemName].simStatus;
+        row[12] = existingSimData[cleanItemName].notes;
 
         // Update live equipped item & ilvl for the top contender
         const topNameMatch = row[6].match(/^([A-Za-z0-9\u00C0-\u024F]+)/);
@@ -1368,10 +1390,11 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
         row[7] = top.slotText;
         row[8] = top.currentIlvl;
         row[9] = `+${top.delta}`;
+        row[11] = '⚡ Live Armory ilvl';
 
         // Top 3 list in Notes
         const top3List = contenders.slice(0, 3).map((c, i) => `${i + 1}. ${c.name} (+${c.delta})`).join(' | ');
-        row[11] = `Live Upgrades: ${top3List} — ${baseNotes}`;
+        row[12] = `Live Upgrades: ${top3List} — ${baseNotes}`;
       }
     });
   }
@@ -1407,6 +1430,13 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Tier').setBackground('#34a853').setFontColor('#ffffff').setRanges(prioRange).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('God-Tier').setBackground('#ff0055').setFontColor('#ffffff').setRanges(prioRange).build());
 
+  // Sim Status Column Conditional Formatting
+  const simStatusColIdx = lootHeaders.indexOf('Sim Status / Last Updated') + 1;
+  const simStatusRange = [sheet.getRange(2, simStatusColIdx, sheet.getMaxRows(), 1)];
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('✅').setBackground('#34a853').setFontColor('#ffffff').setRanges(simStatusRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('⚠️').setBackground('#fbbc04').setFontColor('#000000').setRanges(simStatusRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('⚡').setBackground('#f1f3f4').setFontColor('#3c4043').setRanges(simStatusRange).build());
+
   sheet.setConditionalFormatRules(rules);
 
   // Set widths
@@ -1421,7 +1451,8 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
   sheet.setColumnWidth(9, 100); // Equipped ilvl
   sheet.setColumnWidth(10, 140);// Upgrade Delta
   sheet.setColumnWidth(11, 180);// Priority / BiS Tier
-  sheet.setColumnWidth(12, 380);// Notes
+  sheet.setColumnWidth(12, 190);// Sim Status / Last Updated
+  sheet.setColumnWidth(13, 380);// Notes
 }
 
 /**
@@ -1512,7 +1543,7 @@ function promptAndImportRaidbotsDroptimizer() {
     itemUpgradeMap[itemName] = [];
 
     // Parse existing Top Contender and Notes if previously simmed
-    const currentNotes = (row[11] || '').toString();
+    const currentNotes = (row[12] || '').toString();
     if (currentNotes.includes('Raidbots Sim Upgrades:')) {
       const parts = currentNotes.replace('Raidbots Sim Upgrades:', '').split('|');
       parts.forEach(p => {
@@ -1526,6 +1557,20 @@ function promptAndImportRaidbotsDroptimizer() {
       });
     }
   });
+
+  // Calculate Freshness Badge
+  const now = Date.now();
+  let latestSimDate = now;
+  simDataList.forEach(s => {
+    if (s && s.sim && s.sim.date) {
+      const d = new Date(s.sim.date).getTime();
+      if (d > 0 && d <= now) latestSimDate = d;
+    }
+  });
+
+  const formattedDate = Utilities.formatDate(new Date(latestSimDate), Session.getScriptTimeZone() || "GMT", "MMM d, yyyy");
+  const daysOld = Math.floor((now - latestSimDate) / (1000 * 60 * 60 * 24));
+  const simStatusBadge = daysOld > 7 ? `⚠️ Stale (${daysOld}d ago)` : `✅ Simmed (${formattedDate})`;
 
   // Ingest all fetched sim reports
   simDataList.forEach(simData => {
@@ -1576,9 +1621,10 @@ function promptAndImportRaidbotsDroptimizer() {
       const top = contenders[0];
       row[6] = `${top.name} (+${top.pct}%)`;
       row[9] = `+${top.pct}% DPS`;
+      row[11] = simStatusBadge;
 
       const topList = contenders.slice(0, 5).map((c, i) => `${i + 1}. ${c.name} (+${c.pct}%)`).join(' | ');
-      row[11] = `Raidbots Sim Upgrades: ${topList}`;
+      row[12] = `Raidbots Sim Upgrades: ${topList}`;
       totalMatches++;
     }
   });
