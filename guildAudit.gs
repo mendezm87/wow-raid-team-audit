@@ -350,10 +350,43 @@ function calculateRaidReadyStatus(charRow) {
  * Processes a list of characters and extracts all gear, vault, and audit data.
  */
 function processCharacterSet(characterNames, guildRosterMembers, config, token, enchantAndGemData, bonusData) {
-  const membersToTrackLower = characterNames.map(name => name.toLowerCase());
-  const filteredRoster = guildRosterMembers
-    .filter(m => membersToTrackLower.includes(m.character.name.toLowerCase()))
-    .map(m => ({ name: m.character.name, realmSlug: m.character.realm.slug }));
+  const filteredRoster = [];
+
+  characterNames.forEach(rawInput => {
+    const raw = rawInput.trim();
+    if (!raw) return;
+
+    let targetName = raw;
+    let targetRealm = '';
+    if (raw.includes('-')) {
+      const parts = raw.split('-');
+      targetName = parts[0].trim();
+      targetRealm = parts.slice(1).join('-').trim().toLowerCase().replace(/\s+/g, '-').replace(/'/g, '');
+    }
+
+    // Match in guild roster
+    const match = guildRosterMembers.find(m => {
+      const rosterName = m.character.name.toLowerCase();
+      const rosterRealm = (m.character.realm && m.character.realm.slug) ? m.character.realm.slug.toLowerCase() : '';
+      if (targetRealm) {
+        return rosterName === targetName.toLowerCase() && rosterRealm.includes(targetRealm);
+      }
+      return rosterName === targetName.toLowerCase();
+    });
+
+    if (match) {
+      filteredRoster.push({
+        name: match.character.name,
+        realmSlug: match.character.realm.slug
+      });
+    } else {
+      // If not found in guild roster directly (e.g. cross-realm alt or trial), add directly
+      filteredRoster.push({
+        name: targetName,
+        realmSlug: targetRealm || config.GUILD_REALM_SLUG
+      });
+    }
+  });
 
   if (filteredRoster.length === 0) {
     return [];
@@ -484,7 +517,13 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
       archonMythicLink = `https://www.archon.gg/wow/builds/${specSlug}/${classSlug}/raid/overview/mythic/all-bosses`;
     }
 
-    droptimizerLink = `https://www.raidbots.com/simbot/droptimizer?region=${config.region || 'us'}&realm=${config.realmSlug || 'kiljaeden'}&name=${encodeURIComponent(charName)}`;
+    // Use the character's exact realm slug from their Blizzard profile / roster data
+    const charRealmSlug = (profileData && profileData.realm && profileData.realm.slug) 
+      ? profileData.realm.slug 
+      : (character.realmSlug || config.GUILD_REALM_SLUG || 'kiljaeden');
+    const charRegion = (config.REGION || 'us').toLowerCase();
+
+    droptimizerLink = `https://www.raidbots.com/simbot/droptimizer?region=${charRegion}&realm=${charRealmSlug}&name=${encodeURIComponent(charName)}`;
 
     charRow['Hero Talents'] = heroTreeName;
     charRow['Talent Code'] = talentCode;
