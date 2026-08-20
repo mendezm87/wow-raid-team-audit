@@ -1574,6 +1574,37 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
 }
 
 /**
+ * Universal helper to clean item names for fuzzy matching.
+ */
+function cleanItemNameForMatching(str) {
+  return (str || '')
+    .toString()
+    .toLowerCase()
+    .replace(/^[0-9]+[\/:]/, '') // strip leading item ID e.g. "228892/"
+    .replace(/[0-9]+[\/:]/, '')   // strip secondary difficulty ID e.g. "4/"
+    .replace(/[',.\-_\/()]/g, ' ') // replace punctuation with spaces
+    .replace(/\b(heroic|mythic|normal|champion|veteran|tier|lfr|socket|hero|myth|slot)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Checks if a catalog item matches a Raidbots sim item name.
+ */
+function isItemNameMatch(sheetItem, simItem) {
+  const cSheet = cleanItemNameForMatching(sheetItem);
+  const cSim = cleanItemNameForMatching(simItem);
+  if (!cSheet || !cSim) return false;
+  if (cSheet === cSim) return true;
+  if (cSheet.includes(cSim) || cSim.includes(cSheet)) return true;
+
+  const sheetWords = cSheet.split(' ').filter(w => w.length >= 3);
+  const simWords = cSim.split(' ').filter(w => w.length >= 3);
+  const commonWords = sheetWords.filter(w => simWords.includes(w));
+  return commonWords.length >= 2 || (sheetWords.length === 1 && commonWords.length === 1);
+}
+
+/**
  * Imports one or multiple Raidbots Droptimizer Sim Reports (JSON) and merges exact mathematical % DPS upgrades onto the Loot Sheet.
  * Supports pasting multiple report URLs at once and merges newly simmed players cumulatively without overwriting existing data.
  */
@@ -1652,11 +1683,11 @@ function promptAndImportRaidbotsDroptimizer() {
   const range = sheet.getRange(2, 1, numRows - 1, sheet.getLastColumn());
   const values = range.getValues();
 
-  // Parse existing contenders already recorded in sheet to merge cumulatively
+  // Map of sheet item -> array of { name: 'PlayerName', pct: 8.4 }
   const itemUpgradeMap = {};
 
   values.forEach(row => {
-    const itemName = (row[1] || '').toString().toLowerCase().trim();
+    const itemName = (row[1] || '').toString().trim();
     if (!itemName) return;
     itemUpgradeMap[itemName] = [];
 
@@ -1690,42 +1721,105 @@ function promptAndImportRaidbotsDroptimizer() {
   const daysOld = Math.floor((now - latestSimDate) / (1000 * 60 * 60 * 24));
   const simStatusBadge = daysOld > 7 ? `⚠️ Stale (${daysOld}d ago)` : `✅ Simmed (${formattedDate})`;
 
-  // Ingest all fetched sim reports
+  // Ingest all fetched sim reports using universal schema detection
   simDataList.forEach(simData => {
-    if (!simData || !simData.sim) return;
-    const players = simData.sim.players || [simData.sim.player];
+    if (!simData) return;
 
-    players.forEach(p => {
-      if (!p) return;
-      const playerName = p.name || 'Unknown';
-      const baseDps = p.dps || 1;
+    // 1. Determine Player Name
+    let playerName = 'Unknown';
+    if (simData.simbot && simData.simbot.character && simData.simbot.character.name) {
+      playerName = simData.simbot.character.name;
+    } else if (simData.simbot && simData.simbot.meta && simData.simbot.meta.character && simData.simbot.meta.character.name) {
+      playerName = simData.simbot.meta.character.name;
+    } else if (simData.sim && simData.sim.players && simData.sim.players[0] && simData.sim.players[0].name) {
+      playerName = simData.sim.players[0].name;
+    } else if (simData.sim && simData.sim.player && simData.sim.player.name) {
+      playerName = simData.sim.player.name;
+    }
 
-      const itemsList = p.items || (p.droptimizer ? p.droptimizer.items : []);
-      if (itemsList) {
-        itemsList.forEach(it => {
-          const rawItemName = it.name || it.item_name;
-          if (rawItemName) {
-            const cleanName = rawItemName.toLowerCase().trim();
-            const dps = it.dps || it.score || baseDps;
-            const pctGain = it.pct || it.pct_gain || it.dps_increase_percent || (((dps - baseDps) / baseDps) * 100);
-            if (pctGain > 0) {
-              // Find matching item in catalog
-              const matchedKey = Object.keys(itemUpgradeMap).find(k => k.includes(cleanName) || cleanName.includes(k));
-              if (matchedKey) {
-                // Update or insert player's score
-                const existingIdx = itemUpgradeMap[matchedKey].findIndex(e => e.name.toLowerCase() === playerName.toLowerCase());
-                if (existingIdx >= 0) {
-                  itemUpgradeMap[matchedKey][existingIdx].pct = parseFloat(pctGain.toFixed(1));
-                } else {
-                  itemUpgradeMap[matchedKey].push({
-                    name: playerName,
-                    pct: parseFloat(pctGain.toFixed(1))
-                  });
-                }
-              }
-            }
+    // 2. Determine Baseline DPS
+    let baseDps = 1;
+    if (simData.sim && simData.sim.statistics && simData.sim.statistics.raid_dps && simData.sim.statistics.raid_dps.mean) {
+      baseDps = simData.sim.statistics.raid_dps.mean;
+    } else if (simData.sim && simData.sim.players && simData.sim.players[0] && simData.sim.players[0].collected_data && simData.sim.players[0].collected_data.dps && simData.sim.players[0].collected_data.dps.mean) {
+      baseDps = simData.sim.players[0].collected_data.dps.mean;
+    } else if (simData.sim && simData.sim.players && simData.sim.players[0] && simData.sim.players[0].dps) {
+      baseDps = simData.sim.players[0].dps;
+    } else if (simData.simbot && simData.simbot.baseDps) {
+      baseDps = simData.simbot.baseDps;
+    }
+
+    const itemsToProcess = [];
+
+    // Path A: simbot.droptimizer
+    const droptimizerObj = (simData.simbot && simData.simbot.droptimizer) ||
+                           (simData.sim && simData.sim.droptimizer) ||
+                           (simData.sim && simData.sim.players && simData.sim.players[0] && simData.sim.players[0].droptimizer);
+    if (droptimizerObj) {
+      const itArr = droptimizerObj.items || droptimizerObj.data || droptimizerObj.entries || [];
+      if (Array.isArray(itArr)) {
+        itArr.forEach(it => {
+          const rawName = it.name || it.item_name || it.title || '';
+          const dps = it.dps || it.mean || it.score || (baseDps + (it.raw || 0));
+          let pct = it.pct || it.pct_gain || it.dps_increase_percent;
+          if (pct === undefined && dps > baseDps && baseDps > 1) {
+            pct = ((dps - baseDps) / baseDps) * 100;
+          }
+          if (rawName && pct > 0) {
+            itemsToProcess.push({ name: rawName, pct: parseFloat(pct.toFixed(1)) });
           }
         });
+      }
+    }
+
+    // Path B: sim.profilesets / sim.players[0].profilesets
+    const profilesets = (simData.sim && simData.sim.profilesets && simData.sim.profilesets.results) ||
+                        (simData.sim && simData.sim.profilesets) ||
+                        (simData.sim && simData.sim.players && simData.sim.players[0] && simData.sim.players[0].profilesets);
+    if (profilesets) {
+      const list = Array.isArray(profilesets) ? profilesets : (profilesets.results || Object.keys(profilesets).map(k => ({ name: k, ...(typeof profilesets[k] === 'object' ? profilesets[k] : { mean: profilesets[k] }) })));
+      list.forEach(ps => {
+        const psName = ps.name || ps.id || '';
+        const meanDps = ps.mean || ps.dps || ps.dmg || (ps.collected_data && ps.collected_data.dps && ps.collected_data.dps.mean) || 0;
+        if (psName && meanDps > baseDps && baseDps > 1) {
+          const pct = ((meanDps - baseDps) / baseDps) * 100;
+          if (pct > 0) {
+            itemsToProcess.push({ name: psName, pct: parseFloat(pct.toFixed(1)) });
+          }
+        }
+      });
+    }
+
+    // Path C: sim.players[0].items
+    if (simData.sim && simData.sim.players && simData.sim.players.length > 0) {
+      simData.sim.players.forEach(p => {
+        const itList = p.items || [];
+        if (Array.isArray(itList)) {
+          itList.forEach(it => {
+            const itName = it.name || it.item_name || '';
+            const itDps = it.dps || it.mean || it.score || 0;
+            let pct = it.pct || it.pct_gain || (((itDps - baseDps) / baseDps) * 100);
+            if (itName && pct > 0) {
+              itemsToProcess.push({ name: itName, pct: parseFloat(pct.toFixed(1)) });
+            }
+          });
+        }
+      });
+    }
+
+    // Match extracted items into itemUpgradeMap
+    itemsToProcess.forEach(simItem => {
+      const matchedCatalogKey = Object.keys(itemUpgradeMap).find(sheetKey => isItemNameMatch(sheetKey, simItem.name));
+      if (matchedCatalogKey) {
+        const existingIdx = itemUpgradeMap[matchedCatalogKey].findIndex(e => e.name.toLowerCase() === playerName.toLowerCase());
+        if (existingIdx >= 0) {
+          itemUpgradeMap[matchedCatalogKey][existingIdx].pct = simItem.pct;
+        } else {
+          itemUpgradeMap[matchedCatalogKey].push({
+            name: playerName,
+            pct: simItem.pct
+          });
+        }
       }
     });
   });
@@ -1733,9 +1827,9 @@ function promptAndImportRaidbotsDroptimizer() {
   // Re-write merged rankings onto the sheet
   let totalMatches = 0;
   values.forEach(row => {
-    const itemName = (row[1] || '').toString().toLowerCase().trim();
-    if (itemUpgradeMap[itemName] && itemUpgradeMap[itemName].length > 0) {
-      const contenders = itemUpgradeMap[itemName].sort((a, b) => b.pct - a.pct);
+    const sheetItemName = (row[1] || '').toString().trim();
+    if (itemUpgradeMap[sheetItemName] && itemUpgradeMap[sheetItemName].length > 0) {
+      const contenders = itemUpgradeMap[sheetItemName].sort((a, b) => b.pct - a.pct);
       const top = contenders[0];
       row[6] = `${top.name} (+${top.pct}%)`;
       row[9] = `+${top.pct}% DPS`;
@@ -1748,5 +1842,5 @@ function promptAndImportRaidbotsDroptimizer() {
   });
 
   range.setValues(values);
-  ui.alert('Droptimizer Sims Merged!', `Successfully processed ${successCount} report(s) and merged DPS upgrades across ${totalMatches} raid items.`, ui.ButtonSet.OK);
+  ui.alert('Droptimizer Sims Merged!', `Successfully processed ${successCount} report(s) and mapped DPS upgrades across ${totalMatches} raid items.`, ui.ButtonSet.OK);
 }
