@@ -1241,14 +1241,65 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     return match ? parseInt(match[1], 10) : 0;
   };
 
+  // Check if sheet exists and read existing sim data map to prioritize sims over raw ilvl
+  const existingSimData = {};
+  if (sheet.getLastRow() > 1) {
+    const existingValues = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+    existingValues.forEach(row => {
+      const itemName = (row[1] || '').toString().toLowerCase().trim();
+      const notes = (row[11] || '').toString();
+      const upgradeDelta = (row[9] || '').toString();
+      const topContender = (row[6] || '').toString();
+
+      // If this item was previously simmed with Raidbots
+      if (notes.includes('Raidbots Sim Upgrades:') || upgradeDelta.includes('% DPS')) {
+        existingSimData[itemName] = {
+          topContender: topContender,
+          upgradeDelta: upgradeDelta,
+          notes: notes
+        };
+      }
+    });
+  }
+
   // If character audit data is provided, auto-calculate live equipped upgrades
   if (mainCharacterData && mainCharacterData.length > 0) {
     chaseItemsCatalog.forEach(row => {
+      const cleanItemName = (row[1] || '').toString().toLowerCase().trim();
       const slot = row[2];
       const dropIlvl = Number(row[4]) || 318;
       const targetRole = (row[5] || '').toLowerCase();
       const baseNotes = row[11];
 
+      // 1. PRIORITIZE SIMS: If item already has Raidbots Sim data, preserve the % DPS sim priority!
+      if (existingSimData[cleanItemName]) {
+        row[6] = existingSimData[cleanItemName].topContender;
+        row[9] = existingSimData[cleanItemName].upgradeDelta;
+        row[11] = existingSimData[cleanItemName].notes;
+
+        // Update live equipped item & ilvl for the top contender
+        const topNameMatch = row[6].match(/^([A-Za-z0-9\u00C0-\u024F]+)/);
+        if (topNameMatch) {
+          const topChar = mainCharacterData.find(c => c['Name'] && c['Name'].toLowerCase() === topNameMatch[1].toLowerCase());
+          if (topChar) {
+            let currentSlotText = topChar[slot] || '-';
+            if (slot.includes('Trinket')) {
+              const t1 = topChar['Trinket 1'] || '-';
+              const t2 = topChar['Trinket 2'] || '-';
+              currentSlotText = (extractIlvl(t1) <= extractIlvl(t2) && extractIlvl(t1) > 0) ? t1 : t2;
+            } else if (slot.includes('Ring')) {
+              const r1 = topChar['Ring 1'] || '-';
+              const r2 = topChar['Ring 2'] || '-';
+              currentSlotText = (extractIlvl(r1) <= extractIlvl(r2) && extractIlvl(r1) > 0) ? r1 : r2;
+            }
+            row[7] = currentSlotText;
+            row[8] = extractIlvl(currentSlotText);
+          }
+        }
+        return;
+      }
+
+      // 2. FALLBACK: For unsimmed items, calculate Live Equipped ilvl Delta
       const contenders = [];
 
       mainCharacterData.forEach(char => {
