@@ -403,6 +403,53 @@ function calculateRaidReadyStatus(charRow) {
 }
 
 /**
+ * Robustly extracts the live Blizzard talent loadout code from specializations API data.
+ */
+function extractTalentCodeDeep(data, currentSpecName) {
+  if (!data) return '-';
+  
+  if (data.specializations && Array.isArray(data.specializations)) {
+    const spec = data.specializations.find(s => s.specialization && s.specialization.name === currentSpecName) || data.specializations[0];
+    if (spec && spec.loadouts && Array.isArray(spec.loadouts)) {
+      const active = spec.loadouts.find(l => l.is_active) || spec.loadouts[0];
+      if (active) {
+        const code = active.talent_loadout_code || active.selected_talent_loadout_code || active.selected_class_talents_string;
+        if (code) return code;
+      }
+    }
+  }
+
+  // Deep string match for any 30+ character talent string in the response
+  const jsonStr = JSON.stringify(data);
+  const match = jsonStr.match(/"(?:talent_loadout_code|selected_talent_loadout_code|selected_class_talents_string)":"([^"]+)"/);
+  if (match && match[1]) {
+    return match[1];
+  }
+
+  return '-';
+}
+
+/**
+ * Robustly extracts the active Hero Talent Tree name from specializations API data.
+ */
+function extractHeroTalentTree(data, currentSpecName) {
+  if (!data) return '-';
+  if (data.specializations && Array.isArray(data.specializations)) {
+    const spec = data.specializations.find(s => s.specialization && s.specialization.name === currentSpecName) || data.specializations[0];
+    if (spec && spec.loadouts && Array.isArray(spec.loadouts)) {
+      const active = spec.loadouts.find(l => l.is_active) || spec.loadouts[0];
+      if (active && active.selected_hero_talent_tree && active.selected_hero_talent_tree.name) {
+        return active.selected_hero_talent_tree.name;
+      }
+    }
+  }
+  const jsonStr = JSON.stringify(data);
+  const match = jsonStr.match(/"selected_hero_talent_tree":\{"key":\{"href":"[^"]*\/talent-tree\/([0-9]+)\?[^"]*\},"name":"([^"]+)"/);
+  if (match && match[2]) return match[2];
+  return '-';
+}
+
+/**
  * Processes a list of characters and extracts all gear, vault, and audit data.
  */
 function processCharacterSet(characterNames, guildRosterMembers, config, token, enchantAndGemData, bonusData) {
@@ -597,34 +644,12 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
       charRow['Spec'] = profileData.active_spec ? profileData.active_spec.name : '';
     }
 
-    let heroTreeName = '-';
-    let talentCode = '-';
-    let wowheadGuideLink = '-';
-    let archonHeroicLink = '-';
-    let archonMythicLink = '-';
-    let droptimizerLink = '-';
-
     if (specializationsData) {
-      let activeSpecObj = null;
-      if (specializationsData.specializations) {
-        activeSpecObj = specializationsData.specializations.find(s => s.specialization && s.specialization.name === charRow['Spec']) || specializationsData.specializations[0];
-      } else if (specializationsData.active_specialization) {
-        activeSpecObj = specializationsData.active_specialization;
-      }
-
-      if (activeSpecObj) {
-        if (activeSpecObj.loadouts && activeSpecObj.loadouts.length > 0) {
-          const activeLoadout = activeSpecObj.loadouts.find(l => l.is_active) || activeSpecObj.loadouts[0];
-          if (activeLoadout) {
-            talentCode = activeLoadout.selected_talent_loadout_code || activeLoadout.talent_loadout_code || activeLoadout.selected_talents_string || '-';
-            if (activeLoadout.selected_hero_talent_tree) {
-              heroTreeName = activeLoadout.selected_hero_talent_tree.name || '-';
-            }
-          }
-        } else if (activeSpecObj.selected_talent_loadout_code || activeSpecObj.talent_loadout_code) {
-          talentCode = activeSpecObj.selected_talent_loadout_code || activeSpecObj.talent_loadout_code || '-';
-        }
-      }
+      charRow['Talent Code'] = extractTalentCodeDeep(specializationsData, charRow['Spec']);
+      charRow['Hero Talents'] = extractHeroTalentTree(specializationsData, charRow['Spec']);
+    } else {
+      charRow['Talent Code'] = '-';
+      charRow['Hero Talents'] = '-';
     }
 
     const classSlug = (charRow['Class'] || '').toLowerCase().replace(/\s+/g, '-');
@@ -641,14 +666,10 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
       : (character.realmSlug || config.GUILD_REALM_SLUG || 'kiljaeden');
     const charRegion = (config.REGION || 'us').toLowerCase();
 
-    droptimizerLink = `https://www.raidbots.com/simbot/droptimizer?region=${charRegion}&realm=${charRealmSlug}&name=${encodeURIComponent(charName)}`;
-
-    charRow['Hero Talents'] = heroTreeName;
-    charRow['Talent Code'] = talentCode;
     charRow['Wowhead Link'] = wowheadGuideLink;
     charRow['Archon Heroic Link'] = archonHeroicLink;
     charRow['Archon Mythic Link'] = archonMythicLink;
-    charRow['Droptimizer Link'] = droptimizerLink;
+    charRow['Droptimizer Link'] = `https://www.raidbots.com/simbot/droptimizer?region=${charRegion}&realm=${charRealmSlug}&name=${encodeURIComponent(charName)}`;
 
     // --- 2. Process Great Vault & Raids ---
     if (mplusData) {
