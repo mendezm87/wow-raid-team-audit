@@ -1,4 +1,6 @@
 const SHEET_NAME = 'Guild Audit'; 
+const TALENTS_SHEET_NAME = 'Talents & Builds';
+const LOOT_SHEET_NAME = 'Loot & Chase Items';
 
 // --- VAULT & SEASON CONFIGURATION (Midnight Season 2 - Verified) ---
 const VAULT_MAPPING = {
@@ -32,7 +34,8 @@ function onOpen() {
       .addItem('1. Set API Credentials', 'promptForCredentials')
       .addItem('2. Create Config Sheet', 'createConfigSheet')
       .addSeparator()
-      .addItem('3. Run Audit and Format', 'updateAllCharacterDataWithBonuses')
+      .addItem('3. Run Full Audit & Talents', 'updateAllCharacterDataWithBonuses')
+      .addItem('4. Create/Refresh Loot & Chase Items Sheet', 'createLootAndChaseItemsSheet')
       .addToUi();
 }
 
@@ -261,7 +264,7 @@ function fetchAllCharacterDataBatched(characterList, config, token) {
   const headers = { 'Authorization': 'Bearer ' + token, 'Battlenet-Namespace': `profile-${config.REGION}` };
   const apiHost = getApiHost(config);
   const results = [];
-  const chunkSize = 15; // 15 characters * 5 endpoints = 75 parallel requests
+  const chunkSize = 12; // 12 characters * 6 endpoints = 72 parallel requests
 
   for (let i = 0; i < characterList.length; i += chunkSize) {
     const chunk = characterList.slice(i, i + chunkSize);
@@ -275,12 +278,13 @@ function fetchAllCharacterDataBatched(characterList, config, token) {
       requests.push({ url: `${apiHost}/profile/wow/character/${charRealm}/${charName}/reputations?locale=en_US`, headers: headers, muteHttpExceptions: true });
       requests.push({ url: `${apiHost}/profile/wow/character/${charRealm}/${charName}/mythic-keystone-profile?locale=en_US`, headers: headers, muteHttpExceptions: true });
       requests.push({ url: `${apiHost}/profile/wow/character/${charRealm}/${charName}/encounters/raids?locale=en_US`, headers: headers, muteHttpExceptions: true });
+      requests.push({ url: `${apiHost}/profile/wow/character/${charRealm}/${charName}/specializations?locale=en_US`, headers: headers, muteHttpExceptions: true });
     });
 
     const responses = UrlFetchApp.fetchAll(requests);
 
     chunk.forEach((char, idx) => {
-      const baseIdx = idx * 5;
+      const baseIdx = idx * 6;
       const parseJson = (resp) => {
         try {
           if (resp && resp.getResponseCode() === 200) {
@@ -298,7 +302,8 @@ function fetchAllCharacterDataBatched(characterList, config, token) {
         equipmentData: parseJson(responses[baseIdx + 1]),
         reputationsData: parseJson(responses[baseIdx + 2]),
         mplusData: parseJson(responses[baseIdx + 3]),
-        raidData: parseJson(responses[baseIdx + 4])
+        raidData: parseJson(responses[baseIdx + 4]),
+        specializationsData: parseJson(responses[baseIdx + 5])
       });
     });
   }
@@ -438,12 +443,44 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
       'GV M+ 3': '-'
     };
 
-    // --- 1. Process Profile ---
+    // --- 1. Process Profile & Specializations ---
     if (profileData) {
       charRow['iLvl'] = profileData.equipped_item_level || 0;
       charRow['Class'] = profileData.character_class ? profileData.character_class.name : '';
       charRow['Spec'] = profileData.active_spec ? profileData.active_spec.name : '';
     }
+
+    let heroTreeName = '-';
+    let talentCode = '-';
+    let wowheadGuideLink = '-';
+
+    if (specializationsData) {
+      let activeSpecObj = null;
+      if (specializationsData.specializations) {
+        activeSpecObj = specializationsData.specializations.find(s => s.specialization && s.specialization.name === charRow['Spec']) || specializationsData.specializations[0];
+      }
+      if (activeSpecObj) {
+        if (activeSpecObj.loadouts && activeSpecObj.loadouts.length > 0) {
+          const activeLoadout = activeSpecObj.loadouts.find(l => l.is_active) || activeSpecObj.loadouts[0];
+          if (activeLoadout) {
+            talentCode = activeLoadout.selected_talent_loadout_code || '-';
+            if (activeLoadout.selected_hero_talent_tree) {
+              heroTreeName = activeLoadout.selected_hero_talent_tree.name || '-';
+            }
+          }
+        }
+      }
+    }
+
+    const classSlug = (charRow['Class'] || '').toLowerCase().replace(/\s+/g, '-');
+    const specSlug = (charRow['Spec'] || '').toLowerCase().replace(/\s+/g, '-');
+    if (classSlug && specSlug) {
+      wowheadGuideLink = `https://www.wowhead.com/guide/classes/${classSlug}/${specSlug}/overview`;
+    }
+
+    charRow['Hero Talents'] = heroTreeName;
+    charRow['Talent Code'] = talentCode;
+    charRow['Guide Link'] = wowheadGuideLink;
 
     // --- 2. Process Great Vault & Raids ---
     if (mplusData) {
@@ -766,7 +803,11 @@ function updateAllCharacterDataWithBonuses() {
   sheet.getRange(1, 1, finalData.length, finalData[0].length).setValues(finalData);
   
   applyFormatting(sheet, outputHeaders, combinedDataObjects);
-  SpreadsheetApp.getUi().alert('Audit Complete!', `Successfully updated ${mainCharacterData.length} mains and ${altCharacterData.length} alts.`, SpreadsheetApp.getUi().ButtonSet.OK);
+  
+  // 4. Update Talents & Builds Companion Sheet
+  updateTalentsSheet(mainCharacterData, altCharacterData);
+
+  SpreadsheetApp.getUi().alert('Audit Complete!', `Successfully updated ${mainCharacterData.length} mains and ${altCharacterData.length} alts across Audit and Talents sheets.`, SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 /**
@@ -1025,4 +1066,206 @@ function applyFormatting(sheet, headers, characterDataObjects) {
       sheet.setColumnWidth(colIndex, currentWidth + 15); // Add padding for bold readability
     }
   });
+}
+
+/**
+ * Creates and formats the Talents & Builds companion sheet.
+ */
+function updateTalentsSheet(mainCharacterData, altCharacterData) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(TALENTS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(TALENTS_SHEET_NAME);
+  }
+
+  const talentHeaders = [
+    'Name', 'Class', 'Active Spec', 'Hero Talents', 
+    'Talent Loadout Code (Import String)', 'Wowhead Raid Guide Link', 
+    'iLvl', 'Raid Ready'
+  ];
+
+  const formatTalentRow = (obj) => {
+    const guideFormula = (obj['Guide Link'] && obj['Guide Link'] !== '-') 
+      ? `=HYPERLINK("${obj['Guide Link']}", "View ${obj['Spec'] || 'Spec'} Guide")`
+      : '-';
+    return [
+      obj['Name'] || '',
+      obj['Class'] || '',
+      obj['Spec'] || '',
+      obj['Hero Talents'] || '-',
+      obj['Talent Code'] || '-',
+      guideFormula,
+      obj['iLvl'] || 0,
+      obj['Raid Ready'] || '-'
+    ];
+  };
+
+  const finalRows = [];
+  finalRows.push(...mainCharacterData.map(formatTalentRow));
+
+  if (altCharacterData && altCharacterData.length > 0) {
+    finalRows.push(Array(talentHeaders.length).fill(''));
+    finalRows.push(Array(talentHeaders.length).fill(''));
+    finalRows.push(...altCharacterData.map(formatTalentRow));
+  }
+
+  const outputData = [talentHeaders, ...finalRows];
+  sheet.clear();
+  sheet.clearFormats();
+  sheet.getRange(1, 1, outputData.length, outputData[0].length).setValues(outputData);
+
+  // Formatting
+  const fullRange = sheet.getDataRange();
+  fullRange.setHorizontalAlignment('center');
+  fullRange.setNumberFormat('@');
+  sheet.setFrozenColumns(1);
+  sheet.setFrozenRows(1);
+
+  // Header styling
+  const headerRange = sheet.getRange(1, 1, 1, sheet.getMaxColumns());
+  headerRange.setBackground('#202124').setFontColor('#ffffff').setFontWeight('bold');
+
+  // Bold data
+  if (sheet.getMaxRows() > 1) {
+    sheet.getRange(2, 1, sheet.getMaxRows() - 1, sheet.getMaxColumns()).setFontWeight('bold');
+  }
+
+  // Class colors for Name, Class, Spec
+  const classAndSpecRanges = [
+    sheet.getRange(2, 1, sheet.getMaxRows(), 1), // Name
+    sheet.getRange(2, 2, sheet.getMaxRows(), 1), // Class
+    sheet.getRange(2, 3, sheet.getMaxRows(), 1)  // Spec
+  ];
+  const rules = [];
+  for (const className in CLASS_COLORS) {
+    const rule = SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(`=$B2="${className}"`)
+      .setBackground(CLASS_COLORS[className])
+      .setFontColor('#000000')
+      .setRanges(classAndSpecRanges)
+      .build();
+    rules.push(rule);
+  }
+
+  // Raid Ready column formatting
+  const raidReadyColIdx = talentHeaders.indexOf('Raid Ready') + 1;
+  const rrRange = sheet.getRange(2, raidReadyColIdx, sheet.getMaxRows(), 1);
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('READY').setBackground('#34a853').setFontColor('#ffffff').setRanges([rrRange]).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Missing').setBackground('#ea4335').setFontColor('#ffffff').setRanges([rrRange]).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Tier').setBackground('#fbbc04').setFontColor('#000000').setRanges([rrRange]).build());
+
+  sheet.setConditionalFormatRules(rules);
+  sheet.autoResizeColumns(1, sheet.getMaxColumns());
+
+  // Set widths
+  sheet.setColumnWidth(1, 130); // Name
+  sheet.setColumnWidth(2, 110); // Class
+  sheet.setColumnWidth(3, 130); // Spec
+  sheet.setColumnWidth(4, 200); // Hero Talents
+  sheet.setColumnWidth(5, 380); // Talent String
+  sheet.setColumnWidth(6, 200); // Guide Link
+  sheet.setColumnWidth(7, 80);  // ilvl
+  sheet.setColumnWidth(8, 280); // Raid Ready
+}
+
+/**
+ * Creates and formats the Loot & Chase Items reference sheet.
+ */
+function createLootAndChaseItemsSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(LOOT_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(LOOT_SHEET_NAME);
+  }
+
+  const lootHeaders = [
+    'Boss / Source', 'Chase Item / Drop', 'Slot', 'Difficulty', 'Drop ilvl',
+    'Target Specs / Roles', 'Top Contender (Assigned)', 'Current Equipped Item',
+    'Equipped ilvl', 'Upgrade Delta (+ilvl)', 'Priority / BiS Tier', 'Loot Council Notes'
+  ];
+
+  const chaseItemsCatalog = [
+    // Boss 1
+    ['Boss 1: Void Terror', 'Abyssal Swarmcaller', 'Trinket 1', 'Heroic', 318, 'Agility / Strength DPS', '', '', '', '', 'BiS S-Tier', 'Huge burst stat proc on pull'],
+    ['Boss 1: Void Terror', 'Terror-Forged Greatsword', 'Main Hand', 'Heroic', 318, '2H Strength (DK, War, Pal)', '', '', '', '', 'Major Upgrade', 'High base weapon DPS'],
+    ['Boss 1: Void Terror', 'Helm of Shattered Shadows', 'Head', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Helm', 'Unlocks tier 2pc/4pc'],
+    
+    // Boss 2
+    ['Boss 2: Void Inquisitor', 'Gaze of the Dark Star', 'Trinket 1', 'Heroic', 318, 'Intellect DPS / Healers', '', '', '', '', 'BiS S-Tier', 'On-use spell power amp'],
+    ['Boss 2: Void Inquisitor', 'Whispering Spire Staff', 'Main Hand', 'Heroic', 318, 'Intellect Casters', '', '', '', '', 'Major Upgrade', 'High Intellect stat stick'],
+    ['Boss 2: Void Inquisitor', 'Pauldrons of the Accuser', 'Shoulders', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Shoulders', 'Unlocks tier 2pc/4pc'],
+
+    // Boss 3
+    ['Boss 3: Shadow Behemoth', 'Behemoth\'s Resilient Core', 'Trinket 1', 'Heroic', 318, 'Tanks (All)', '', '', '', '', 'Tank BiS', 'Cheat death / mega shield proc'],
+    ['Boss 3: Shadow Behemoth', 'Chestguard of the Titan', 'Chest', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Chest', 'Major stat & tier chest slot'],
+    
+    // Boss 4
+    ['Boss 4: Thalassian Council', 'Council\'s Signet of Command', 'Ring 1', 'Heroic', 318, 'All Specs (Rare Cantrip)', '', '', '', '', 'Rare Ring Proc', 'Cantrip secondary stat burst proc'],
+    ['Boss 4: Thalassian Council', 'Gauntlets of Ancient Duty', 'Hands', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Gloves', 'Tier slot token'],
+
+    // Boss 5
+    ['Boss 5: Sunwell Abomination', 'Solar-Corrupted Core', 'Trinket 2', 'Heroic', 318, 'All DPS / Healers', '', '', '', '', 'BiS A-Tier', 'Stacking haste / mastery aura'],
+    ['Boss 5: Sunwell Abomination', 'Leggings of Sundered Light', 'Legs', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Legs', 'Tier slot token'],
+
+    // Boss 6
+    ['Boss 6: Midnight Vanguard', 'Vanguard\'s Bulwark', 'Off Hand', 'Heroic', 318, 'Prot Pal, Prot War, Resto/Ele Sham', '', '', '', '', 'Shield BiS', 'Block rating & mastery proc'],
+    ['Boss 6: Midnight Vanguard', 'Shadow-Etched Dagger', 'Main Hand', 'Heroic', 318, 'Rogues, DH, Agi Casters', '', '', '', '', 'Major Weapon', 'Fast attack speed stat dagger'],
+
+    // Boss 7
+    ['Boss 7: Void Ascendant', 'Heart of the Ascendant', 'Trinket 1', 'Heroic', 318, 'All Specs (Rare Proc)', '', '', '', '', 'Very Rare BiS', 'Huge primary stat proc on execute'],
+    ['Boss 7: Void Ascendant', 'Void-Infused Cloak', 'Back', 'Heroic', 318, 'All Specs', '', '', '', '', 'BiS Back', 'Max item level cloak'],
+
+    // Boss 8
+    ['Boss 8: Final Boss (Mythic/Heroic)', 'Crown of the End Times', 'Head', 'Heroic', 318, 'All Specs (Omni-Token)', '', '', '', '', 'Omni-Token (Any Slot)', 'Can be turned in for any tier piece'],
+    ['Boss 8: Final Boss (Mythic/Heroic)', 'Cosmic Annihilator', 'Main Hand', 'Heroic', 318, 'All Weapon Wielders', '', '', '', '', 'Mythic Weapon', 'Top weapon DPS in the game'],
+    ['Boss 8: Final Boss (Mythic/Heroic)', 'Echo of the Void Harbinger', 'Trinket 2', 'Heroic', 318, 'All DPS (Very Rare)', '', '', '', '', 'God-Tier Trinket', 'Best in slot for 90% of specs']
+  ];
+
+  const fullData = [lootHeaders, ...chaseItemsCatalog];
+
+  sheet.clear();
+  sheet.clearFormats();
+  sheet.getRange(1, 1, fullData.length, fullData[0].length).setValues(fullData);
+
+  // Formatting
+  const fullRange = sheet.getDataRange();
+  fullRange.setHorizontalAlignment('center');
+  fullRange.setNumberFormat('@');
+  sheet.setFrozenColumns(2);
+  sheet.setFrozenRows(1);
+
+  // Header styling
+  const headerRange = sheet.getRange(1, 1, 1, sheet.getMaxColumns());
+  headerRange.setBackground('#202124').setFontColor('#ffffff').setFontWeight('bold');
+
+  // Bold data
+  sheet.getRange(2, 1, sheet.getMaxRows() - 1, sheet.getMaxColumns()).setFontWeight('bold');
+
+  // Priority Column Conditional Formatting
+  const rules = [];
+  const prioColIdx = lootHeaders.indexOf('Priority / BiS Tier') + 1;
+  const prioRange = sheet.getRange(2, prioColIdx, sheet.getMaxRows(), 1);
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('BiS').setBackground('#a335ee').setFontColor('#ffffff').setRanges([prioRange]).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Rare').setBackground('#ff8000').setFontColor('#000000').setRanges([prioRange]).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Tier').setBackground('#34a853').setFontColor('#ffffff').setRanges([prioRange]).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('God-Tier').setBackground('#ff0055').setFontColor('#ffffff').setRanges([prioRange]).build());
+
+  sheet.setConditionalFormatRules(rules);
+  sheet.autoResizeColumns(1, sheet.getMaxColumns());
+
+  // Set widths
+  sheet.setColumnWidth(1, 180); // Boss
+  sheet.setColumnWidth(2, 240); // Item Name
+  sheet.setColumnWidth(3, 110); // Slot
+  sheet.setColumnWidth(4, 100); // Difficulty
+  sheet.setColumnWidth(5, 85);  // Drop ilvl
+  sheet.setColumnWidth(6, 220); // Target Specs
+  sheet.setColumnWidth(7, 180); // Top Contender
+  sheet.setColumnWidth(8, 220); // Equipped Item
+  sheet.setColumnWidth(9, 100); // Equipped ilvl
+  sheet.setColumnWidth(10, 140);// Upgrade Delta
+  sheet.setColumnWidth(11, 180);// Priority / BiS Tier
+  sheet.setColumnWidth(12, 280);// Notes
+
+  SpreadsheetApp.getUi().alert('Loot & Chase Items Sheet Created!', 'Created the loot distribution and chase items reference sheet with Season 2 boss loot tables.', SpreadsheetApp.getUi().ButtonSet.OK);
 }
