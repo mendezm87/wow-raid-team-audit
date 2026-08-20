@@ -820,7 +820,7 @@ function applyFormatting(sheet, headers, characterDataObjects) {
   // Reset all number formats so legacy percentage formatting from older sheets is cleared
   fullRange.setNumberFormat('@');
   
-  // Set integer number format for numeric stat columns
+  // Set integer number format for numeric stat columns in one batch
   ['iLvl', 'M+ Rating', 'Total Sockets', 'Empty Sockets', 'Imperfect Gems', 'Crafted Items', 'GV Slots Unlocked'].forEach(colName => {
     const colIdx = headers.indexOf(colName) + 1;
     if (colIdx > 0 && sheet.getMaxRows() > 1) {
@@ -835,12 +835,13 @@ function applyFormatting(sheet, headers, characterDataObjects) {
   const headerRange = sheet.getRange(1, 1, 1, sheet.getMaxColumns());
   headerRange.setBackground('#202124').setFontColor('#ffffff').setFontWeight('bold');
   
-  const dataRangeToBold = sheet.getRange(2, 4, sheet.getMaxRows() - 1, sheet.getMaxColumns() - 3);
-  dataRangeToBold.setFontWeight("bold");
+  if (sheet.getMaxRows() > 1 && sheet.getMaxColumns() > 3) {
+    sheet.getRange(2, 4, sheet.getMaxRows() - 1, sheet.getMaxColumns() - 3).setFontWeight("bold");
+  }
 
   const rules = [];
 
-  // 1. Class Colors for Name, Class, Spec
+  // 1. Class Colors for Name, Class, Spec (Consolidated multi-range rule)
   const nameColIndex = headers.indexOf('Name') + 1;
   const classColIndex = headers.indexOf('Class') + 1;
   const specColIndex = headers.indexOf('Spec') + 1;
@@ -851,101 +852,88 @@ function applyFormatting(sheet, headers, characterDataObjects) {
 
   if (classAndSpecRanges.length > 0) {
     for (const className in CLASS_COLORS) {
-      const rule = SpreadsheetApp.newConditionalFormatRule()
+      rules.push(SpreadsheetApp.newConditionalFormatRule()
         .whenFormulaSatisfied(`=$B2="${className}"`)
         .setBackground(CLASS_COLORS[className])
-        .setFontColor(className === 'Priest' ? '#000000' : '#000000')
+        .setFontColor('#000000')
         .setRanges(classAndSpecRanges)
-        .build();
-      rules.push(rule);
+        .build());
     }
   }
-
-  const addRule = (columnIndex, textCondition, color, fontColor = '#ffffff') => {
-    if (columnIndex > -1) {
-      const range = sheet.getRange(2, columnIndex + 1, sheet.getMaxRows(), 1);
-      const rule = SpreadsheetApp.newConditionalFormatRule()
-        .whenTextContains(textCondition)
-        .setBackground(color)
-        .setFontColor(fontColor)
-        .setRanges([range])
-        .build();
-      rules.push(rule);
-    }
-  };
 
   // 2. Raid Ready Column Rules
   const raidReadyColIdx = headers.indexOf('Raid Ready');
   if (raidReadyColIdx > -1) {
-    addRule(raidReadyColIdx, "READY", "#34a853", "#ffffff"); // Green
-    addRule(raidReadyColIdx, "Missing", "#ea4335", "#ffffff"); // Red
-    addRule(raidReadyColIdx, "Socket", "#ea4335", "#ffffff");  // Red
-    addRule(raidReadyColIdx, "Tier", "#fbbc04", "#000000");    // Yellow
+    const rrRange = [sheet.getRange(2, raidReadyColIdx + 1, sheet.getMaxRows(), 1)];
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("READY").setBackground("#34a853").setFontColor("#ffffff").setRanges(rrRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Missing").setBackground("#ea4335").setFontColor("#ffffff").setRanges(rrRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Socket").setBackground("#ea4335").setFontColor("#ffffff").setRanges(rrRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Tier").setBackground("#fbbc04").setFontColor("#000000").setRanges(rrRange).build());
   }
 
-  // 3. Upgrade Tracks & Gear Slots
+  // 3. Upgrade Tracks & Gear Slots (Multi-range consolidation: 7 rules instead of 112)
   const gearCols = [
     'Head', 'Shoulders', 'Chest', 'Hands', 'Legs',
     'Main Hand', 'Off Hand', 'Trinket 1', 'Trinket 2',
     'Neck', 'Back', 'Wrist', 'Waist', 'Feet', 'Ring 1', 'Ring 2'
   ];
-  
-  gearCols.forEach(colName => {
-    const colIdx = headers.indexOf(colName);
-    addRule(colIdx, "Myth", "#ff8000", "#000000");      // Orange
-    addRule(colIdx, "Hero", "#a335ee", "#ffffff");      // Purple
-    addRule(colIdx, "Champion", "#0070dd", "#ffffff");  // Blue
-    addRule(colIdx, "Veteran", "#1eff00", "#000000");   // Green
-    addRule(colIdx, "Explorer", "#9e9e9e", "#ffffff");  // Gray
-    addRule(colIdx, "Adventurer", "#9e9e9e", "#ffffff");// Gray
-    addRule(colIdx, "Crafted", "#f28b82", "#000000");   // Soft Pink/Coral for Crafted
-  });
+  const gearRanges = gearCols
+    .map(name => headers.indexOf(name) + 1)
+    .filter(idx => idx > 0)
+    .map(idx => sheet.getRange(2, idx, sheet.getMaxRows(), 1));
+
+  if (gearRanges.length > 0) {
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Myth").setBackground("#ff8000").setFontColor("#000000").setRanges(gearRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Hero").setBackground("#a335ee").setFontColor("#ffffff").setRanges(gearRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Champion").setBackground("#0070dd").setFontColor("#ffffff").setRanges(gearRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Veteran").setBackground("#1eff00").setFontColor("#000000").setRanges(gearRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Explorer").setBackground("#9e9e9e").setFontColor("#ffffff").setRanges(gearRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Adventurer").setBackground("#9e9e9e").setFontColor("#ffffff").setRanges(gearRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Crafted").setBackground("#f28b82").setFontColor("#000000").setRanges(gearRanges).build());
+  }
 
   // 4. Tier Set Progress Rules
   const tierSetColIdx = headers.indexOf('Tier Set');
-  addRule(tierSetColIdx, "5/5", "#34a853", "#ffffff");
-  addRule(tierSetColIdx, "4/5", "#34a853", "#ffffff");
-  addRule(tierSetColIdx, "3/5", "#fbbc04", "#000000");
-  addRule(tierSetColIdx, "2/5", "#fbbc04", "#000000");
-  addRule(tierSetColIdx, "1/5", "#ea4335", "#ffffff");
-  addRule(tierSetColIdx, "0/5", "#ea4335", "#ffffff");
+  if (tierSetColIdx > -1) {
+    const tsRange = [sheet.getRange(2, tierSetColIdx + 1, sheet.getMaxRows(), 1)];
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("5/5").setBackground("#34a853").setFontColor("#ffffff").setRanges(tsRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("4/5").setBackground("#34a853").setFontColor("#ffffff").setRanges(tsRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("3/5").setBackground("#fbbc04").setFontColor("#000000").setRanges(tsRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("2/5").setBackground("#fbbc04").setFontColor("#000000").setRanges(tsRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("1/5").setBackground("#ea4335").setFontColor("#ffffff").setRanges(tsRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("0/5").setBackground("#ea4335").setFontColor("#ffffff").setRanges(tsRange).build());
+  }
 
   // 5. Empty Sockets & Imperfect Gems Rules
   const emptySocketsColIdx = headers.indexOf('Empty Sockets');
   if (emptySocketsColIdx > -1) {
-    const range = sheet.getRange(2, emptySocketsColIdx + 1, sheet.getMaxRows(), 1);
-    rules.push(SpreadsheetApp.newConditionalFormatRule()
-      .whenNumberGreaterThan(0)
-      .setBackground("#ea4335")
-      .setFontColor("#ffffff")
-      .setRanges([range])
-      .build());
+    const esRange = [sheet.getRange(2, emptySocketsColIdx + 1, sheet.getMaxRows(), 1)];
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThan(0).setBackground("#ea4335").setFontColor("#ffffff").setRanges(esRange).build());
   }
 
   const imperfectGemsColIdx = headers.indexOf('Imperfect Gems');
   if (imperfectGemsColIdx > -1) {
-    const range = sheet.getRange(2, imperfectGemsColIdx + 1, sheet.getMaxRows(), 1);
-    rules.push(SpreadsheetApp.newConditionalFormatRule()
-      .whenNumberGreaterThan(0)
-      .setBackground("#fbbc04")
-      .setFontColor("#000000")
-      .setRanges([range])
-      .build());
+    const igRange = [sheet.getRange(2, imperfectGemsColIdx + 1, sheet.getMaxRows(), 1)];
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThan(0).setBackground("#fbbc04").setFontColor("#000000").setRanges(igRange).build());
   }
 
-  // 6. Enchants Rules
+  // 6. Enchants Rules (Multi-range consolidation: 5 rules instead of 45)
   const enchantCols = [
     'Enchant Main Hand', 'Enchant Off Hand', 'Enchant Head', 'Enchant Shoulder',
     'Enchant Chest', 'Enchant Legs', 'Enchant Feet', 'Enchant Ring 1', 'Enchant Ring 2'
   ];
-  enchantCols.forEach(colName => {
-    const colIdx = headers.indexOf(colName);
-    addRule(colIdx, "Tier2", "#34a853", "#ffffff"); // Gold / Rank 2
-    addRule(colIdx, "Tier1", "#fbbc04", "#000000"); // Silver / Rank 1
-    addRule(colIdx, "Rune of", "#34a853", "#ffffff"); // DK Runeforging
-    addRule(colIdx, "N/A", "#e0e0e0", "#555555");
-    addRule(colIdx, "Missing", "#ea4335", "#ffffff");
-  });
+  const enchantRanges = enchantCols
+    .map(name => headers.indexOf(name) + 1)
+    .filter(idx => idx > 0)
+    .map(idx => sheet.getRange(2, idx, sheet.getMaxRows(), 1));
+
+  if (enchantRanges.length > 0) {
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Tier2").setBackground("#34a853").setFontColor("#ffffff").setRanges(enchantRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Tier1").setBackground("#fbbc04").setFontColor("#000000").setRanges(enchantRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Rune of").setBackground("#34a853").setFontColor("#ffffff").setRanges(enchantRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("N/A").setBackground("#e0e0e0").setFontColor("#555555").setRanges(enchantRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Missing").setBackground("#ea4335").setFontColor("#ffffff").setRanges(enchantRanges).build());
+  }
   
   // 7. Great Vault Styling & Borders
   const gvRaid1_idx = headers.indexOf('GV Raid 1') + 1;
@@ -964,107 +952,59 @@ function applyFormatting(sheet, headers, characterDataObjects) {
   }
 
   const gvRaidCols = ['GV Raid 1', 'GV Raid 2', 'GV Raid 3'];
-  gvRaidCols.forEach(colName => {
-    const colIdx = headers.indexOf(colName);
-    addRule(colIdx, VAULT_MAPPING.raid.lfr.toString(), "#1eff00", "#000000");
-    addRule(colIdx, VAULT_MAPPING.raid.normal.toString(), "#0070dd", "#ffffff");
-    addRule(colIdx, VAULT_MAPPING.raid.heroic.toString(), "#a335ee", "#ffffff");
-    addRule(colIdx, VAULT_MAPPING.raid.mythic.toString(), "#ff8000", "#000000");
-  });
-  
-  const addNumericRule = (columnIndex, condition, color, fontColor = '#ffffff') => {
-    if (columnIndex > -1 && typeof condition === 'number') {
-      const range = sheet.getRange(2, columnIndex + 1, sheet.getMaxRows(), 1);
-      const rule = SpreadsheetApp.newConditionalFormatRule()
-        .whenNumberGreaterThanOrEqualTo(condition)
-        .setBackground(color)
-        .setFontColor(fontColor)
-        .setRanges([range])
-        .build();
-      rules.push(rule);
-    }
-  };
+  const gvRaidRanges = gvRaidCols
+    .map(name => headers.indexOf(name) + 1)
+    .filter(idx => idx > 0)
+    .map(idx => sheet.getRange(2, idx, sheet.getMaxRows(), 1));
+
+  if (gvRaidRanges.length > 0) {
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(VAULT_MAPPING.raid.lfr.toString()).setBackground("#1eff00").setFontColor("#000000").setRanges(gvRaidRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(VAULT_MAPPING.raid.normal.toString()).setBackground("#0070dd").setFontColor("#ffffff").setRanges(gvRaidRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(VAULT_MAPPING.raid.heroic.toString()).setBackground("#a335ee").setFontColor("#ffffff").setRanges(gvRaidRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(VAULT_MAPPING.raid.mythic.toString()).setBackground("#ff8000").setFontColor("#000000").setRanges(gvRaidRanges).build());
+  }
 
   const gvMplusCols = ['GV M+ 1', 'GV M+ 2', 'GV M+ 3'];
-  gvMplusCols.forEach(colName => {
-    const colIdx = headers.indexOf(colName);
-    addNumericRule(colIdx, 331, "#ff8000", "#000000"); // Mythic (Orange)
-    addNumericRule(colIdx, 312, "#a335ee", "#ffffff"); // Heroic (Purple)
-    addNumericRule(colIdx, 299, "#0070dd", "#ffffff"); // Normal / Champion (Blue)
-    addNumericRule(colIdx, 292, "#1eff00", "#000000"); // LFR / Veteran (Green)
-  });
+  const gvMplusRanges = gvMplusCols
+    .map(name => headers.indexOf(name) + 1)
+    .filter(idx => idx > 0)
+    .map(idx => sheet.getRange(2, idx, sheet.getMaxRows(), 1));
 
-  // M+ Rating Color (per-row Blizzard API rating color)
+  if (gvMplusRanges.length > 0) {
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(331).setBackground("#ff8000").setFontColor("#000000").setRanges(gvMplusRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(312).setBackground("#a335ee").setFontColor("#ffffff").setRanges(gvMplusRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(299).setBackground("#0070dd").setFontColor("#ffffff").setRanges(gvMplusRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(292).setBackground("#1eff00").setFontColor("#000000").setRanges(gvMplusRanges).build());
+  }
+
+  // M+ Rating Color (Batch updated in 1 single call)
   const mPlusRatingColIdx = headers.indexOf('M+ Rating') + 1;
-  if (mPlusRatingColIdx > 0 && characterDataObjects) {
-    characterDataObjects.forEach((charData, index) => {
-      if (charData && charData['M+ Rating Color']) {
-        sheet.getRange(index + 2, mPlusRatingColIdx).setBackground(charData['M+ Rating Color']).setFontColor('#000000');
-      }
-    });
+  if (mPlusRatingColIdx > 0 && characterDataObjects && characterDataObjects.length > 0) {
+    const backgrounds = characterDataObjects.map(charData => [(charData && charData['M+ Rating Color']) ? charData['M+ Rating Color'] : '#ffffff']);
+    const fontColors = characterDataObjects.map(() => ['#000000']);
+    sheet.getRange(2, mPlusRatingColIdx, backgrounds.length, 1).setBackgrounds(backgrounds).setFontColors(fontColors);
   }
 
   sheet.setConditionalFormatRules(rules);
-  sheet.autoResizeColumns(1, sheet.getMaxColumns());
 
-  // Set comfortable minimum widths and generous padding for readability
+  // Set column widths directly (Fast 1-pass execution without getColumnWidth overhead)
   const minWidths = {
-    'Name': 120,
-    'Class': 110,
-    'Spec': 120,
-    'iLvl': 65,
-    'Raid Ready': 300, // Wide enough for detailed checklist issues
-    'M+ Rating': 90,
-    'Tier Set': 120,   // Wide enough for "2/5 (+2 Prev)"
-    'Total Sockets': 105,
-    'Empty Sockets': 105,
-    'Imperfect Gems': 115,
-    'Crafted Items': 105,
-    'Embellishment 1': 170,
-    'Embellishment 2': 170,
-    'Head': 290,
-    'Shoulders': 290,
-    'Chest': 290,
-    'Hands': 290,
-    'Legs': 290,
-    'Main Hand': 290,
-    'Off Hand': 290,
-    'Trinket 1': 290,
-    'Trinket 2': 290,
-    'Neck': 290,
-    'Back': 290,
-    'Wrist': 290,
-    'Waist': 290,
-    'Feet': 290,
-    'Ring 1': 290,
-    'Ring 2': 290,
-    'Enchant Main Hand': 170,
-    'Enchant Off Hand': 170,
-    'Enchant Head': 170,
-    'Enchant Shoulder': 170,
-    'Enchant Chest': 170,
-    'Enchant Legs': 170,
-    'Enchant Feet': 170,
-    'Enchant Ring 1': 170,
-    'Enchant Ring 2': 170,
-    'GV Slots Unlocked': 125,
-    'GV Raid 1': 95,
-    'GV Raid 2': 95,
-    'GV Raid 3': 95,
-    'GV M+ 1': 95,
-    'GV M+ 2': 95,
-    'GV M+ 3': 95
+    'Name': 120, 'Class': 110, 'Spec': 120, 'iLvl': 65,
+    'Raid Ready': 300, 'M+ Rating': 90, 'Tier Set': 120,
+    'Total Sockets': 105, 'Empty Sockets': 105, 'Imperfect Gems': 115, 'Crafted Items': 105,
+    'Embellishment 1': 170, 'Embellishment 2': 170,
+    'Head': 290, 'Shoulders': 290, 'Chest': 290, 'Hands': 290, 'Legs': 290,
+    'Main Hand': 290, 'Off Hand': 290, 'Trinket 1': 290, 'Trinket 2': 290,
+    'Neck': 290, 'Back': 290, 'Wrist': 290, 'Waist': 290, 'Feet': 290,
+    'Ring 1': 290, 'Ring 2': 290,
+    'Enchant Main Hand': 170, 'Enchant Off Hand': 170, 'Enchant Head': 170, 'Enchant Shoulder': 170,
+    'Enchant Chest': 170, 'Enchant Legs': 170, 'Enchant Feet': 170, 'Enchant Ring 1': 170, 'Enchant Ring 2': 170,
+    'GV Slots Unlocked': 125, 'GV Raid 1': 95, 'GV Raid 2': 95, 'GV Raid 3': 95,
+    'GV M+ 1': 95, 'GV M+ 2': 95, 'GV M+ 3': 95
   };
 
   headers.forEach((header, idx) => {
-    const colIndex = idx + 1;
-    const desiredMin = minWidths[header] || 100;
-    const currentWidth = sheet.getColumnWidth(colIndex);
-    if (currentWidth < desiredMin) {
-      sheet.setColumnWidth(colIndex, desiredMin);
-    } else {
-      sheet.setColumnWidth(colIndex, currentWidth + 15); // Add padding for bold readability
-    }
+    sheet.setColumnWidth(idx + 1, minWidths[header] || 110);
   });
 }
 
@@ -1155,7 +1095,6 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Tier').setBackground('#fbbc04').setFontColor('#000000').setRanges([rrRange]).build());
 
   sheet.setConditionalFormatRules(rules);
-  sheet.autoResizeColumns(1, sheet.getMaxColumns());
 
   // Set widths
   sheet.setColumnWidth(1, 130); // Name
@@ -1251,7 +1190,6 @@ function createLootAndChaseItemsSheet() {
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('God-Tier').setBackground('#ff0055').setFontColor('#ffffff').setRanges([prioRange]).build());
 
   sheet.setConditionalFormatRules(rules);
-  sheet.autoResizeColumns(1, sheet.getMaxColumns());
 
   // Set widths
   sheet.setColumnWidth(1, 180); // Boss
