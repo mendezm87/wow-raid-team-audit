@@ -1,24 +1,29 @@
 const SHEET_NAME = 'Guild Audit'; 
+
+// --- VAULT & SEASON CONFIGURATION (Midnight Season 2 - Verified) ---
 const VAULT_MAPPING = {
   raid: {
-      mythic: 325 ,
-      heroic: 312 ,
-      normal: 299 ,
-      lfr: 286
+      mythic: 331,
+      heroic: 318,
+      normal: 305,
+      lfr: 292
   },
   mplus: {
-      20: 272, 19: 272, 18: 272, 17: 272, 16: 272, 15: 272, 14: 272,
-      13: 272, 12: 272, 11: 272, 10: 272, 9: 269, 8: 269, 7: 269, 6: 266,
-      5: 263, 4: 263, 3: 259, 2: 259
+      20: 318, 19: 318, 18: 318, 17: 318, 16: 318, 15: 318, 14: 318,
+      13: 318, 12: 318, 11: 318, 10: 318, // Caps at 318 (Myth 1/6) for +10 and above
+      9: 315, 8: 315,                     // 315 (Hero 4/6)
+      7: 312, 6: 312,                     // 312 (Hero 3/6)
+      5: 308, 4: 308,                     // 308 (Hero 2/6)
+      3: 305, 2: 305                      // 305 (Hero 1/6)
   }
 };
 
-CLASS_COLORS = {
-        'Warrior': '#C79C6E', 'Mage': '#3FC7EB', 'Rogue': '#FFF569', 'Paladin': '#F58CBA',
-        'Warlock': '#8787ED', 'Shaman': '#0070DE', 'Hunter': '#ABD473', 'Druid': '#FF7D0A',
-        'Priest': '#FFFFFF', 'Death Knight': '#C41F3B', 'Monk': '#00FF96',
-        'Demon Hunter': '#A330C9', 'Evoker': '#33937F',
-}
+const CLASS_COLORS = {
+  'Warrior': '#C79C6E', 'Mage': '#3FC7EB', 'Rogue': '#FFF569', 'Paladin': '#F58CBA',
+  'Warlock': '#8787ED', 'Shaman': '#0070DE', 'Hunter': '#ABD473', 'Druid': '#FF7D0A',
+  'Priest': '#FFFFFF', 'Death Knight': '#C41F3B', 'Monk': '#00FF96',
+  'Demon Hunter': '#A330C9', 'Evoker': '#33937F',
+};
 // --- END CONFIGURATION ---
 
 function onOpen() {
@@ -27,40 +32,43 @@ function onOpen() {
       .addItem('1. Set API Credentials', 'promptForCredentials')
       .addItem('2. Create Config Sheet', 'createConfigSheet')
       .addSeparator()
-      .addItem('3. Run Audit and format', 'updateAllCharacterDataWithBonuses')
+      .addItem('3. Run Audit and Format', 'updateAllCharacterDataWithBonuses')
       .addToUi();
 }
 
 function createConfigSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (ss.getSheetByName('Config')) {
-      SpreadsheetApp.getUi().alert('The "Config" sheet already exists.');
-      return;
-    }
+  if (ss.getSheetByName('Config')) {
+    SpreadsheetApp.getUi().alert('The "Config" sheet already exists.');
+    return;
+  }
   const sheet = ss.insertSheet('Config', 0);
   const setupData = [
-      ['Configuration', 'Value'],
-      ['Region', 'us'],
-      ['Realm Slug', 'kiljaeden'],
-      ['Guild Slug', 'prey'],
-      ['', ''], // Empty row for spacing
-      ['Main Characters to Track', ''], // Header for the list
-      ['Jevo', ''],
-      ['Lyci', ''],
-      ['Aemonnd', ''],
-      ['', ''], // Empty row for spacing
-      ['Alts to Track', ''], // NEW: Header for alts
-      ['Altcharone', ''],   // Example alt
-      ['Altchartwo', '']    // Example alt
+      ['Configuration', 'Value', '', 'Midnight S2 Great Vault Reference', 'Vault ilvl', 'Track'],
+      ['Region', 'us', '', 'Raid Mythic (6/6)', 331, 'Mythic'],
+      ['Realm Slug', 'kiljaeden', '', 'Raid Heroic (4/6)', 318, 'Hero'],
+      ['Guild Slug', 'prey', '', 'Raid Normal (2/6)', 305, 'Champion'],
+      ['', '', '', 'Raid LFR (2/4/6)', 292, 'Veteran'],
+      ['Main Characters to Track', '', '', 'Mythic+ 10+', 318, 'Myth 1/6'],
+      ['Jevo', '', '', 'Mythic+ 8-9', 315, 'Hero 4/6'],
+      ['Lyci', '', '', 'Mythic+ 6-7', 312, 'Hero 3/6'],
+      ['Aemonnd', '', '', 'Mythic+ 4-5', 308, 'Hero 2/6'],
+      ['', '', '', 'Mythic+ 2-3', 305, 'Hero 1/6'],
+      ['Alts to Track', '', '', 'World / Delves Tier 8', 305, 'Champion/Hero'],
+      ['Altcharone', '', '', '', '', ''],
+      ['Altchartwo', '', '', '', '', '']
   ];
-  sheet.getRange(1, 1, setupData.length, 2).setValues(setupData);
-  sheet.getRange("A1:B1").merge().setHorizontalAlignment('center').setFontWeight('bold');
+  sheet.getRange(1, 1, setupData.length, 6).setValues(setupData);
+  sheet.getRange("A1:B1").merge().setHorizontalAlignment('center').setFontWeight('bold').setBackground('#202124').setFontColor('#ffffff');
   sheet.getRange("A2:A4").setFontWeight('bold');
-  sheet.getRange("A6").merge().setHorizontalAlignment('center').setFontWeight('bold');
-  // NEW: Formatting for the new Alts header
-  sheet.getRange("A11").merge().setHorizontalAlignment('center').setFontWeight('bold');
-  sheet.autoResizeColumns(1, 2);
-  SpreadsheetApp.getUi().alert('"Config" sheet created. Please update it with your guild\'s information.');
+  sheet.getRange("A6").merge().setHorizontalAlignment('center').setFontWeight('bold').setBackground('#e8eaed');
+  sheet.getRange("A11").merge().setHorizontalAlignment('center').setFontWeight('bold').setBackground('#e8eaed');
+  
+  // Reference Table Header Formatting
+  sheet.getRange("D1:F1").setFontWeight('bold').setBackground('#202124').setFontColor('#ffffff').setHorizontalAlignment('center');
+  sheet.getRange("D2:F10").setHorizontalAlignment('center');
+  sheet.autoResizeColumns(1, 6);
+  SpreadsheetApp.getUi().alert('"Config" sheet created with Midnight Season 2 Great Vault reference.');
 }
 
 function getConfigurationFromSheet() {
@@ -71,11 +79,10 @@ function getConfigurationFromSheet() {
     return null;
   }
 
-  const region = configSheet.getRange('B2').getValue();
-  const realmSlug = configSheet.getRange('B3').getValue();
-  const guildSlug = configSheet.getRange('B4').getValue();
+  const region = configSheet.getRange('B2').getValue().toString().trim().toLowerCase();
+  const realmSlug = configSheet.getRange('B3').getValue().toString().trim().toLowerCase();
+  const guildSlug = configSheet.getRange('B4').getValue().toString().trim().toLowerCase();
 
-  // Dynamically find and read character lists
   const data = configSheet.getDataRange().getValues();
   const members = [];
   const alts = [];
@@ -83,24 +90,23 @@ function getConfigurationFromSheet() {
   let readingAlts = false;
 
   for (const row of data) {
-      const header = row[0].toString().toLowerCase();
+      const header = row[0].toString().toLowerCase().trim();
       if (header.includes('main characters')) {
           readingMains = true;
           readingAlts = false;
-          continue; // Skip the header row itself
+          continue;
       } else if (header.includes('alts to track')) {
           readingMains = false;
           readingAlts = true;
-          continue; // Skip the header row
+          continue;
       }
 
       if (readingMains && row[0]) {
-          members.push(row[0]);
+          members.push(row[0].toString().trim());
       } else if (readingAlts && row[0]) {
-          alts.push(row[0]);
+          alts.push(row[0].toString().trim());
       }
 
-      // Stop reading if we hit an empty row after starting
       if ((readingMains || readingAlts) && !row[0]) {
           readingMains = false;
           readingAlts = false;
@@ -113,28 +119,25 @@ function getConfigurationFromSheet() {
   }
 
   return {
-  REGION: region,
-  GUILD_REALM_SLUG: realmSlug,
-  GUILD_NAME_SLUG: guildSlug,
-  MEMBERS_TO_TRACK: members,
-    ALTS_TO_TRACK: alts // NEW: Add alts to the config object
+    REGION: region,
+    GUILD_REALM_SLUG: realmSlug,
+    GUILD_NAME_SLUG: guildSlug,
+    MEMBERS_TO_TRACK: members,
+    ALTS_TO_TRACK: alts
   };
 }
 
-/**
- * Prompts the user to enter their Blizzard API credentials and saves them to User Properties.
- */
 function promptForCredentials() {
   const ui = SpreadsheetApp.getUi();
   const userProperties = PropertiesService.getUserProperties();
 
   const clientIdResponse = ui.prompt('Set Blizzard Client ID', 'Please enter your Client ID:', ui.ButtonSet.OK_CANCEL);
   if (clientIdResponse.getSelectedButton() !== ui.Button.OK) return;
-  const clientId = clientIdResponse.getResponseText();
+  const clientId = clientIdResponse.getResponseText().trim();
 
   const clientSecretResponse = ui.prompt('Set Blizzard Client Secret', 'Please enter your Client Secret:', ui.ButtonSet.OK_CANCEL);
   if (clientSecretResponse.getSelectedButton() !== ui.Button.OK) return;
-  const clientSecret = clientSecretResponse.getResponseText();
+  const clientSecret = clientSecretResponse.getResponseText().trim();
 
   if (clientId && clientSecret) {
     userProperties.setProperties({
@@ -174,10 +177,15 @@ function getAccessToken(config) {
   const options = {
     method: 'post',
     payload: { grant_type: 'client_credentials' },
-    headers: { 'Authorization': 'Basic ' + Utilities.base64Encode(CLIENT_ID + ':' + CLIENT_SECRET) }
+    headers: { 'Authorization': 'Basic ' + Utilities.base64Encode(CLIENT_ID + ':' + CLIENT_SECRET) },
+    muteHttpExceptions: true
   };
   
   const response = UrlFetchApp.fetch(url, options);
+  if (response.getResponseCode() !== 200) {
+    SpreadsheetApp.getUi().alert('Authentication Failed', 'Failed to authenticate with Blizzard API. Please verify your Client ID and Client Secret.', SpreadsheetApp.getUi().ButtonSet.OK);
+    return null;
+  }
   const data = JSON.parse(response.getContentText());
   token = data.access_token;
   const expiryTime = new Date().getTime() + (data.expires_in - 60) * 1000;
@@ -190,7 +198,7 @@ function getAccessToken(config) {
 function fetchBlizzardEndpoint(url, headers) {
   try {
     const response = UrlFetchApp.fetch(url, { headers: headers, 'muteHttpExceptions': true });
-    if (response.getResponseCode() == 200) {
+    if (response.getResponseCode() === 200) {
       return JSON.parse(response.getContentText());
     }
     Logger.log(`Failed to fetch ${url}. Response code: ${response.getResponseCode()}`);
@@ -205,12 +213,14 @@ function getBonusData() {
   Logger.log('Fetching bonuses.json from Raidbots...');
   const bonusUrl = 'https://www.raidbots.com/static/data/live/bonuses.json';
   try {
-    const response = UrlFetchApp.fetch(bonusUrl);
-    const bonusText = response.getContentText();
-    return JSON.parse(bonusText);
+    const response = UrlFetchApp.fetch(bonusUrl, { muteHttpExceptions: true });
+    if (response.getResponseCode() === 200) {
+      return JSON.parse(response.getContentText());
+    }
+    return {};
   } catch (e) {
     Logger.log(`Failed to fetch or parse bonuses.json. Error: ${e.toString()}`);
-    return null;
+    return {};
   }
 }
 
@@ -218,265 +228,336 @@ function getEnchantData() {
   Logger.log('Fetching enchantments.json from Raidbots...');
   const enchantUrl = 'https://www.raidbots.com/static/data/live/enchantments.json';
   try {
-    const response = UrlFetchApp.fetch(enchantUrl);
-    const enchantText = response.getContentText();
-    const enchantArray = JSON.parse(enchantText);
-    
-    // Convert array to a map for efficient lookups { id: {enchant_data} }
-    const enchantMap = enchantArray.reduce((map, enchant) => {
-      // Use the item ID for gems, or the enchant ID for enchants
-      const key = enchant.itemId || enchant.id;
-      map[key] = enchant;
-      return map;
-    }, {});
-    
-    return enchantMap;
+    const response = UrlFetchApp.fetch(enchantUrl, { muteHttpExceptions: true });
+    if (response.getResponseCode() === 200) {
+      const enchantArray = JSON.parse(response.getContentText());
+      return enchantArray.reduce((map, enchant) => {
+        const key = enchant.itemId || enchant.id;
+        map[key] = enchant;
+        return map;
+      }, {});
+    }
+    return {};
   } catch (e) {
     Logger.log(`Failed to fetch or parse enchantments.json. Error: ${e.toString()}`);
-    return null;
+    return {};
   }
 }
 
 function rgbToHex(r, g, b) {
-  // Convert each component to its hexadecimal string representation
   let rHex = r.toString(16);
   let gHex = g.toString(16);
   let bHex = b.toString(16);
-
-  // Pad single-digit hex values with a leading zero
   if (rHex.length === 1) rHex = "0" + rHex;
   if (gHex.length === 1) gHex = "0" + gHex;
   if (bHex.length === 1) bHex = "0" + bHex;
-
-  // Concatenate and return with the '#' prefix
   return "#" + rHex + gHex + bHex;
 }
 
 /**
- * Helper function to fetch and process data for a list of character names.
- * @param {Array<string>} characterNames - The list of character names to process.
- * @param {Array<Object>} guildRosterMembers - The full guild roster from the API.
- * @param {Object} config - The script's configuration object.
- * @param {string} token - The Blizzard API access token.
- * @param {Object} enchantAndGemData - The enchant and gem data from Raidbots.
- * @param {Object} bonusData - The bonus ID data from Raidbots.
- * @param {Array<string>} outputHeaders - The headers for the output sheet.
- * @returns {Array<Object>} An array of character data objects.
+ * Fast batch fetching of all character endpoints using UrlFetchApp.fetchAll.
  */
-function processCharacterSet(characterNames, guildRosterMembers, config, token, enchantAndGemData, bonusData, outputHeaders) {
-    const characterDataObjects = [];
-    const headers = { 'Authorization': 'Bearer ' + token, 'Battlenet-Namespace': `profile-${config.REGION}` };
-    const apiHost = getApiHost(config);
+function fetchAllCharacterDataBatched(characterList, config, token) {
+  const headers = { 'Authorization': 'Bearer ' + token, 'Battlenet-Namespace': `profile-${config.REGION}` };
+  const apiHost = getApiHost(config);
+  const results = [];
+  const chunkSize = 15; // 15 characters * 5 endpoints = 75 parallel requests
 
-    const membersToTrackLower = characterNames.map(name => name.toLowerCase());
-    const filteredRoster = guildRosterMembers.filter(member =>
-        membersToTrackLower.includes(member.character.name.toLowerCase())
-    );
+  for (let i = 0; i < characterList.length; i += chunkSize) {
+    const chunk = characterList.slice(i, i + chunkSize);
+    const requests = [];
 
-    for (const member of filteredRoster) {
-        const charName = member.character.name.toLowerCase();
-        const charRealm = member.character.realm.slug;
-        
-        let charRow = {
-      'Name': member.character.name, 'Class': '', 'Spec': '', 'iLvl': 0,  'M+ Rating': 0, 
-      'Total Sockets': 0, 'Crafted Items': 0, 'Raid Buff (%)': 0, 'Imperfect Gems': 0,
-      'Embellishment 1': '-', 'Embellishment 2': '-',
-      //'Reshii Wraps Rank': '-', 'Reshii Boots': '-',
-      'Tier Set': '0/5', 'Tier Helm': '-', 'Tier Shoulder': '-', 'Tier Chest': '-', 'Tier Gloves': '-', 'Tier Legs': '-', 'Main Hand': '-', 'Off Hand': '-',  'Trinket 1': '-', 'Trinket 2': '-',
-       'Neck': '-', 'Back': '-', 'Wrists': '-', 'Wasit': '-', 'Feet': '-', 'Ring 1': '-', 'Ring 2': '-',
-      'Enchant Main Hand': 'Missing', 'Enchant Off Hand': 'Missing', 'Enchant Cloak': 'Missing', 'Enchant Chest': 'Missing', 'Enchant Wrists': 'Missing', 'Enchant Legs': 'Missing', 'Enchant Feet': 'Missing', 'Enchant Ring 1': 'Missing', 'Enchant Ring 2': 'Missing',
-      //'K\'aresh Trust Renown': 0, 'Manaforge Vandals Renown': 0, 
-      'GV Slots Unlocked': 0,
-      'GV Raid 1': '-', 'GV Raid 2': '-', 'GV Raid 3': '-',
-      'GV M+ 1': '-', 'GV M+ 2': '-', 'GV M+ 3': '-'
+    chunk.forEach(char => {
+      const charName = encodeURIComponent(char.name.toLowerCase());
+      const charRealm = encodeURIComponent(char.realmSlug);
+      requests.push({ url: `${apiHost}/profile/wow/character/${charRealm}/${charName}?locale=en_US`, headers: headers, muteHttpExceptions: true });
+      requests.push({ url: `${apiHost}/profile/wow/character/${charRealm}/${charName}/equipment?locale=en_US`, headers: headers, muteHttpExceptions: true });
+      requests.push({ url: `${apiHost}/profile/wow/character/${charRealm}/${charName}/reputations?locale=en_US`, headers: headers, muteHttpExceptions: true });
+      requests.push({ url: `${apiHost}/profile/wow/character/${charRealm}/${charName}/mythic-keystone-profile?locale=en_US`, headers: headers, muteHttpExceptions: true });
+      requests.push({ url: `${apiHost}/profile/wow/character/${charRealm}/${charName}/encounters/raids?locale=en_US`, headers: headers, muteHttpExceptions: true });
+    });
+
+    const responses = UrlFetchApp.fetchAll(requests);
+
+    chunk.forEach((char, idx) => {
+      const baseIdx = idx * 5;
+      const parseJson = (resp) => {
+        try {
+          if (resp && resp.getResponseCode() === 200) {
+            return JSON.parse(resp.getContentText());
+          }
+        } catch (e) {
+          Logger.log(`Error parsing response for ${char.name}: ${e}`);
+        }
+        return null;
       };
 
-    // --- Fetch all character data ---
-    const profileData = fetchBlizzardEndpoint(`${apiHost}/profile/wow/character/${charRealm}/${charName}?locale=en_US`, headers);
-    const equipmentData = fetchBlizzardEndpoint(`${apiHost}/profile/wow/character/${charRealm}/${charName}/equipment?locale=en_US`, headers);
-    const reputationsData = fetchBlizzardEndpoint(`${apiHost}/profile/wow/character/${charRealm}/${charName}/reputations?locale=en_US`, headers);
-    const mplusData = fetchBlizzardEndpoint(`${apiHost}/profile/wow/character/${charRealm}/${charName}/mythic-keystone-profile?locale=en_US`, headers);
-    const raidData = fetchBlizzardEndpoint(`${apiHost}/profile/wow/character/${charRealm}/${charName}/encounters/raids?locale=en_US`, headers);
-
-    
-    // --- Process Profile ---
-    if (profileData) {
-      charRow['iLvl'] = profileData.equipped_item_level;
-      charRow['Class'] = profileData.character_class.name;
-      charRow['Spec'] = profileData.active_spec.name;
-    }
-
-    // --- Process Great Vault Data ---
-    if (mplusData) {
-      if (mplusData.current_mythic_rating) {
-          charRow['M+ Rating'] = mplusData.current_mythic_rating.rating;
-          const c = mplusData.current_mythic_rating.color;
-          charRow['M+ Rating Color'] = rgbToHex(c.r, c.g, c.b);
-      }
-
-      if (mplusData.current_period){
-        // timestamp logic
-        const weekStartTimestamp = (mplusData.current_period.period.id * 604800000) + 1135699200000;
-        const weekEndTimestamp = weekStartTimestamp + 604800000;
-
-        // Raid Slots (using the calculated timestamps)
-        if (raidData) {
-            // Target latest raid
-            //const latestRaid = raidData.expansions?.slice(-1)[0]?.instances?.slice(-1)[0];
-            // Target the entire latest expansion instead of just the last instance
-            const latestExpansion = raidData.expansions?.slice(-2)[0];
-            //if (latestRaid) {
-            if (latestExpansion && latestExpansion.instances) {
-                let weeklyMythicKills = 0;
-                let weeklyHeroicKills = 0;
-                let weeklyNormalKills = 0;
-                let weeklyLFRKills = 0;
-                // Loop logic for single instanced raid seasons
-                /*for (const mode of latestRaid.modes) {
-                    for (const boss of mode.progress.encounters) {
-                        if (boss.last_kill_timestamp >= weekStartTimestamp && boss.last_kill_timestamp < weekEndTimestamp) {
-                            if (mode.difficulty.type === 'MYTHIC') weeklyMythicKills++;
-                            if (mode.difficulty.type === 'HEROIC') weeklyHeroicKills++;
-                            if (mode.difficulty.type === 'NORMAL') weeklyNormalKills++;
-                            if (mode.difficulty.type === 'LFR') weeklyLFRKills++;
-                        }
-                    }
-                }*/
-                // Logic for multi-instance raid seasons
-                for (const raidInstance of latestExpansion.instances) {
-                  // ADD THIS LINE: Log the name of the instance being checked
-                  Logger.log(`Checking Raid Instance: ${raidInstance.instance.name}`);
-                    if (raidInstance.modes) {
-                        for (const mode of raidInstance.modes) {
-                            // Added an optional chain/check to safely catch missing progress
-                            if (mode.progress && mode.progress.encounters) {
-                                for (const boss of mode.progress.encounters) {
-                                    // Check if the kill falls within the current week's timestamps
-                                    if (boss.last_kill_timestamp >= weekStartTimestamp && boss.last_kill_timestamp < weekEndTimestamp) {
-                                        if (mode.difficulty.type === 'MYTHIC') weeklyMythicKills++;
-                                        if (mode.difficulty.type === 'HEROIC') weeklyHeroicKills++;
-                                        if (mode.difficulty.type === 'NORMAL') weeklyNormalKills++;
-                                        if (mode.difficulty.type === 'LFR') weeklyLFRKills++;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                Logger.log(`Generating data for ${charName}`)
-
-                if (weeklyLFRKills >= 6) charRow['GV Raid 3'] = VAULT_MAPPING.raid.lfr, charRow['GV Raid 2'] = VAULT_MAPPING.raid.lfr, charRow['GV Raid 1'] = VAULT_MAPPING.raid.lfr;
-                else if (weeklyLFRKills >= 4) charRow['GV Raid 2'] = VAULT_MAPPING.raid.lfr, charRow['GV Raid 1'] = VAULT_MAPPING.raid.lfr;
-                else if (weeklyLFRKills >= 2) charRow['GV Raid 1'] = VAULT_MAPPING.raid.lfr;
-
-                if (weeklyNormalKills >= 6) charRow['GV Raid 3'] = VAULT_MAPPING.raid.normal, charRow['GV Raid 2'] = VAULT_MAPPING.raid.normal, charRow['GV Raid 1'] = VAULT_MAPPING.raid.normal;
-                else if (weeklyNormalKills >= 4) charRow['GV Raid 2'] = VAULT_MAPPING.raid.normal, charRow['GV Raid 1'] = VAULT_MAPPING.raid.normal;
-                else if (weeklyNormalKills >= 2) charRow['GV Raid 1'] = VAULT_MAPPING.raid.normal;
-                                
-                if (weeklyHeroicKills >= 6) charRow['GV Raid 3'] = VAULT_MAPPING.raid.heroic, charRow['GV Raid 2'] = VAULT_MAPPING.raid.heroic, charRow['GV Raid 1'] = VAULT_MAPPING.raid.heroic;
-                else if (weeklyHeroicKills >= 4) charRow['GV Raid 2'] = VAULT_MAPPING.raid.heroic, charRow['GV Raid 1'] = VAULT_MAPPING.raid.heroic;
-                else if (weeklyHeroicKills >= 2) charRow['GV Raid 1'] = VAULT_MAPPING.raid.heroic;
-
-                if (weeklyMythicKills >= 6) charRow['GV Raid 3'] = VAULT_MAPPING.raid.mythic, charRow['GV Raid 2'] = VAULT_MAPPING.raid.mythic, charRow['GV Raid 1'] = VAULT_MAPPING.raid.mythic;
-                else if (weeklyMythicKills >= 4) charRow['GV Raid 2'] = VAULT_MAPPING.raid.mythic, charRow['GV Raid 1'] = VAULT_MAPPING.raid.mythic;
-                else if (weeklyMythicKills >= 2) charRow['GV Raid 1'] = VAULT_MAPPING.raid.mythic;
-            }
-        }
-    
-        // Mythic+ Slots (this part is already weekly)
-        if (mplusData.current_period.best_runs) {
-            const sortedRuns = mplusData.current_period.best_runs.sort((a, b) => b.keystone_level - a.keystone_level);
-            if (sortedRuns.length >= 1) charRow['GV M+ 1'] = VAULT_MAPPING.mplus[sortedRuns[0].keystone_level] || '-';
-            if (sortedRuns.length >= 4) charRow['GV M+ 2'] = VAULT_MAPPING.mplus[sortedRuns[3].keystone_level] || '-';
-            if (sortedRuns.length >= 8) charRow['GV M+ 3'] = VAULT_MAPPING.mplus[sortedRuns[7].keystone_level] || '-';
-        }
-
-        }
-    }
-    
-    // Count unlocked slots
-    let unlockedCount = 0;
-    ['GV Raid 1', 'GV Raid 2', 'GV Raid 3', 'GV M+ 1', 'GV M+ 2', 'GV M+ 3'].forEach(slot => {
-        if (charRow[slot] !== '-') unlockedCount++;
+      results.push({
+        character: char,
+        profileData: parseJson(responses[baseIdx]),
+        equipmentData: parseJson(responses[baseIdx + 1]),
+        reputationsData: parseJson(responses[baseIdx + 2]),
+        mplusData: parseJson(responses[baseIdx + 3]),
+        raidData: parseJson(responses[baseIdx + 4])
+      });
     });
-    charRow['GV Slots Unlocked'] = unlockedCount;
+  }
 
+  return results;
+}
 
-    // --- Process Reputations ---
-    if (reputationsData) {
-      for (const rep of reputationsData.reputations) {
-        if (rep.faction.name === "The K'aresh Trust") {
-          charRow['K\'aresh Trust Renown'] = rep.standing.renown_level || 0;
-        }
-        // Fill in faction name e.g.: "Manaforge Vandals"
-        if (rep.faction.name === "") {
-          const renown = rep.standing.renown_level || 0;
-          charRow['Manaforge Vandals Renown'] = renown;
-          // Calculate Raid Buff
-          if (renown >= 15) charRow['Raid Buff (%)'] = '15%';
-          else if (renown >= 13) charRow['Raid Buff (%)'] = '12%';
-          else if (renown >= 10) charRow['Raid Buff (%)'] = '9%';
-          else if (renown >= 7) charRow['Raid Buff (%)'] = '6%';
-          else if (renown >= 4) charRow['Raid Buff (%)'] = '3%';
-        }
-      }
-    }
-
+/**
+ * Calculates a summary readiness badge for the character.
+ */
+function calculateRaidReadyStatus(charRow) {
+  const issues = [];
   
-    
-    // --- Process Equipment ---
-    if (equipmentData) {
-      let tierCount = 0;
-      const embellishments = [];
-      for (const item of equipmentData.equipped_items) {
-        // UPDATED: Sockets & Gems logic
-        if (item.sockets) {
-          charRow['Total Sockets'] += item.sockets.length;
-          for (const socket of item.sockets) {
-            if (socket.item) {
-              const gemId = socket.item.id;
-              const gemData = enchantAndGemData[gemId];
-              // If the gem is found and its craftingQuality is NOT 3, increment the counter.
-              if (gemData && gemData.craftingQuality < 3) {
-                charRow['Imperfect Gems']++;
+  // Tier set check (warn if less than 4pc of current tier)
+  const tierSetText = charRow['Tier Set'] || '';
+  const tierMatch = tierSetText.match(/^(\d+)\/5/);
+  const currentCount = tierMatch ? parseInt(tierMatch[1], 10) : 0;
+  if (currentCount < 4) {
+    issues.push(`${currentCount}/4 Tier`);
+  }
+  
+  if (charRow['Empty Sockets'] > 0) {
+    issues.push(`${charRow['Empty Sockets']} Empty Socket${charRow['Empty Sockets'] > 1 ? 's' : ''}`);
+  }
+  
+  const enchantCols = [
+    'Enchant Main Hand', 'Enchant Off Hand', 'Enchant Head', 'Enchant Shoulder',
+    'Enchant Chest', 'Enchant Legs', 'Enchant Feet', 'Enchant Ring 1', 'Enchant Ring 2'
+  ];
+  let missingEnchants = 0;
+  enchantCols.forEach(col => {
+    if (charRow[col] === 'Missing') missingEnchants++;
+  });
+  
+  if (missingEnchants > 0) {
+    issues.push(`${missingEnchants} Missing Enchant${missingEnchants > 1 ? 's' : ''}`);
+  }
+  
+  return issues.length === 0 ? 'READY' : issues.join(', ');
+}
+
+/**
+ * Processes a list of characters and extracts all gear, vault, and audit data.
+ */
+function processCharacterSet(characterNames, guildRosterMembers, config, token, enchantAndGemData, bonusData) {
+  const membersToTrackLower = characterNames.map(name => name.toLowerCase());
+  const filteredRoster = guildRosterMembers
+    .filter(m => membersToTrackLower.includes(m.character.name.toLowerCase()))
+    .map(m => ({ name: m.character.name, realmSlug: m.character.realm.slug }));
+
+  if (filteredRoster.length === 0) {
+    return [];
+  }
+
+  Logger.log(`Batch fetching data for ${filteredRoster.length} characters...`);
+  const batchedPayloads = fetchAllCharacterDataBatched(filteredRoster, config, token);
+  const characterDataObjects = [];
+
+  // --- PASS 1: Roster-Wide Discovery of Active Season Tier Set IDs ---
+  // In WoW, all tier sets in a new season share a higher numerical ID range (within 15 of each other).
+  let globalMaxSetId = 0;
+  const classToMaxSetId = {};
+
+  for (const item of batchedPayloads) {
+    const eq = item.equipmentData;
+    const className = (item.profileData && item.profileData.character_class) ? item.profileData.character_class.name : '';
+    if (eq && eq.equipped_items) {
+      for (const eqItem of eq.equipped_items) {
+        if (['HEAD', 'SHOULDER', 'CHEST', 'HANDS', 'LEGS'].includes(eqItem.slot.type) && eqItem.set && eqItem.set.item_set) {
+          const setId = Number(eqItem.set.item_set.id) || 0;
+          if (setId > 0) {
+            if (setId > globalMaxSetId) globalMaxSetId = setId;
+            if (className) {
+              if (!classToMaxSetId[className] || setId > classToMaxSetId[className]) {
+                classToMaxSetId[className] = setId;
               }
             }
           }
         }
-        // Count Crafted Items
-        if(item.name_description){
-          if (item.name_description.display_string.includes("Crafted")) {
-            charRow['Crafted Items']++;
-        
-          // Find Embellishments
-            if (item.spells) {
-                for(const spell of item.spells) {
-                    if(spell.spell.name && !item.bonus_list.includes(11192) ) embellishments.push(spell.spell.name);
+      }
+    }
+  }
 
+  // Any set ID older than (globalMaxSetId - 15) belongs to a previous season's database block
+  const seasonMinSetIdThreshold = globalMaxSetId > 0 ? (globalMaxSetId - 15) : 0;
+
+  // --- PASS 2: Process Character Rows ---
+  for (const item of batchedPayloads) {
+    const { character, profileData, equipmentData, reputationsData, mplusData, raidData } = item;
+    const charName = character.name;
+
+    let charRow = {
+      'Name': charName,
+      'Class': '',
+      'Spec': '',
+      'iLvl': 0,
+      'Raid Ready': 'Checking...',
+      'M+ Rating': 0,
+      'Tier Set': '0/5',
+      'Total Sockets': 0,
+      'Empty Sockets': 0,
+      'Imperfect Gems': 0,
+      'Crafted Items': 0,
+      'Embellishment 1': '-',
+      'Embellishment 2': '-',
+      'Head': '-',
+      'Shoulders': '-',
+      'Chest': '-',
+      'Hands': '-',
+      'Legs': '-',
+      'Main Hand': '-',
+      'Off Hand': '-',
+      'Trinket 1': '-',
+      'Trinket 2': '-',
+      'Neck': '-',
+      'Back': '-',
+      'Wrist': '-',
+      'Waist': '-',
+      'Feet': '-',
+      'Ring 1': '-',
+      'Ring 2': '-',
+      'Enchant Main Hand': 'Missing',
+      'Enchant Off Hand': 'Missing',
+      'Enchant Head': 'Missing',
+      'Enchant Shoulder': 'Missing',
+      'Enchant Chest': 'Missing',
+      'Enchant Legs': 'Missing',
+      'Enchant Feet': 'Missing',
+      'Enchant Ring 1': 'Missing',
+      'Enchant Ring 2': 'Missing',
+      'GV Slots Unlocked': 0,
+      'GV Raid 1': '-',
+      'GV Raid 2': '-',
+      'GV Raid 3': '-',
+      'GV M+ 1': '-',
+      'GV M+ 2': '-',
+      'GV M+ 3': '-'
+    };
+
+    // --- 1. Process Profile ---
+    if (profileData) {
+      charRow['iLvl'] = profileData.equipped_item_level || 0;
+      charRow['Class'] = profileData.character_class ? profileData.character_class.name : '';
+      charRow['Spec'] = profileData.active_spec ? profileData.active_spec.name : '';
+    }
+
+    // --- 2. Process Great Vault & Raids ---
+    if (mplusData) {
+      if (mplusData.current_mythic_rating) {
+        charRow['M+ Rating'] = Math.round(mplusData.current_mythic_rating.rating || 0);
+        const c = mplusData.current_mythic_rating.color;
+        if (c) {
+          charRow['M+ Rating Color'] = rgbToHex(c.r, c.g, c.b);
+        }
+      }
+
+      if (mplusData.current_period && mplusData.current_period.period) {
+        const weekStartTimestamp = (mplusData.current_period.period.id * 604800000) + 1135699200000;
+        const weekEndTimestamp = weekStartTimestamp + 604800000;
+
+        // Robust Raid Kill Tracking: Scan recent expansions for kills in current period
+        if (raidData && raidData.expansions) {
+          let weeklyMythicKills = 0;
+          let weeklyHeroicKills = 0;
+          let weeklyNormalKills = 0;
+          let weeklyLFRKills = 0;
+
+          // Check the last 3 expansion entries to be immune to expansion index changes
+          const expansionsToCheck = raidData.expansions.slice(-3);
+          for (const exp of expansionsToCheck) {
+            if (exp.instances) {
+              for (const raidInstance of exp.instances) {
+                if (raidInstance.modes) {
+                  for (const mode of raidInstance.modes) {
+                    if (mode.progress && mode.progress.encounters) {
+                      for (const boss of mode.progress.encounters) {
+                        if (boss.last_kill_timestamp >= weekStartTimestamp && boss.last_kill_timestamp < weekEndTimestamp) {
+                          if (mode.difficulty.type === 'MYTHIC') weeklyMythicKills++;
+                          else if (mode.difficulty.type === 'HEROIC') weeklyHeroicKills++;
+                          else if (mode.difficulty.type === 'NORMAL') weeklyNormalKills++;
+                          else if (mode.difficulty.type === 'LFR') weeklyLFRKills++;
+                        }
+                      }
+                    }
+                  }
                 }
+              }
             }
           }
+
+          if (weeklyLFRKills >= 6) { charRow['GV Raid 3'] = VAULT_MAPPING.raid.lfr; charRow['GV Raid 2'] = VAULT_MAPPING.raid.lfr; charRow['GV Raid 1'] = VAULT_MAPPING.raid.lfr; }
+          else if (weeklyLFRKills >= 4) { charRow['GV Raid 2'] = VAULT_MAPPING.raid.lfr; charRow['GV Raid 1'] = VAULT_MAPPING.raid.lfr; }
+          else if (weeklyLFRKills >= 2) { charRow['GV Raid 1'] = VAULT_MAPPING.raid.lfr; }
+
+          if (weeklyNormalKills >= 6) { charRow['GV Raid 3'] = VAULT_MAPPING.raid.normal; charRow['GV Raid 2'] = VAULT_MAPPING.raid.normal; charRow['GV Raid 1'] = VAULT_MAPPING.raid.normal; }
+          else if (weeklyNormalKills >= 4) { charRow['GV Raid 2'] = VAULT_MAPPING.raid.normal; charRow['GV Raid 1'] = VAULT_MAPPING.raid.normal; }
+          else if (weeklyNormalKills >= 2) { charRow['GV Raid 1'] = VAULT_MAPPING.raid.normal; }
+                          
+          if (weeklyHeroicKills >= 6) { charRow['GV Raid 3'] = VAULT_MAPPING.raid.heroic; charRow['GV Raid 2'] = VAULT_MAPPING.raid.heroic; charRow['GV Raid 1'] = VAULT_MAPPING.raid.heroic; }
+          else if (weeklyHeroicKills >= 4) { charRow['GV Raid 2'] = VAULT_MAPPING.raid.heroic; charRow['GV Raid 1'] = VAULT_MAPPING.raid.heroic; }
+          else if (weeklyHeroicKills >= 2) { charRow['GV Raid 1'] = VAULT_MAPPING.raid.heroic; }
+
+          if (weeklyMythicKills >= 6) { charRow['GV Raid 3'] = VAULT_MAPPING.raid.mythic; charRow['GV Raid 2'] = VAULT_MAPPING.raid.mythic; charRow['GV Raid 1'] = VAULT_MAPPING.raid.mythic; }
+          else if (weeklyMythicKills >= 4) { charRow['GV Raid 2'] = VAULT_MAPPING.raid.mythic; charRow['GV Raid 1'] = VAULT_MAPPING.raid.mythic; }
+          else if (weeklyMythicKills >= 2) { charRow['GV Raid 1'] = VAULT_MAPPING.raid.mythic; }
         }
 
-
-        // Find Enchants
-        if(item.enchantments) {
-            const enchantName = item.enchantments[0].display_string;
-            if (item.slot.type === 'MAIN_HAND') charRow['Enchant Main Hand'] = enchantName;
-            if (item.slot.type === 'OFF_HAND') charRow['Enchant Off Hand'] = enchantName;
-            //todo: add exceptions for offhand types of HOLDABLE and SHIELD and Hunters using mainhand RANGEDRIGHT
-            //if (item.inventory_type.type === 'TWOHWEAPON' && item.slot.type !== 'OFF_HAND') charRow['Enchant Off Hand'] = 'N/A';
-            if (item.slot.type === 'BACK') charRow['Enchant Cloak'] = enchantName;
-            if (item.slot.type === 'CHEST') charRow['Enchant Chest'] = enchantName;
-            if (item.slot.type === 'WRIST') charRow['Enchant Wrists'] = enchantName;
-            if (item.slot.type === 'LEGS') charRow['Enchant Legs'] = enchantName;
-            if (item.slot.type === 'FEET') charRow['Enchant Feet'] = enchantName;
-            if (item.slot.type === 'FINGER_1') charRow['Enchant Ring 1'] = enchantName;
-            if (item.slot.type === 'FINGER_2') charRow['Enchant Ring 2'] = enchantName;
+        // Mythic+ Vault Slots
+        if (mplusData.current_period.best_runs) {
+          const sortedRuns = mplusData.current_period.best_runs.sort((a, b) => b.keystone_level - a.keystone_level);
+          if (sortedRuns.length >= 1) charRow['GV M+ 1'] = VAULT_MAPPING.mplus[sortedRuns[0].keystone_level] || '-';
+          if (sortedRuns.length >= 4) charRow['GV M+ 2'] = VAULT_MAPPING.mplus[sortedRuns[3].keystone_level] || '-';
+          if (sortedRuns.length >= 8) charRow['GV M+ 3'] = VAULT_MAPPING.mplus[sortedRuns[7].keystone_level] || '-';
         }
-        // Find Tier Pieces and their upgrade tracks
+      }
+    }
+
+    // Count Unlocked Vault Slots
+    let unlockedCount = 0;
+    ['GV Raid 1', 'GV Raid 2', 'GV Raid 3', 'GV M+ 1', 'GV M+ 2', 'GV M+ 3'].forEach(slot => {
+      if (charRow[slot] !== '-') unlockedCount++;
+    });
+    charRow['GV Slots Unlocked'] = unlockedCount;
+
+    // --- 3. Process Equipment, Sockets, Enchants & Tier ---
+    if (equipmentData && equipmentData.equipped_items) {
+      const embellishments = [];
+      let isTwoHandWeapon = false;
+      let hasOffHandItem = false;
+      let offHandInventoryType = '';
+
+      // Tier helper: Verifies piece is from the active season tier ID block and matches class max set ID
+      const tierSlots = ['HEAD', 'SHOULDER', 'CHEST', 'HANDS', 'LEGS'];
+      const isCurrentSeasonPiece = (eqItem) => {
+        if (!eqItem.set || !eqItem.set.item_set) return false;
+        const setId = Number(eqItem.set.item_set.id) || 0;
+        if (setId === 0) return false;
+        if (seasonMinSetIdThreshold > 0 && setId < seasonMinSetIdThreshold) return false;
+        const charClass = charRow['Class'];
+        if (charClass && classToMaxSetId[charClass] && setId < classToMaxSetId[charClass]) return false;
+        return true;
+      };
+
+      let currentTierCount = 0;
+      let prevTierCount = 0;
+      for (const eqItem of equipmentData.equipped_items) {
+        if (tierSlots.includes(eqItem.slot.type) && eqItem.set && eqItem.set.item_set) {
+          if (isCurrentSeasonPiece(eqItem)) {
+            currentTierCount++;
+          } else {
+            prevTierCount++;
+          }
+        }
+      }
+
+      for (const item of equipmentData.equipped_items) {
+        // Upgrade Track & Progress extraction
         let upgradeInfo = '-';
-        if (item.bonus_list) {
+        if (item.bonus_list && bonusData) {
           for (const bonusId of item.bonus_list) {
             const bonus = bonusData[bonusId];
             if (bonus && bonus.upgrade) {
@@ -485,156 +566,240 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
             }
           }
         }
-        
-
-        //Find weapons
-        if (item.slot.type === 'MAIN_HAND') charRow['Main Hand'] = `${item.name} ${item.level.value} (${upgradeInfo})`;
-        if (item.slot.type === 'OFF_HAND') charRow['Off Hand'] = `${item.name} ${item.level.value} (${upgradeInfo})`;
-        //Find Minor Gear
-        if(item.slot.type === 'NECK') charRow['Neck'] = `${item.name} ${item.level.value} (${upgradeInfo})`
-        if(item.slot.type === 'WAIST') charRow['Waist'] = `${item.name} ${item.level.value} (${upgradeInfo})`
-        if(item.slot.type === 'FEET') charRow['Feet'] = `${item.name} ${item.level.value} (${upgradeInfo})`
-        if(item.slot.type === 'WRIST') charRow['Wrist'] = `${item.name} ${item.level.value} (${upgradeInfo})`
-        if(item.slot.type === 'FINGER_1') charRow['Ring 1'] = `${item.name} ${item.level.value} (${upgradeInfo})`
-        if(item.slot.type === 'FINGER_2') charRow['Ring 2'] = `${item.name} ${item.level.value} (${upgradeInfo})`
-
-        // Find Trinkets
-        if(item.slot.type === 'TRINKET_1') charRow['Trinket 1'] = `${item.name} ${item.level.value} (${upgradeInfo})`
-        if(item.slot.type === 'TRINKET_2') charRow['Trinket 2'] = `${item.name} ${item.level.value} (${upgradeInfo})`
-
-        if (item.set) { 
-          if (item.slot.type === 'HEAD') charRow['Tier Helm'] = `${item.level.value} (${upgradeInfo})`, tierCount++;
-          if (item.slot.type === 'SHOULDER') charRow['Tier Shoulder'] = `${item.level.value} (${upgradeInfo})`, tierCount++;
-          if (item.slot.type === 'CHEST') charRow['Tier Chest'] = `${item.level.value} (${upgradeInfo})`, tierCount++;
-          if (item.slot.type === 'HANDS') charRow['Tier Gloves'] = `${item.level.value} (${upgradeInfo})`, tierCount++;
-          if (item.slot.type === 'LEGS') charRow['Tier Legs'] = `${item.level.value} (${upgradeInfo})`,tierCount++;
+        if (upgradeInfo === '-') {
+          if (item.name_description && item.name_description.display_string.includes("Crafted")) {
+            upgradeInfo = 'Crafted';
+          } else if (item.quality && item.quality.type === 'LEGENDARY') {
+            upgradeInfo = 'Legendary';
+          }
         }
+
+        // Track weapon types for offhand enchant logic
+        if (item.slot.type === 'MAIN_HAND') {
+          if (item.inventory_type && (item.inventory_type.type === 'TWOHWEAPON' || item.inventory_type.type === 'RANGED' || item.inventory_type.type === 'RANGEDRIGHT')) {
+            isTwoHandWeapon = true;
+          }
+        }
+        if (item.slot.type === 'OFF_HAND') {
+          hasOffHandItem = true;
+          offHandInventoryType = item.inventory_type ? item.inventory_type.type : '';
+        }
+
+        // Sockets & Gems logic (Midnight 2-rank quality: Silver Rank 1, Gold Rank 2)
+        if (item.sockets) {
+          for (const socket of item.sockets) {
+            charRow['Total Sockets']++;
+            if (socket.item) {
+              const gemId = socket.item.id;
+              const gemData = enchantAndGemData ? enchantAndGemData[gemId] : null;
+              // In Midnight, gems have 2 ranks (Silver = 1, Gold = 2). Flag Silver (< 2) as Imperfect.
+              const quality = gemData ? (gemData.craftingQuality || gemData.quality || 2) : 2;
+              if (quality < 2) {
+                charRow['Imperfect Gems']++;
+              }
+            } else {
+              charRow['Empty Sockets']++;
+            }
+          }
+        }
+
+        // Crafted Items & Embellishments
+        if (item.name_description && item.name_description.display_string.includes("Crafted")) {
+          charRow['Crafted Items']++;
+          if (item.spells) {
+            for (const spell of item.spells) {
+              if (spell.spell && spell.spell.name && (!item.bonus_list || !item.bonus_list.includes(11192))) {
+                embellishments.push(spell.spell.name);
+              }
+            }
+          }
+        }
+
+        // Enchants (Midnight slots: MH, OH, Head, Shoulder, Chest, Legs, Feet, Ring 1, Ring 2)
+        if (item.enchantments && item.enchantments.length > 0) {
+          const enchantName = item.enchantments[0].display_string;
+          if (item.slot.type === 'MAIN_HAND') charRow['Enchant Main Hand'] = enchantName;
+          if (item.slot.type === 'OFF_HAND') charRow['Enchant Off Hand'] = enchantName;
+          if (item.slot.type === 'HEAD') charRow['Enchant Head'] = enchantName;
+          if (item.slot.type === 'SHOULDER') charRow['Enchant Shoulder'] = enchantName;
+          if (item.slot.type === 'CHEST') charRow['Enchant Chest'] = enchantName;
+          if (item.slot.type === 'LEGS') charRow['Enchant Legs'] = enchantName;
+          if (item.slot.type === 'FEET') charRow['Enchant Feet'] = enchantName;
+          if (item.slot.type === 'FINGER_1') charRow['Enchant Ring 1'] = enchantName;
+          if (item.slot.type === 'FINGER_2') charRow['Enchant Ring 2'] = enchantName;
+        }
+
+        // Tier Prefix Resolver: [Tier] for current season, [Prev Tier] for older season
+        let tierPrefix = '';
+        if (tierSlots.includes(item.slot.type) && item.set && item.set.item_set) {
+          tierPrefix = isCurrentSeasonPiece(item) ? '[Tier] ' : '[Prev Tier] ';
+        }
+
+        // Slot Gear Display helper: [Tier/Prev Tier] <ilvl> (<track> <level>/<max>) - <Item Name>
+        const formatItemDisplay = (equippedItem, prefix = '') => {
+          const ilvl = equippedItem.level ? equippedItem.level.value : '';
+          const itemName = equippedItem.name ? ` - ${equippedItem.name}` : '';
+          return `${prefix}${ilvl} (${upgradeInfo})${itemName}`;
+        };
+
+        // Tier Armor Slots
+        if (item.slot.type === 'HEAD') charRow['Head'] = formatItemDisplay(item, tierPrefix);
+        if (item.slot.type === 'SHOULDER') charRow['Shoulders'] = formatItemDisplay(item, tierPrefix);
+        if (item.slot.type === 'CHEST') charRow['Chest'] = formatItemDisplay(item, tierPrefix);
+        if (item.slot.type === 'HANDS') charRow['Hands'] = formatItemDisplay(item, tierPrefix);
+        if (item.slot.type === 'LEGS') charRow['Legs'] = formatItemDisplay(item, tierPrefix);
+
+        // Other Gear Slots
+        if (item.slot.type === 'MAIN_HAND') charRow['Main Hand'] = formatItemDisplay(item);
+        if (item.slot.type === 'OFF_HAND') charRow['Off Hand'] = formatItemDisplay(item);
+        if (item.slot.type === 'NECK') charRow['Neck'] = formatItemDisplay(item);
+        if (item.slot.type === 'WAIST') charRow['Waist'] = formatItemDisplay(item);
+        if (item.slot.type === 'FEET') charRow['Feet'] = formatItemDisplay(item);
+        if (item.slot.type === 'WRIST') charRow['Wrist'] = formatItemDisplay(item);
+        if (item.slot.type === 'FINGER_1') charRow['Ring 1'] = formatItemDisplay(item);
+        if (item.slot.type === 'FINGER_2') charRow['Ring 2'] = formatItemDisplay(item);
+        if (item.slot.type === 'TRINKET_1') charRow['Trinket 1'] = formatItemDisplay(item);
+        if (item.slot.type === 'TRINKET_2') charRow['Trinket 2'] = formatItemDisplay(item);
       }
-      charRow['Tier Set'] = `${tierCount}/5`;
-      if(embellishments[0]) charRow['Embellishment 1'] = embellishments[0];
-      if(embellishments[1]) charRow['Embellishment 2'] = embellishments[1];
-    }
-        characterDataObjects.push(charRow);
-        Logger.log(`Successfully processed data for ${member.character.name}`);
-        Utilities.sleep(300);
-    }
-    // --- End of the main loop ---
 
-    return characterDataObjects;
+      // Off-Hand Enchant Exception Handling
+      if (isTwoHandWeapon && !hasOffHandItem) {
+        charRow['Enchant Off Hand'] = 'N/A';
+      } else if (hasOffHandItem && offHandInventoryType === 'HOLDABLE') {
+        charRow['Enchant Off Hand'] = 'N/A'; // Held in Off-Hand cannot be enchanted
+      }
+
+      // Dynamic Tier Set Status Formatting
+      if (currentTierCount >= 4) {
+        charRow['Tier Set'] = `${currentTierCount}/5`;
+      } else if (currentTierCount > 0 && prevTierCount > 0) {
+        charRow['Tier Set'] = `${currentTierCount}/5 (+${prevTierCount} Prev)`;
+      } else if (currentTierCount > 0 && prevTierCount === 0) {
+        charRow['Tier Set'] = `${currentTierCount}/5`;
+      } else if (currentTierCount === 0 && prevTierCount > 0) {
+        charRow['Tier Set'] = `0/5 (${prevTierCount} Prev)`;
+      } else {
+        charRow['Tier Set'] = `0/5`;
+      }
+
+      if (embellishments[0]) charRow['Embellishment 1'] = embellishments[0];
+      if (embellishments[1]) charRow['Embellishment 2'] = embellishments[1];
+    }
+
+    // --- 4. Calculate Raid Ready Summary ---
+    charRow['Raid Ready'] = calculateRaidReadyStatus(charRow);
+
+    characterDataObjects.push(charRow);
+    Logger.log(`Processed ${charName}`);
+  }
+
+  return characterDataObjects;
 }
-
 
 function updateAllCharacterDataWithBonuses() {
   const config = getConfigurationFromSheet();
   if (!config) return;
 
   const token = getAccessToken(config);
-  if (!token) { return; }
+  if (!token) return;
 
   const enchantAndGemData = getEnchantData();
-  if (!enchantAndGemData) { return; }
-
   const bonusData = getBonusData();
-  if (!bonusData) { return; }
 
   const headers = { 'Authorization': 'Bearer ' + token, 'Battlenet-Namespace': `profile-${config.REGION}` };
   const apiHost = getApiHost(config);
 
   const rosterData = fetchBlizzardEndpoint(`${apiHost}/data/wow/guild/${config.GUILD_REALM_SLUG}/${config.GUILD_NAME_SLUG}/roster?locale=en_US`, headers);
   if (!rosterData || !rosterData.members) {
-    Logger.log("Failed to fetch guild roster.");
+    SpreadsheetApp.getUi().alert('Roster Fetch Failed', 'Failed to fetch guild roster. Please check your Realm Slug and Guild Slug.', SpreadsheetApp.getUi().ButtonSet.OK);
     return;
   }
   
-  const characterDataObjects = [];
   const outputHeaders = [
-    'Name', 'Class', 'Spec', 'iLvl', 'M+ Rating', 
-    'Total Sockets', 'Crafted Items', 'Raid Buff (%)', 'Imperfect Gems',
+    'Name', 'Class', 'Spec', 'iLvl', 'Raid Ready', 'M+ Rating', 
+    'Tier Set', 'Total Sockets', 'Empty Sockets', 'Imperfect Gems', 'Crafted Items',
     'Embellishment 1', 'Embellishment 2',
-    //'Reshii Wraps Rank', 'Reshii Boots',
-    'Tier Set', 'Tier Helm', 'Tier Shoulder', 'Tier Chest', 'Tier Gloves', 'Tier Legs', 'Main Hand', 'Off Hand', 'Trinket 1', 'Trinket 2', 
+    'Head', 'Shoulders', 'Chest', 'Hands', 'Legs',
+    'Main Hand', 'Off Hand', 'Trinket 1', 'Trinket 2', 
     'Neck', 'Back', 'Wrist', 'Waist', 'Feet', 'Ring 1', 'Ring 2',
-    'Enchant Main Hand', 'Enchant Off Hand', 'Enchant Cloak', 'Enchant Chest', 'Enchant Wrists', 'Enchant Legs', 'Enchant Feet', 'Enchant Ring 1', 'Enchant Ring 2',
-    //'K\'aresh Trust Renown', 'Manaforge Vandals Renown', 
+    'Enchant Main Hand', 'Enchant Off Hand', 'Enchant Head', 'Enchant Shoulder', 'Enchant Chest', 'Enchant Legs', 'Enchant Feet', 'Enchant Ring 1', 'Enchant Ring 2',
     'GV Slots Unlocked', 
     'GV Raid 1', 'GV Raid 2', 'GV Raid 3',
     'GV M+ 1', 'GV M+ 2', 'GV M+ 3'
   ];
 
   // 1. Process Mains
-  const mainCharacterData = processCharacterSet(config.MEMBERS_TO_TRACK, rosterData.members, config, token, enchantAndGemData, bonusData, outputHeaders);
-  mainCharacterData.sort((a, b) => a['Class'].localeCompare(b['Class']));
+  const mainCharacterData = processCharacterSet(config.MEMBERS_TO_TRACK, rosterData.members, config, token, enchantAndGemData, bonusData);
+  mainCharacterData.sort((a, b) => (a['Class'] || '').localeCompare(b['Class'] || ''));
 
   // 2. Process Alts
   let altCharacterData = [];
   if (config.ALTS_TO_TRACK && config.ALTS_TO_TRACK.length > 0) {
-      altCharacterData = processCharacterSet(config.ALTS_TO_TRACK, rosterData.members, config, token, enchantAndGemData, bonusData, outputHeaders);
-      altCharacterData.sort((a, b) => a['Class'].localeCompare(b['Class']));
+      altCharacterData = processCharacterSet(config.ALTS_TO_TRACK, rosterData.members, config, token, enchantAndGemData, bonusData);
+      altCharacterData.sort((a, b) => (a['Class'] || '').localeCompare(b['Class'] || ''));
   }
 
-  // 3. Combine and Prepare for Sheet
+  // 3. Combine and Output
   const combinedDataObjects = [...mainCharacterData];
   const finalDataRows = [];
 
-  // Add main character data rows
-  finalDataRows.push(...mainCharacterData.map(obj => outputHeaders.map(header => obj[header] || '')));
+  finalDataRows.push(...mainCharacterData.map(obj => outputHeaders.map(header => obj[header] !== undefined ? obj[header] : '')));
   
-  // Add separator and alt data rows if alts exist
   if (altCharacterData.length > 0) {
-      // Add two empty rows for spacing
       finalDataRows.push(Array(outputHeaders.length).fill(''));
       finalDataRows.push(Array(outputHeaders.length).fill(''));
       
-      finalDataRows.push(...altCharacterData.map(obj => outputHeaders.map(header => obj[header] || '')));
-      combinedDataObjects.push({}, {}, ...altCharacterData); // Add placeholders for formatting
+      finalDataRows.push(...altCharacterData.map(obj => outputHeaders.map(header => obj[header] !== undefined ? obj[header] : '')));
+      combinedDataObjects.push({}, {}, ...altCharacterData);
   }
   
   const finalData = [outputHeaders, ...finalDataRows];
 
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-  if (sheet) {
-    sheet.clear();
-    sheet.clearFormats();
-    sheet.getRange(1, 1, finalData.length, finalData[0].length).setValues(finalData);
-    
-    // Pass the combined object list to formatting
-    applyFormatting(sheet, outputHeaders, combinedDataObjects);
-    Logger.log('Update complete!');
-  } else {
-    Logger.log(`Error: Could not find a sheet named '${SHEET_NAME}'. Please check the name.`);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
   }
+
+  sheet.clear();
+  sheet.clearFormats();
+  sheet.getRange(1, 1, finalData.length, finalData[0].length).setValues(finalData);
+  
+  applyFormatting(sheet, outputHeaders, combinedDataObjects);
+  SpreadsheetApp.getUi().alert('Audit Complete!', `Successfully updated ${mainCharacterData.length} mains and ${altCharacterData.length} alts.`, SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 /**
- * Applies all conditional formatting and cosmetic changes to the sheet.
- * @param {Sheet} sheet The Google Sheet object to format.
- * @param {Array<string>} headers The array of headers to find column indexes.
+ * Applies all conditional formatting and cosmetic styling.
  */
-//function applyFormatting(sheet, headers, dataRows) {
 function applyFormatting(sheet, headers, characterDataObjects) {
   const fullRange = sheet.getDataRange();
-  
-  // --- Center all text in the sheet ---
   fullRange.setHorizontalAlignment('center');
-  // --- END ---
-  // Freeze the first column
+  
+  // Reset all number formats so legacy percentage formatting from older sheets is cleared
+  fullRange.setNumberFormat('@');
+  
+  // Set integer number format for numeric stat columns
+  ['iLvl', 'M+ Rating', 'Total Sockets', 'Empty Sockets', 'Imperfect Gems', 'Crafted Items', 'GV Slots Unlocked'].forEach(colName => {
+    const colIdx = headers.indexOf(colName) + 1;
+    if (colIdx > 0 && sheet.getMaxRows() > 1) {
+      sheet.getRange(2, colIdx, sheet.getMaxRows() - 1, 1).setNumberFormat('0');
+    }
+  });
+  
   sheet.setFrozenColumns(1);
   sheet.setFrozenRows(1);
 
-  // --- Bolding and Resizing ---
+  // Header styling
   const headerRange = sheet.getRange(1, 1, 1, sheet.getMaxColumns());
-  headerRange.setBackground('#bbbbbb').setFontWeight('bold');
+  headerRange.setBackground('#202124').setFontColor('#ffffff').setFontWeight('bold');
   
-  const dataRangeToBold = sheet.getRange(2, 4, sheet.getMaxRows() -1, sheet.getMaxColumns() - 3);
+  const dataRangeToBold = sheet.getRange(2, 4, sheet.getMaxRows() - 1, sheet.getMaxColumns() - 3);
   dataRangeToBold.setFontWeight("bold");
 
-  sheet.autoResizeColumns(1, sheet.getMaxColumns());
-  // --- END Bolding and Resizing ---
-
-  // --- Build Conditional Formatting Rules ---
   const rules = [];
 
-  // Rule for Class Colors
+  // 1. Class Colors for Name, Class, Spec
   const nameColIndex = headers.indexOf('Name') + 1;
   const classColIndex = headers.indexOf('Class') + 1;
   const specColIndex = headers.indexOf('Spec') + 1;
@@ -646,80 +811,102 @@ function applyFormatting(sheet, headers, characterDataObjects) {
   if (classAndSpecRanges.length > 0) {
     for (const className in CLASS_COLORS) {
       const rule = SpreadsheetApp.newConditionalFormatRule()
-        .whenFormulaSatisfied(`=$B2="${className}"`) // Formula still checks the Class column (B)
+        .whenFormulaSatisfied(`=$B2="${className}"`)
         .setBackground(CLASS_COLORS[className])
+        .setFontColor(className === 'Priest' ? '#000000' : '#000000')
         .setRanges(classAndSpecRanges)
         .build();
       rules.push(rule);
     }
   }
 
-  // Helper function for track/enchant/vault rules
-  const addRule = (columnIndex, textCondition, color) => {
+  const addRule = (columnIndex, textCondition, color, fontColor = '#ffffff') => {
     if (columnIndex > -1) {
-      const range = sheet.getRange(2, columnIndex + 1, sheet.getMaxRows());
+      const range = sheet.getRange(2, columnIndex + 1, sheet.getMaxRows(), 1);
       const rule = SpreadsheetApp.newConditionalFormatRule()
         .whenTextContains(textCondition)
         .setBackground(color)
+        .setFontColor(fontColor)
         .setRanges([range])
         .build();
       rules.push(rule);
     }
   };
-  
-  const addNumericRule = (columnIndex, condition, color) => {
-      // FIX: Add a check to ensure the condition is a valid number.
-      if (columnIndex > -1 && typeof condition === 'number') {
-          const range = sheet.getRange(2, columnIndex + 1, sheet.getMaxRows());
-          const rule = SpreadsheetApp.newConditionalFormatRule()
-              .whenNumberGreaterThanOrEqualTo(condition)
-              .setBackground(color)
-              .setRanges([range])
-              .build();
-          rules.push(rule);
-      }
-  };
 
-  // Rules for Upgrade Tracks
-  const tierCols = ['Tier Helm', 'Tier Shoulder', 'Tier Chest', 'Tier Gloves', 'Tier Legs', 'Main Hand', 'Off Hand', 'Trinket 1', 'Trinket 2', 'Feet', 'Neck', 'Back', 'Wrist', 'Waist', 'Ring 1', 'Ring 2',];
-  tierCols.forEach(colName => {
+  // 2. Raid Ready Column Rules
+  const raidReadyColIdx = headers.indexOf('Raid Ready');
+  if (raidReadyColIdx > -1) {
+    addRule(raidReadyColIdx, "READY", "#34a853", "#ffffff"); // Green
+    addRule(raidReadyColIdx, "Missing", "#ea4335", "#ffffff"); // Red
+    addRule(raidReadyColIdx, "Socket", "#ea4335", "#ffffff");  // Red
+    addRule(raidReadyColIdx, "Tier", "#fbbc04", "#000000");    // Yellow
+  }
+
+  // 3. Upgrade Tracks & Gear Slots
+  const gearCols = [
+    'Head', 'Shoulders', 'Chest', 'Hands', 'Legs',
+    'Main Hand', 'Off Hand', 'Trinket 1', 'Trinket 2',
+    'Neck', 'Back', 'Wrist', 'Waist', 'Feet', 'Ring 1', 'Ring 2'
+  ];
+  
+  gearCols.forEach(colName => {
     const colIdx = headers.indexOf(colName);
-    addRule(colIdx, "Myth", "#ff8000"); // Orange
-    addRule(colIdx, "Hero", "#a335ee");   // Purple
-    addRule(colIdx, "Champion", "#0070dd"); // Blue
-    addRule(colIdx, "Veteran", "#1eff00"); // Green
-    addRule(colIdx, "285 (-)", "#ff8000"); // Orange crafted
-    addRule(colIdx, "272 (-)", "#a335ee");   // Purple crafted
-    addRule(colIdx, "259 (-)", "#0070dd"); // Blue crafted
-    addRule(colIdx, "246 (-)", "#1eff00"); // Green crafted
-    addRule(colIdx, "-", "#bbbbbb"); //Gray for blanks
+    addRule(colIdx, "Myth", "#ff8000", "#000000");      // Orange
+    addRule(colIdx, "Hero", "#a335ee", "#ffffff");      // Purple
+    addRule(colIdx, "Champion", "#0070dd", "#ffffff");  // Blue
+    addRule(colIdx, "Veteran", "#1eff00", "#000000");   // Green
+    addRule(colIdx, "Explorer", "#9e9e9e", "#ffffff");  // Gray
+    addRule(colIdx, "Adventurer", "#9e9e9e", "#ffffff");// Gray
+    addRule(colIdx, "Crafted", "#f28b82", "#000000");   // Soft Pink/Coral for Crafted
   });
 
-    // Rules for Tier Set Count
+  // 4. Tier Set Progress Rules
   const tierSetColIdx = headers.indexOf('Tier Set');
-  addRule(tierSetColIdx, "5/5", "#1eff00"); // Green
-  addRule(tierSetColIdx, "4/5", "#1eff00"); // Green
-  addRule(tierSetColIdx, "3/5", "#ffff00"); // Yellow
-  addRule(tierSetColIdx, "2/5", "#ffff00"); // Yellow
-  addRule(tierSetColIdx, "1/5", "#ff0000"); // Red
-  addRule(tierSetColIdx, "0/5", "#ff0000"); // Red
+  addRule(tierSetColIdx, "5/5", "#34a853", "#ffffff");
+  addRule(tierSetColIdx, "4/5", "#34a853", "#ffffff");
+  addRule(tierSetColIdx, "3/5", "#fbbc04", "#000000");
+  addRule(tierSetColIdx, "2/5", "#fbbc04", "#000000");
+  addRule(tierSetColIdx, "1/5", "#ea4335", "#ffffff");
+  addRule(tierSetColIdx, "0/5", "#ea4335", "#ffffff");
 
-  // Rules for Enchants
-  const enchantCols = ['Enchant Main Hand', 'Enchant Off Hand', 'Enchant Cloak', 'Enchant Chest', 'Enchant Wrists', 'Enchant Legs', 'Enchant Feet', 'Enchant Ring 1', 'Enchant Ring 2'];
+  // 5. Empty Sockets & Imperfect Gems Rules
+  const emptySocketsColIdx = headers.indexOf('Empty Sockets');
+  if (emptySocketsColIdx > -1) {
+    const range = sheet.getRange(2, emptySocketsColIdx + 1, sheet.getMaxRows(), 1);
+    rules.push(SpreadsheetApp.newConditionalFormatRule()
+      .whenNumberGreaterThan(0)
+      .setBackground("#ea4335")
+      .setFontColor("#ffffff")
+      .setRanges([range])
+      .build());
+  }
+
+  const imperfectGemsColIdx = headers.indexOf('Imperfect Gems');
+  if (imperfectGemsColIdx > -1) {
+    const range = sheet.getRange(2, imperfectGemsColIdx + 1, sheet.getMaxRows(), 1);
+    rules.push(SpreadsheetApp.newConditionalFormatRule()
+      .whenNumberGreaterThan(0)
+      .setBackground("#fbbc04")
+      .setFontColor("#000000")
+      .setRanges([range])
+      .build());
+  }
+
+  // 6. Enchants Rules
+  const enchantCols = [
+    'Enchant Main Hand', 'Enchant Off Hand', 'Enchant Head', 'Enchant Shoulder',
+    'Enchant Chest', 'Enchant Legs', 'Enchant Feet', 'Enchant Ring 1', 'Enchant Ring 2'
+  ];
   enchantCols.forEach(colName => {
-      const colIdx = headers.indexOf(colName);
-      addRule(colIdx, "Tier2", "#34a853"); // Green for Rank 3
-      addRule(colIdx, "Tier1", "#fff200"); // Yellow for Rank 2
-      //addRule(colIdx, "Tier1", "#ff0000"); // Red for Rank 1
-      addRule(colIdx, "Rune of", "#34a853"); //Green for DK
-      if(colName !== 'Enchant Off Hand'){
-        addRule(colIdx, "Missing", "#ff0000"); //Red for missing
-      }
-      if(colName == 'Enchant Off Hand'){
-        addRule(colIdx, "Missing", "#bbbbbb"); //Gray
-      }
+    const colIdx = headers.indexOf(colName);
+    addRule(colIdx, "Tier2", "#34a853", "#ffffff"); // Gold / Rank 2
+    addRule(colIdx, "Tier1", "#fbbc04", "#000000"); // Silver / Rank 1
+    addRule(colIdx, "Rune of", "#34a853", "#ffffff"); // DK Runeforging
+    addRule(colIdx, "N/A", "#e0e0e0", "#555555");
+    addRule(colIdx, "Missing", "#ea4335", "#ffffff");
   });
   
+  // 7. Great Vault Styling & Borders
   const gvRaid1_idx = headers.indexOf('GV Raid 1') + 1;
   const gvRaid3_idx = headers.indexOf('GV Raid 3') + 1;
   const gvMplus1_idx = headers.indexOf('GV M+ 1') + 1;
@@ -728,43 +915,114 @@ function applyFormatting(sheet, headers, characterDataObjects) {
   const medium_border = SpreadsheetApp.BorderStyle.SOLID_MEDIUM;
 
   if (gvRaid1_idx > 0 && gvRaid3_idx > 0 && lastDataRow > 1) {
-      const raidRange = sheet.getRange(1, gvRaid1_idx, lastDataRow, 3);
-      raidRange.setBorder(true, true, true, true, false, false, '#000000', medium_border);
+    sheet.getRange(1, gvRaid1_idx, lastDataRow, 3).setBorder(true, true, true, true, false, false, '#000000', medium_border);
   }
 
   if (gvMplus1_idx > 0 && gvMplus3_idx > 0 && lastDataRow > 1) {
-      const mplusRange = sheet.getRange(1, gvMplus1_idx, lastDataRow, 3);
-      mplusRange.setBorder(true, true, true, true, false, false, '#000000', medium_border);
+    sheet.getRange(1, gvMplus1_idx, lastDataRow, 3).setBorder(true, true, true, true, false, false, '#000000', medium_border);
   }
 
   const gvRaidCols = ['GV Raid 1', 'GV Raid 2', 'GV Raid 3'];
   gvRaidCols.forEach(colName => {
-      const colIdx = headers.indexOf(colName);
-      // Apply from lowest to highest, so the highest match wins
-      addRule(colIdx, VAULT_MAPPING.raid.lfr, "#1eff00");
-      addRule(colIdx, VAULT_MAPPING.raid.normal, "#0070dd");
-      addRule(colIdx, VAULT_MAPPING.raid.heroic, "#a335ee");
-      addRule(colIdx, VAULT_MAPPING.raid.mythic, "#ff8000");
+    const colIdx = headers.indexOf(colName);
+    addRule(colIdx, VAULT_MAPPING.raid.lfr.toString(), "#1eff00", "#000000");
+    addRule(colIdx, VAULT_MAPPING.raid.normal.toString(), "#0070dd", "#ffffff");
+    addRule(colIdx, VAULT_MAPPING.raid.heroic.toString(), "#a335ee", "#ffffff");
+    addRule(colIdx, VAULT_MAPPING.raid.mythic.toString(), "#ff8000", "#000000");
   });
   
+  const addNumericRule = (columnIndex, condition, color, fontColor = '#ffffff') => {
+    if (columnIndex > -1 && typeof condition === 'number') {
+      const range = sheet.getRange(2, columnIndex + 1, sheet.getMaxRows(), 1);
+      const rule = SpreadsheetApp.newConditionalFormatRule()
+        .whenNumberGreaterThanOrEqualTo(condition)
+        .setBackground(color)
+        .setFontColor(fontColor)
+        .setRanges([range])
+        .build();
+      rules.push(rule);
+    }
+  };
+
   const gvMplusCols = ['GV M+ 1', 'GV M+ 2', 'GV M+ 3'];
   gvMplusCols.forEach(colName => {
-      const colIdx = headers.indexOf(colName);
-      addNumericRule(colIdx, VAULT_MAPPING.mplus[10], "#ff8000");
-      addNumericRule(colIdx, VAULT_MAPPING.mplus[2], "#a335ee");
-      Logger.log(colIdx)
+    const colIdx = headers.indexOf(colName);
+    addNumericRule(colIdx, 331, "#ff8000", "#000000"); // Mythic (Orange)
+    addNumericRule(colIdx, 312, "#a335ee", "#ffffff"); // Heroic (Purple)
+    addNumericRule(colIdx, 299, "#0070dd", "#ffffff"); // Normal / Champion (Blue)
+    addNumericRule(colIdx, 292, "#1eff00", "#000000"); // LFR / Veteran (Green)
   });
 
+  // M+ Rating Color (per-row Blizzard API rating color)
   const mPlusRatingColIdx = headers.indexOf('M+ Rating') + 1;
   if (mPlusRatingColIdx > 0 && characterDataObjects) {
-      characterDataObjects.forEach((charData, index) => {
-          if (charData['M+ Rating Color']) {
-              // index + 2 because sheet is 1-based and we skip the header row
-              sheet.getRange(index + 2, mPlusRatingColIdx).setBackground(charData['M+ Rating Color']);
-          }
-      });
+    characterDataObjects.forEach((charData, index) => {
+      if (charData && charData['M+ Rating Color']) {
+        sheet.getRange(index + 2, mPlusRatingColIdx).setBackground(charData['M+ Rating Color']).setFontColor('#000000');
+      }
+    });
   }
 
-  // Apply all rules to the sheet
   sheet.setConditionalFormatRules(rules);
+  sheet.autoResizeColumns(1, sheet.getMaxColumns());
+
+  // Set comfortable minimum widths and generous padding for readability
+  const minWidths = {
+    'Name': 120,
+    'Class': 110,
+    'Spec': 120,
+    'iLvl': 65,
+    'Raid Ready': 300, // Wide enough for detailed checklist issues
+    'M+ Rating': 90,
+    'Tier Set': 120,   // Wide enough for "2/5 (+2 Prev)"
+    'Total Sockets': 105,
+    'Empty Sockets': 105,
+    'Imperfect Gems': 115,
+    'Crafted Items': 105,
+    'Embellishment 1': 170,
+    'Embellishment 2': 170,
+    'Head': 290,
+    'Shoulders': 290,
+    'Chest': 290,
+    'Hands': 290,
+    'Legs': 290,
+    'Main Hand': 290,
+    'Off Hand': 290,
+    'Trinket 1': 290,
+    'Trinket 2': 290,
+    'Neck': 290,
+    'Back': 290,
+    'Wrist': 290,
+    'Waist': 290,
+    'Feet': 290,
+    'Ring 1': 290,
+    'Ring 2': 290,
+    'Enchant Main Hand': 170,
+    'Enchant Off Hand': 170,
+    'Enchant Head': 170,
+    'Enchant Shoulder': 170,
+    'Enchant Chest': 170,
+    'Enchant Legs': 170,
+    'Enchant Feet': 170,
+    'Enchant Ring 1': 170,
+    'Enchant Ring 2': 170,
+    'GV Slots Unlocked': 125,
+    'GV Raid 1': 95,
+    'GV Raid 2': 95,
+    'GV Raid 3': 95,
+    'GV M+ 1': 95,
+    'GV M+ 2': 95,
+    'GV M+ 3': 95
+  };
+
+  headers.forEach((header, idx) => {
+    const colIndex = idx + 1;
+    const desiredMin = minWidths[header] || 100;
+    const currentWidth = sheet.getColumnWidth(colIndex);
+    if (currentWidth < desiredMin) {
+      sheet.setColumnWidth(colIndex, desiredMin);
+    } else {
+      sheet.setColumnWidth(colIndex, currentWidth + 15); // Add padding for bold readability
+    }
+  });
 }
