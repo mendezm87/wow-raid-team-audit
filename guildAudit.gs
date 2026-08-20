@@ -453,6 +453,7 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
     let heroTreeName = '-';
     let talentCode = '-';
     let wowheadGuideLink = '-';
+    let archonBuildLink = '-';
 
     if (specializationsData) {
       let activeSpecObj = null;
@@ -476,11 +477,13 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
     const specSlug = (charRow['Spec'] || '').toLowerCase().replace(/\s+/g, '-');
     if (classSlug && specSlug) {
       wowheadGuideLink = `https://www.wowhead.com/guide/classes/${classSlug}/${specSlug}/overview`;
+      archonBuildLink = `https://www.archon.gg/wow/builds/${specSlug}-${classSlug}/raid/overview`;
     }
 
     charRow['Hero Talents'] = heroTreeName;
     charRow['Talent Code'] = talentCode;
-    charRow['Guide Link'] = wowheadGuideLink;
+    charRow['Wowhead Link'] = wowheadGuideLink;
+    charRow['Archon Link'] = archonBuildLink;
 
     // --- 2. Process Great Vault & Raids ---
     if (mplusData) {
@@ -1020,13 +1023,16 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
 
   const talentHeaders = [
     'Name', 'Class', 'Active Spec', 'Hero Talents', 
-    'Talent Loadout Code (Import String)', 'Wowhead Raid Guide Link', 
+    'Talent Loadout Code (Import String)', 'Archon Meta Build', 'Wowhead Guide', 
     'iLvl', 'Raid Ready'
   ];
 
   const formatTalentRow = (obj) => {
-    const guideFormula = (obj['Guide Link'] && obj['Guide Link'] !== '-') 
-      ? `=HYPERLINK("${obj['Guide Link']}", "View ${obj['Spec'] || 'Spec'} Guide")`
+    const archonFormula = (obj['Archon Link'] && obj['Archon Link'] !== '-') 
+      ? `=HYPERLINK("${obj['Archon Link']}", "View Archon Build")`
+      : '-';
+    const wowheadFormula = (obj['Wowhead Link'] && obj['Wowhead Link'] !== '-') 
+      ? `=HYPERLINK("${obj['Wowhead Link']}", "View Wowhead Guide")`
       : '-';
     return [
       obj['Name'] || '',
@@ -1034,7 +1040,8 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
       obj['Spec'] || '',
       obj['Hero Talents'] || '-',
       obj['Talent Code'] || '-',
-      guideFormula,
+      archonFormula,
+      wowheadFormula,
       obj['iLvl'] || 0,
       obj['Raid Ready'] || '-'
     ];
@@ -1078,21 +1085,20 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   ];
   const rules = [];
   for (const className in CLASS_COLORS) {
-    const rule = SpreadsheetApp.newConditionalFormatRule()
+    rules.push(SpreadsheetApp.newConditionalFormatRule()
       .whenFormulaSatisfied(`=$B2="${className}"`)
       .setBackground(CLASS_COLORS[className])
       .setFontColor('#000000')
       .setRanges(classAndSpecRanges)
-      .build();
-    rules.push(rule);
+      .build());
   }
 
   // Raid Ready column formatting
   const raidReadyColIdx = talentHeaders.indexOf('Raid Ready') + 1;
-  const rrRange = sheet.getRange(2, raidReadyColIdx, sheet.getMaxRows(), 1);
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('READY').setBackground('#34a853').setFontColor('#ffffff').setRanges([rrRange]).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Missing').setBackground('#ea4335').setFontColor('#ffffff').setRanges([rrRange]).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Tier').setBackground('#fbbc04').setFontColor('#000000').setRanges([rrRange]).build());
+  const rrRange = [sheet.getRange(2, raidReadyColIdx, sheet.getMaxRows(), 1)];
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('READY').setBackground('#34a853').setFontColor('#ffffff').setRanges(rrRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Missing').setBackground('#ea4335').setFontColor('#ffffff').setRanges(rrRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Tier').setBackground('#fbbc04').setFontColor('#000000').setRanges(rrRange).build());
 
   sheet.setConditionalFormatRules(rules);
 
@@ -1102,13 +1108,15 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   sheet.setColumnWidth(3, 130); // Spec
   sheet.setColumnWidth(4, 200); // Hero Talents
   sheet.setColumnWidth(5, 380); // Talent String
-  sheet.setColumnWidth(6, 200); // Guide Link
-  sheet.setColumnWidth(7, 80);  // ilvl
-  sheet.setColumnWidth(8, 280); // Raid Ready
+  sheet.setColumnWidth(6, 180); // Archon Build
+  sheet.setColumnWidth(7, 180); // Wowhead Guide
+  sheet.setColumnWidth(8, 80);  // ilvl
+  sheet.setColumnWidth(9, 280); // Raid Ready
 }
 
 /**
  * Creates and formats the Loot & Chase Items reference sheet.
+ * Features the current Season 2 raid: The Venomous Abyss (8 Bosses).
  */
 function createLootAndChaseItemsSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1124,40 +1132,45 @@ function createLootAndChaseItemsSheet() {
   ];
 
   const chaseItemsCatalog = [
-    // Boss 1
-    ['Boss 1: Void Terror', 'Abyssal Swarmcaller', 'Trinket 1', 'Heroic', 318, 'Agility / Strength DPS', '', '', '', '', 'BiS S-Tier', 'Huge burst stat proc on pull'],
-    ['Boss 1: Void Terror', 'Terror-Forged Greatsword', 'Main Hand', 'Heroic', 318, '2H Strength (DK, War, Pal)', '', '', '', '', 'Major Upgrade', 'High base weapon DPS'],
-    ['Boss 1: Void Terror', 'Helm of Shattered Shadows', 'Head', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Helm', 'Unlocks tier 2pc/4pc'],
-    
-    // Boss 2
-    ['Boss 2: Void Inquisitor', 'Gaze of the Dark Star', 'Trinket 1', 'Heroic', 318, 'Intellect DPS / Healers', '', '', '', '', 'BiS S-Tier', 'On-use spell power amp'],
-    ['Boss 2: Void Inquisitor', 'Whispering Spire Staff', 'Main Hand', 'Heroic', 318, 'Intellect Casters', '', '', '', '', 'Major Upgrade', 'High Intellect stat stick'],
-    ['Boss 2: Void Inquisitor', 'Pauldrons of the Accuser', 'Shoulders', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Shoulders', 'Unlocks tier 2pc/4pc'],
+    // Boss 1: Nek'zali the Soulcoiler
+    ['Boss 1: Nek\'zali the Soulcoiler', 'Soulcoil Siphon', 'Trinket 1', 'Heroic', 318, 'Intellect / Agility DPS', '', '', '', '', 'BiS S-Tier', 'On-use secondary stat siphon burst'],
+    ['Boss 1: Nek\'zali the Soulcoiler', 'Soulcoiler\'s Spinecleaver', 'Main Hand', 'Heroic', 318, '2H Strength / Agi', '', '', '', '', 'Major Weapon', 'High weapon damage stat polearm/axe'],
+    ['Boss 1: Nek\'zali the Soulcoiler', 'Helm of Coiling Serpents', 'Head', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Helm', 'Unlocks tier 2pc/4pc bonus'],
 
-    // Boss 3
-    ['Boss 3: Shadow Behemoth', 'Behemoth\'s Resilient Core', 'Trinket 1', 'Heroic', 318, 'Tanks (All)', '', '', '', '', 'Tank BiS', 'Cheat death / mega shield proc'],
-    ['Boss 3: Shadow Behemoth', 'Chestguard of the Titan', 'Chest', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Chest', 'Major stat & tier chest slot'],
-    
-    // Boss 4
-    ['Boss 4: Thalassian Council', 'Council\'s Signet of Command', 'Ring 1', 'Heroic', 318, 'All Specs (Rare Cantrip)', '', '', '', '', 'Rare Ring Proc', 'Cantrip secondary stat burst proc'],
-    ['Boss 4: Thalassian Council', 'Gauntlets of Ancient Duty', 'Hands', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Gloves', 'Tier slot token'],
+    // Boss 2: Entombed Sentinels
+    ['Boss 2: Entombed Sentinels', 'Sentinel\'s Petrified Core', 'Trinket 1', 'Heroic', 318, 'Tanks (All)', '', '', '', '', 'Tank BiS', 'Massive passive armor and on-use shield'],
+    ['Boss 2: Entombed Sentinels', 'Sentinel\'s Stonecarver', 'Main Hand', 'Heroic', 318, '1H Strength / Agi (War, Pal, DK, DH)', '', '', '', '', 'Major Weapon', '1H Weapon with haste proc'],
+    ['Boss 2: Entombed Sentinels', 'Pauldrons of the Entombed', 'Shoulders', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Shoulders', 'Unlocks tier 2pc/4pc bonus'],
 
-    // Boss 5
-    ['Boss 5: Sunwell Abomination', 'Solar-Corrupted Core', 'Trinket 2', 'Heroic', 318, 'All DPS / Healers', '', '', '', '', 'BiS A-Tier', 'Stacking haste / mastery aura'],
-    ['Boss 5: Sunwell Abomination', 'Leggings of Sundered Light', 'Legs', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Legs', 'Tier slot token'],
+    // Boss 3: The Lost Explorers
+    ['Boss 3: The Lost Explorers', 'Explorer\'s Compass of Doom', 'Trinket 2', 'Heroic', 318, 'All DPS Specs', '', '', '', '', 'BiS S-Tier', 'Stacking crit proc on periodic damage'],
+    ['Boss 3: The Lost Explorers', 'Lost Explorer\'s Signet', 'Ring 1', 'Heroic', 318, 'All Specs (Rare Cantrip)', '', '', '', '', 'Rare Ring Proc', 'Cantrip speed and mastery burst proc'],
+    ['Boss 3: The Lost Explorers', 'Hauberk of the Lost Expedition', 'Chest', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Chest', 'Tier chest piece token'],
 
-    // Boss 6
-    ['Boss 6: Midnight Vanguard', 'Vanguard\'s Bulwark', 'Off Hand', 'Heroic', 318, 'Prot Pal, Prot War, Resto/Ele Sham', '', '', '', '', 'Shield BiS', 'Block rating & mastery proc'],
-    ['Boss 6: Midnight Vanguard', 'Shadow-Etched Dagger', 'Main Hand', 'Heroic', 318, 'Rogues, DH, Agi Casters', '', '', '', '', 'Major Weapon', 'Fast attack speed stat dagger'],
+    // Boss 4: Vashnik the Malignant
+    ['Boss 4: Vashnik the Malignant', 'Malignant Spore Pod', 'Trinket 1', 'Heroic', 318, 'Healers / Caster DPS', '', '', '', '', 'Healer BiS', 'Smart group burst heal and mana return'],
+    ['Boss 4: Vashnik the Malignant', 'Vashnik\'s Toxic Bulwark', 'Off Hand', 'Heroic', 318, 'Prot Pal, Prot War, Resto/Ele Sham', '', '', '', '', 'Shield BiS', 'High block value shield with damage reflect'],
+    ['Boss 4: Vashnik the Malignant', 'Gauntlets of Malignancy', 'Hands', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Gloves', 'Tier gloves token'],
 
-    // Boss 7
-    ['Boss 7: Void Ascendant', 'Heart of the Ascendant', 'Trinket 1', 'Heroic', 318, 'All Specs (Rare Proc)', '', '', '', '', 'Very Rare BiS', 'Huge primary stat proc on execute'],
-    ['Boss 7: Void Ascendant', 'Void-Infused Cloak', 'Back', 'Heroic', 318, 'All Specs', '', '', '', '', 'BiS Back', 'Max item level cloak'],
+    // Boss 5: Sszorak
+    ['Boss 5: Sszorak', 'Font of Venomous Rage', 'Trinket 2', 'Heroic', 318, 'Strength / Agility DPS', '', '', '', '', 'God-Tier Trinket', 'Primary stat surge and attack speed aura'],
+    ['Boss 5: Sszorak', 'Staff of the Venom Brood', 'Main Hand', 'Heroic', 318, 'Intellect Casters / Healers', '', '', '', '', 'Major Weapon', '2H Caster Staff with mastery proc'],
+    ['Boss 5: Sszorak', 'Leggings of the Broodmother', 'Legs', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Legs', 'Tier legs token'],
 
-    // Boss 8
-    ['Boss 8: Final Boss (Mythic/Heroic)', 'Crown of the End Times', 'Head', 'Heroic', 318, 'All Specs (Omni-Token)', '', '', '', '', 'Omni-Token (Any Slot)', 'Can be turned in for any tier piece'],
-    ['Boss 8: Final Boss (Mythic/Heroic)', 'Cosmic Annihilator', 'Main Hand', 'Heroic', 318, 'All Weapon Wielders', '', '', '', '', 'Mythic Weapon', 'Top weapon DPS in the game'],
-    ['Boss 8: Final Boss (Mythic/Heroic)', 'Echo of the Void Harbinger', 'Trinket 2', 'Heroic', 318, 'All DPS (Very Rare)', '', '', '', '', 'God-Tier Trinket', 'Best in slot for 90% of specs']
+    // Boss 6: The Twin Fangs
+    ['Boss 6: The Twin Fangs', 'Twin Fang Venom Vial', 'Trinket 1', 'Heroic', 318, 'Melee DPS / Hunters', '', '', '', '', 'BiS A-Tier', 'Venom stacking DoT that executes at 20%'],
+    ['Boss 6: The Twin Fangs', 'Fang of the Left Twin', 'Main Hand', 'Heroic', 318, 'Rogues, DH, Monks', '', '', '', '', 'Major Weapon', 'Fast 1.8 Agi Dagger/Fist weapon'],
+    ['Boss 6: The Twin Fangs', 'Cloak of Shifting Fangs', 'Back', 'Heroic', 318, 'All Specs', '', '', '', '', 'BiS Back', 'Max item level cloak with avoidance'],
+
+    // Boss 7: The Coiled Altar
+    ['Boss 7: The Coiled Altar', 'Coiled Altar Relic', 'Trinket 2', 'Mythic', 344, 'All Roles (Very Rare)', '', '', '', '', 'Very Rare BiS', 'Special 344 item level altar proc trinket'],
+    ['Boss 7: The Coiled Altar', 'Altar-Keeper\'s Greatbow', 'Main Hand', 'Mythic', 344, 'Hunters (Very Rare)', '', '', '', '', 'Very Rare Weapon', 'Mythic 344 ilvl Ranged Weapon with void shot'],
+    ['Boss 7: The Coiled Altar', 'Band of the Coiled Ritual', 'Ring 2', 'Mythic', 344, 'All Specs', '', '', '', '', 'BiS Ring', 'Mythic 344 ilvl ring with custom socket'],
+
+    // Boss 8: Ula'tek (Final Boss)
+    ['Boss 8: Ula\'tek', 'Slumbering Coil Curio', 'Omni-Token', 'Mythic', 344, 'All Classes (Any Tier Slot)', '', '', '', '', 'Omni Tier Token', 'Can be turned in for ANY tier piece'],
+    ['Boss 8: Ula\'tek', 'Hex Lord\'s Dooming Idol', 'Trinket 1', 'Mythic', 344, 'All DPS / Healers (Very Rare)', '', '', '', '', 'God-Tier Trinket', 'Top trinket in the game with stacking execute doom'],
+    ['Boss 8: Ula\'tek', 'Fang of Ula\'tek', 'Main Hand', 'Mythic', 344, 'All Weapon Classes (Very Rare)', '', '', '', '', 'Mythic Weapon', 'Top-tier 344 ilvl weapon with cantrip shadow strike']
   ];
 
   const fullData = [lootHeaders, ...chaseItemsCatalog];
@@ -1183,21 +1196,21 @@ function createLootAndChaseItemsSheet() {
   // Priority Column Conditional Formatting
   const rules = [];
   const prioColIdx = lootHeaders.indexOf('Priority / BiS Tier') + 1;
-  const prioRange = sheet.getRange(2, prioColIdx, sheet.getMaxRows(), 1);
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('BiS').setBackground('#a335ee').setFontColor('#ffffff').setRanges([prioRange]).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Rare').setBackground('#ff8000').setFontColor('#000000').setRanges([prioRange]).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Tier').setBackground('#34a853').setFontColor('#ffffff').setRanges([prioRange]).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('God-Tier').setBackground('#ff0055').setFontColor('#ffffff').setRanges([prioRange]).build());
+  const prioRange = [sheet.getRange(2, prioColIdx, sheet.getMaxRows(), 1)];
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('BiS').setBackground('#a335ee').setFontColor('#ffffff').setRanges(prioRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Rare').setBackground('#ff8000').setFontColor('#000000').setRanges(prioRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Tier').setBackground('#34a853').setFontColor('#ffffff').setRanges(prioRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('God-Tier').setBackground('#ff0055').setFontColor('#ffffff').setRanges(prioRange).build());
 
   sheet.setConditionalFormatRules(rules);
 
   // Set widths
-  sheet.setColumnWidth(1, 180); // Boss
+  sheet.setColumnWidth(1, 230); // Boss
   sheet.setColumnWidth(2, 240); // Item Name
   sheet.setColumnWidth(3, 110); // Slot
   sheet.setColumnWidth(4, 100); // Difficulty
   sheet.setColumnWidth(5, 85);  // Drop ilvl
-  sheet.setColumnWidth(6, 220); // Target Specs
+  sheet.setColumnWidth(6, 240); // Target Specs
   sheet.setColumnWidth(7, 180); // Top Contender
   sheet.setColumnWidth(8, 220); // Equipped Item
   sheet.setColumnWidth(9, 100); // Equipped ilvl
@@ -1205,5 +1218,5 @@ function createLootAndChaseItemsSheet() {
   sheet.setColumnWidth(11, 180);// Priority / BiS Tier
   sheet.setColumnWidth(12, 280);// Notes
 
-  SpreadsheetApp.getUi().alert('Loot & Chase Items Sheet Created!', 'Created the loot distribution and chase items reference sheet with Season 2 boss loot tables.', SpreadsheetApp.getUi().ButtonSet.OK);
+  SpreadsheetApp.getUi().alert('Loot & Chase Items Sheet Created!', 'Created the loot distribution and chase items reference sheet with Season 2 (The Venomous Abyss) boss loot tables.', SpreadsheetApp.getUi().ButtonSet.OK);
 }
