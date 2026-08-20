@@ -608,16 +608,21 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
       let activeSpecObj = null;
       if (specializationsData.specializations) {
         activeSpecObj = specializationsData.specializations.find(s => s.specialization && s.specialization.name === charRow['Spec']) || specializationsData.specializations[0];
+      } else if (specializationsData.active_specialization) {
+        activeSpecObj = specializationsData.active_specialization;
       }
+
       if (activeSpecObj) {
         if (activeSpecObj.loadouts && activeSpecObj.loadouts.length > 0) {
           const activeLoadout = activeSpecObj.loadouts.find(l => l.is_active) || activeSpecObj.loadouts[0];
           if (activeLoadout) {
-            talentCode = activeLoadout.selected_talent_loadout_code || '-';
+            talentCode = activeLoadout.selected_talent_loadout_code || activeLoadout.talent_loadout_code || activeLoadout.selected_talents_string || '-';
             if (activeLoadout.selected_hero_talent_tree) {
               heroTreeName = activeLoadout.selected_hero_talent_tree.name || '-';
             }
           }
+        } else if (activeSpecObj.selected_talent_loadout_code || activeSpecObj.talent_loadout_code) {
+          talentCode = activeSpecObj.selected_talent_loadout_code || activeSpecObj.talent_loadout_code || '-';
         }
       }
     }
