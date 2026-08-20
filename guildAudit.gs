@@ -1197,6 +1197,18 @@ function applyFormatting(sheet, headers, characterDataObjects) {
   });
 }
 
+const ARCHON_BOSS_OPTIONS = [
+  'All Bosses (Overview)',
+  'Boss 1: Nek\'zali',
+  'Boss 2: Sentinels',
+  'Boss 3: Lost Explorers',
+  'Boss 4: Vashnik',
+  'Boss 5: Sszorak',
+  'Boss 6: Twin Fangs',
+  'Boss 7: Coiled Altar',
+  'Boss 8: Ula\'tek'
+];
+
 /**
  * Creates and formats the Talents & Builds companion sheet.
  */
@@ -1209,29 +1221,32 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
 
   const talentHeaders = [
     'Name', 'Class', 'Active Spec', 'Hero Talents', 
-    'Talent Loadout Code (Import String)', 'Archon (Heroic)', 'Archon (Mythic)', 'Wowhead Guide', 
+    'Talent Loadout Code (Import String)', 'Archon Boss Build (Dropdown)',
+    'Archon (Heroic Link)', 'Archon (Mythic Link)', 'Wowhead Guide', 
     'Raidbots Droptimizer', 'iLvl', 'Raid Ready'
   ];
 
-  const formatTalentRow = (obj) => {
-    const archonHeroicFormula = (obj['Archon Heroic Link'] && obj['Archon Heroic Link'] !== '-') 
-      ? `=HYPERLINK("${obj['Archon Heroic Link']}", "Heroic Build")`
-      : '-';
-    const archonMythicFormula = (obj['Archon Mythic Link'] && obj['Archon Mythic Link'] !== '-') 
-      ? `=HYPERLINK("${obj['Archon Mythic Link']}", "Mythic Build")`
-      : '-';
+  const formatTalentRow = (obj, idx) => {
+    const rowNum = idx + 2;
+    const specClassSlug = `LOWER(C${rowNum}) & "/" & LOWER(SUBSTITUTE(B${rowNum}, " ", "-"))`;
+    const bossSlugFormula = `IF(F${rowNum}="Boss 1: Nek'zali", "nekzali-the-soulcoiler", IF(F${rowNum}="Boss 2: Sentinels", "entombed-sentinels", IF(F${rowNum}="Boss 3: Lost Explorers", "the-lost-explorers", IF(F${rowNum}="Boss 4: Vashnik", "vashnik-the-malignant", IF(F${rowNum}="Boss 5: Sszorak", "sszorak", IF(F${rowNum}="Boss 6: Twin Fangs", "the-twin-fangs", IF(F${rowNum}="Boss 7: Coiled Altar", "the-coiled-altar", IF(F${rowNum}="Boss 8: Ula'tek", "ulatek", "all-bosses"))))))))`;
+
+    const archonHeroicFormula = `=HYPERLINK("https://www.archon.gg/wow/builds/" & ${specClassSlug} & "/raid/overview/heroic/" & ${bossSlugFormula}, "Heroic Build")`;
+    const archonMythicFormula = `=HYPERLINK("https://www.archon.gg/wow/builds/" & ${specClassSlug} & "/raid/overview/mythic/" & ${bossSlugFormula}, "Mythic Build")`;
     const wowheadFormula = (obj['Wowhead Guide Link'] && obj['Wowhead Guide Link'] !== '-') 
       ? `=HYPERLINK("${obj['Wowhead Guide Link']}", "Wowhead Guide")`
       : '-';
     const droptimizerFormula = (obj['Droptimizer Link'] && obj['Droptimizer Link'] !== '-')
       ? `=HYPERLINK("${obj['Droptimizer Link']}", "1-Click Sim Link")`
       : '-';
+
     return [
       obj['Name'] || '',
       obj['Class'] || '',
       obj['Spec'] || '',
       obj['Hero Talents'] || '-',
       obj['Talent Code'] || '-',
+      'All Bosses (Overview)',
       archonHeroicFormula,
       archonMythicFormula,
       wowheadFormula,
@@ -1242,12 +1257,13 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   };
 
   const finalRows = [];
-  finalRows.push(...mainCharacterData.map(formatTalentRow));
+  finalRows.push(...mainCharacterData.map((c, i) => formatTalentRow(c, i)));
 
   if (altCharacterData && altCharacterData.length > 0) {
     finalRows.push(Array(talentHeaders.length).fill(''));
     finalRows.push(Array(talentHeaders.length).fill(''));
-    finalRows.push(...altCharacterData.map(formatTalentRow));
+    const startAltIdx = mainCharacterData.length + 2;
+    finalRows.push(...altCharacterData.map((c, i) => formatTalentRow(c, startAltIdx + i)));
   }
 
   const outputData = [talentHeaders, ...finalRows];
@@ -1296,23 +1312,33 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
 
   sheet.setConditionalFormatRules(rules);
 
+  // Add Data Validation Dropdown for Boss Build Selector (Column F)
+  if (sheet.getMaxRows() > 1) {
+    const bossRule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(ARCHON_BOSS_OPTIONS, true)
+      .setAllowInvalid(true)
+      .build();
+    sheet.getRange(2, 6, sheet.getMaxRows() - 1, 1).setDataValidation(bossRule);
+  }
+
   // Set widths
   sheet.setColumnWidth(1, 130); // Name
   sheet.setColumnWidth(2, 110); // Class
   sheet.setColumnWidth(3, 130); // Spec
   sheet.setColumnWidth(4, 230); // Hero Talents
   sheet.setColumnWidth(5, 480); // Talent String
-  sheet.setColumnWidth(6, 140); // Archon Heroic
-  sheet.setColumnWidth(7, 140); // Archon Mythic
-  sheet.setColumnWidth(8, 150); // Wowhead Guide
-  sheet.setColumnWidth(9, 160); // Raidbots Droptimizer
-  sheet.setColumnWidth(10, 80); // ilvl
-  sheet.setColumnWidth(11, 460);// Raid Ready
+  sheet.setColumnWidth(6, 210); // Archon Boss Dropdown
+  sheet.setColumnWidth(7, 150); // Archon Heroic
+  sheet.setColumnWidth(8, 150); // Archon Mythic
+  sheet.setColumnWidth(9, 150); // Wowhead Guide
+  sheet.setColumnWidth(10, 160); // Raidbots Droptimizer
+  sheet.setColumnWidth(11, 80); // ilvl
+  sheet.setColumnWidth(12, 460);// Raid Ready
 }
 
 /**
  * Creates and formats the Loot & Chase Items reference sheet.
- * Features the current Season 2 raid: The Venomous Abyss (8 Bosses).
+ * Features the current Season 2 raid: The Venomous Abyss (8 Bosses) with distinct boss separator banners.
  * Automatically calculates upgrade deltas against live equipped gear if character data is provided.
  */
 function createLootAndChaseItemsSheet(mainCharacterData) {
@@ -1330,45 +1356,88 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
   ];
 
   const chaseItemsCatalog = [
-    // Boss 1: Nek'zali the Soulcoiler
+    // ════════════════════════════════════════════════════════════
+    // ⚔️ BOSS 1: NEK'ZALI THE SOULCOILER
+    // ════════════════════════════════════════════════════════════
+    ['⚔️ BOSS 1: NEK\'ZALI THE SOULCOILER', '═════════════════════════════════', '', '', '', '', '', '', '', '', '', '', ''],
     ['Boss 1: Nek\'zali the Soulcoiler', 'Soulcoil Siphon', 'Trinket 1', 'Heroic', 318, 'Intellect / Agility DPS', '', '', '', '', 'BiS S-Tier', '⚡ Live Armory ilvl', 'On-use secondary stat siphon burst'],
-    ['Boss 1: Nek\'zali the Soulcoiler', 'Soulcoiler\'s Spinecleaver', 'Main Hand', 'Heroic', 318, '2H Strength / Agi', '', '', '', '', 'Major Weapon', '⚡ Live Armory ilvl', 'High weapon damage stat polearm/axe'],
-    ['Boss 1: Nek\'zali the Soulcoiler', 'Helm of Coiling Serpents', 'Head', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Helm', '⚡ Live Armory ilvl', 'Unlocks tier 2pc/4pc bonus'],
+    ['Boss 1: Nek\'zali the Soulcoiler', 'Caustic Keeper-Crusher', 'Main Hand', 'Heroic', 318, '1H Agi/Str Weapon', '', '', '', '', 'Major Weapon', '⚡ Live Armory ilvl', 'High DPS fast weapon'],
+    ['Boss 1: Nek\'zali the Soulcoiler', 'Warhelm of the Consecrated Flame', 'Head', 'Heroic', 318, 'All Classes (Tier Helm)', '', '', '', '', 'Tier Helm', '⚡ Live Armory ilvl', 'Unlocks tier 2pc/4pc bonus'],
+    ['Boss 1: Nek\'zali the Soulcoiler', 'Skullguard of the Risen Sacrifice', 'Head', 'Heroic', 318, 'Plate Helm', '', '', '', '', 'Non-Tier Helm', '⚡ Live Armory ilvl', 'Crit/Mastery plate helm'],
+    ['Boss 1: Nek\'zali the Soulcoiler', 'Swelling Sea Spaulders', 'Shoulders', 'Heroic', 318, 'Mail Shoulders', '', '', '', '', 'Mail Shoulders', '⚡ Live Armory ilvl', 'Haste/Mastery mail shoulders'],
 
-    // Boss 2: Entombed Sentinels
+    // ════════════════════════════════════════════════════════════
+    // 🛡️ BOSS 2: ENTOMBED SENTINELS
+    // ════════════════════════════════════════════════════════════
+    ['🛡️ BOSS 2: ENTOMBED SENTINELS', '═════════════════════════════════', '', '', '', '', '', '', '', '', '', '', ''],
     ['Boss 2: Entombed Sentinels', 'Sentinel\'s Petrified Core', 'Trinket 1', 'Heroic', 318, 'Tanks (All)', '', '', '', '', 'Tank BiS', '⚡ Live Armory ilvl', 'Massive passive armor and on-use shield'],
-    ['Boss 2: Entombed Sentinels', 'Sentinel\'s Stonecarver', 'Main Hand', 'Heroic', 318, '1H Strength / Agi (War, Pal, DK, DH)', '', '', '', '', 'Major Weapon', '⚡ Live Armory ilvl', '1H Weapon with haste proc'],
-    ['Boss 2: Entombed Sentinels', 'Pauldrons of the Entombed', 'Shoulders', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Shoulders', '⚡ Live Armory ilvl', 'Unlocks tier 2pc/4pc bonus'],
+    ['Boss 2: Entombed Sentinels', 'Pauldrons of the Consecrated Flame', 'Shoulders', 'Heroic', 318, 'All Classes (Tier Shoulders)', '', '', '', '', 'Tier Shoulders', '⚡ Live Armory ilvl', 'Unlocks tier 2pc/4pc bonus'],
+    ['Boss 2: Entombed Sentinels', 'Pauldrons of the Forgotten Sacrifice', 'Shoulders', 'Heroic', 318, 'Plate Shoulders', '', '', '', '', 'Plate Shoulders', '⚡ Live Armory ilvl', 'High strength plate shoulders'],
+    ['Boss 2: Entombed Sentinels', 'Sentinel\'s Vitriolic Chain', 'Neck', 'Heroic', 318, 'All Specs', '', '', '', '', 'BiS Neck', '⚡ Live Armory ilvl', 'Haste/Versatility neck with socket'],
+    ['Boss 2: Entombed Sentinels', 'Entombed Cultist\'s Sabatons', 'Feet', 'Heroic', 318, 'Plate Feet', '', '', '', '', 'Plate Boots', '⚡ Live Armory ilvl', 'Plate boots with mastery'],
 
-    // Boss 3: The Lost Explorers
-    ['Boss 3: The Lost Explorers', 'Explorer\'s Compass of Doom', 'Trinket 2', 'Heroic', 318, 'All DPS Specs', '', '', '', '', 'BiS S-Tier', '⚡ Live Armory ilvl', 'Stacking crit proc on periodic damage'],
-    ['Boss 3: The Lost Explorers', 'Lost Explorer\'s Signet', 'Ring 1', 'Heroic', 318, 'All Specs (Rare Cantrip)', '', '', '', '', 'Rare Ring Proc', '⚡ Live Armory ilvl', 'Cantrip speed and mastery burst proc'],
-    ['Boss 3: The Lost Explorers', 'Hauberk of the Lost Expedition', 'Chest', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Chest', '⚡ Live Armory ilvl', 'Tier chest piece token'],
+    // ════════════════════════════════════════════════════════════
+    // 🧭 BOSS 3: THE LOST EXPLORERS
+    // ════════════════════════════════════════════════════════════
+    ['🧭 BOSS 3: THE LOST EXPLORERS', '═════════════════════════════════', '', '', '', '', '', '', '', '', '', '', ''],
+    ['Boss 3: The Lost Explorers', 'Gebbo\'s Bottomless Bag', 'Trinket 2', 'Heroic', 318, 'All DPS / Healers', '', '', '', '', 'BiS A-Tier', '⚡ Live Armory ilvl', 'Trinket proc with random utility / stat surge'],
+    ['Boss 3: The Lost Explorers', 'Bulwark of the Consecrated Flame', 'Chest', 'Heroic', 318, 'All Classes (Tier Chest)', '', '', '', '', 'Tier Chest', '⚡ Live Armory ilvl', 'Tier chest piece token'],
+    ['Boss 3: The Lost Explorers', 'Reckless Spirit Breastplate', 'Chest', 'Heroic', 318, 'Plate Chest', '', '', '', '', 'Plate Chest', '⚡ Live Armory ilvl', 'Plate chest with crit/haste'],
+    ['Boss 3: The Lost Explorers', 'Shellbound Bracers', 'Wrist', 'Heroic', 318, 'Plate Wrist', '', '', '', '', 'Plate Wrists', '⚡ Live Armory ilvl', 'Plate bracers with custom socket'],
 
-    // Boss 4: Vashnik the Malignant
-    ['Boss 4: Vashnik the Malignant', 'Malignant Spore Pod', 'Trinket 1', 'Heroic', 318, 'Healers / Caster DPS', '', '', '', '', 'Healer BiS', '⚡ Live Armory ilvl', 'Smart group burst heal and mana return'],
-    ['Boss 4: Vashnik the Malignant', 'Vashnik\'s Toxic Bulwark', 'Off Hand', 'Heroic', 318, 'Prot Pal, Prot War, Resto/Ele Sham', '', '', '', '', 'Shield BiS', '⚡ Live Armory ilvl', 'High block value shield with damage reflect'],
-    ['Boss 4: Vashnik the Malignant', 'Gauntlets of Malignancy', 'Hands', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Gloves', '⚡ Live Armory ilvl', 'Tier gloves token'],
+    // ════════════════════════════════════════════════════════════
+    // 🧪 BOSS 4: VASHNIK THE MALIGNANT
+    // ════════════════════════════════════════════════════════════
+    ['🧪 BOSS 4: VASHNIK THE MALIGNANT', '═════════════════════════════════', '', '', '', '', '', '', '', '', '', '', ''],
+    ['Boss 4: Vashnik the Malignant', 'Malignant Toothed Edge', 'Main Hand', 'Heroic', 318, '1H Agi / Str (War, Pal, DK, DH, Rogue)', '', '', '', '', 'Major Weapon', '⚡ Live Armory ilvl', 'Fast 1H weapon with shadow damage proc'],
+    ['Boss 4: Vashnik the Malignant', 'Gauntlets of the Consecrated Flame', 'Hands', 'Heroic', 318, 'All Classes (Tier Gloves)', '', '', '', '', 'Tier Gloves', '⚡ Live Armory ilvl', 'Tier gloves token'],
+    ['Boss 4: Vashnik the Malignant', 'Scaleplate Strangulators', 'Hands', 'Heroic', 318, 'Plate Gloves', '', '', '', '', 'Plate Gloves', '⚡ Live Armory ilvl', 'Plate gloves with haste/crit'],
+    ['Boss 4: Vashnik the Malignant', 'Vile Alchemist\'s Band', 'Ring 1', 'Heroic', 318, 'All Specs', '', '', '', '', 'BiS Ring', '⚡ Live Armory ilvl', 'Haste/Crit ring with cantrip poison proc'],
 
-    // Boss 5: Sszorak
-    ['Boss 5: Sszorak', 'Font of Venomous Rage', 'Trinket 2', 'Heroic', 318, 'Strength / Agility DPS', '', '', '', '', 'God-Tier Trinket', '⚡ Live Armory ilvl', 'Primary stat surge and attack speed aura'],
-    ['Boss 5: Sszorak', 'Staff of the Venom Brood', 'Main Hand', 'Heroic', 318, 'Intellect Casters / Healers', '', '', '', '', 'Major Weapon', '⚡ Live Armory ilvl', '2H Caster Staff with mastery proc'],
-    ['Boss 5: Sszorak', 'Leggings of the Broodmother', 'Legs', 'Heroic', 318, 'All Classes (Tier Token)', '', '', '', '', 'Tier Legs', '⚡ Live Armory ilvl', 'Tier legs token'],
+    // ════════════════════════════════════════════════════════════
+    // 🐊 BOSS 5: SSZORAK
+    // ════════════════════════════════════════════════════════════
+    ['🐊 BOSS 5: SSZORAK', '═════════════════════════════════', '', '', '', '', '', '', '', '', '', '', ''],
+    ['Boss 5: Sszorak', 'Sszorak\'s Ferocity', 'Trinket 2', 'Heroic', 318, 'Strength / Agility DPS', '', '', '', '', 'God-Tier Trinket', '⚡ Live Armory ilvl', 'Primary stat surge and attack speed aura'],
+    ['Boss 5: Sszorak', 'Greaves of the Consecrated Flame', 'Legs', 'Heroic', 318, 'All Classes (Tier Legs)', '', '', '', '', 'Tier Legs', '⚡ Live Armory ilvl', 'Tier legs token'],
+    ['Boss 5: Sszorak', 'Chausses of Unbound Rancor', 'Legs', 'Heroic', 318, 'Plate Legs', '', '', '', '', 'Plate Legs', '⚡ Live Armory ilvl', 'Plate legs with crit/mastery'],
+    ['Boss 5: Sszorak', 'Apex Brute\'s Claw Ring', 'Ring 2', 'Heroic', 318, 'All Specs', '', '', '', '', 'BiS Ring', '⚡ Live Armory ilvl', 'Mastery/Versatility high stat ring'],
 
-    // Boss 6: The Twin Fangs
-    ['Boss 6: The Twin Fangs', 'Twin Fang Venom Vial', 'Trinket 1', 'Heroic', 318, 'Melee DPS / Hunters', '', '', '', '', 'BiS A-Tier', '⚡ Live Armory ilvl', 'Venom stacking DoT that executes at 20%'],
-    ['Boss 6: The Twin Fangs', 'Fang of the Left Twin', 'Main Hand', 'Heroic', 318, 'Rogues, DH, Monks', '', '', '', '', 'Major Weapon', '⚡ Live Armory ilvl', 'Fast 1.8 Agi Dagger/Fist weapon'],
-    ['Boss 6: The Twin Fangs', 'Cloak of Shifting Fangs', 'Back', 'Heroic', 318, 'All Specs', '', '', '', '', 'BiS Back', '⚡ Live Armory ilvl', 'Max item level cloak with avoidance'],
+    // ════════════════════════════════════════════════════════════
+    // ⚔️ BOSS 6: THE TWIN FANGS
+    // ════════════════════════════════════════════════════════════
+    ['⚔️ BOSS 6: THE TWIN FANGS', '═════════════════════════════════', '', '', '', '', '', '', '', '', '', '', ''],
+    ['Boss 6: The Twin Fangs', 'Bound Serpent\'s Jade Eye', 'Trinket 1', 'Heroic', 318, 'Melee DPS / Hunters / Casters', '', '', '', '', 'BiS S-Tier', '⚡ Live Armory ilvl', 'Venom stacking DoT that executes at low health'],
+    ['Boss 6: The Twin Fangs', 'Amulet of the Twin Fangs', 'Neck', 'Heroic', 318, 'All Specs', '', '', '', '', 'BiS Neck', '⚡ Live Armory ilvl', 'High crit/haste amulet'],
+    ['Boss 6: The Twin Fangs', 'Silken Voodoo Drape', 'Back', 'Heroic', 318, 'All Specs', '', '', '', '', 'BiS Cloak', '⚡ Live Armory ilvl', 'Max item level cloak with avoidance'],
+    ['Boss 6: The Twin Fangs', 'Scaled Fiend\'s Warboots', 'Feet', 'Heroic', 318, 'Plate Feet', '', '', '', '', 'Plate Boots', '⚡ Live Armory ilvl', 'High armor plate boots'],
 
-    // Boss 7: The Coiled Altar
-    ['Boss 7: The Coiled Altar', 'Coiled Altar Relic', 'Trinket 2', 'Mythic', 344, 'All Roles (Very Rare)', '', '', '', '', 'Very Rare BiS', '⚡ Live Armory ilvl', 'Special 344 item level altar proc trinket'],
-    ['Boss 7: The Coiled Altar', 'Altar-Keeper\'s Greatbow', 'Main Hand', 'Mythic', 344, 'Hunters (Very Rare)', '', '', '', '', 'Very Rare Weapon', '⚡ Live Armory ilvl', 'Mythic 344 ilvl Ranged Weapon with void shot'],
-    ['Boss 7: The Coiled Altar', 'Band of the Coiled Ritual', 'Ring 2', 'Mythic', 344, 'All Specs', '', '', '', '', 'BiS Ring', '⚡ Live Armory ilvl', 'Mythic 344 ilvl ring with custom socket'],
+    // ════════════════════════════════════════════════════════════
+    // 🏛️ BOSS 7: THE COILED ALTAR
+    // ════════════════════════════════════════════════════════════
+    ['🏛️ BOSS 7: THE COILED ALTAR', '═════════════════════════════════', '', '', '', '', '', '', '', '', '', '', ''],
+    ['Boss 7: The Coiled Altar', 'Aqirbane Reliquary', 'Trinket 2', 'Heroic', 318, 'All Roles', '', '', '', '', 'Very Rare BiS', '⚡ Live Armory ilvl', 'Special void altar proc burst trinket'],
+    ['Boss 7: The Coiled Altar', 'Zul\'jin\'s Guillotine Technique', 'Main Hand', 'Heroic', 318, '2H Strength / Agility', '', '', '', '', 'Major 2H Weapon', '⚡ Live Armory ilvl', 'High weapon damage 2H polearm/axe'],
+    ['Boss 7: The Coiled Altar', 'Girdle of Toxic Regret', 'Waist', 'Heroic', 318, 'Plate Waist', '', '', '', '', 'Plate Belt', '⚡ Live Armory ilvl', 'Plate belt with haste/crit'],
+    ['Boss 7: The Coiled Altar', 'Amani Summoning Shawl', 'Back', 'Heroic', 318, 'All Specs', '', '', '', '', 'BiS Cloak', '⚡ Live Armory ilvl', 'Mastery cloak with speed bonus'],
 
-    // Boss 8: Ula'tek (Final Boss)
-    ['Boss 8: Ula\'tek', 'Slumbering Coil Curio', 'Omni-Token', 'Mythic', 344, 'All Classes (Any Tier Slot)', '', '', '', '', 'Omni Tier Token', '⚡ Live Armory ilvl', 'Can be turned in for ANY tier piece'],
-    ['Boss 8: Ula\'tek', 'Hex Lord\'s Dooming Idol', 'Trinket 1', 'Mythic', 344, 'All DPS / Healers (Very Rare)', '', '', '', '', 'God-Tier Trinket', '⚡ Live Armory ilvl', 'Top trinket in the game with stacking execute doom'],
-    ['Boss 8: Ula\'tek', 'Fang of Ula\'tek', 'Main Hand', 'Mythic', 344, 'All Weapon Classes (Very Rare)', '', '', '', '', 'Mythic Weapon', '⚡ Live Armory ilvl', 'Top-tier 344 ilvl weapon with cantrip shadow strike']
+    // ════════════════════════════════════════════════════════════
+    // 👑 BOSS 8: ULA'TEK (FINAL BOSS)
+    // ════════════════════════════════════════════════════════════
+    ['👑 BOSS 8: ULA\'TEK (FINAL BOSS)', '═════════════════════════════════', '', '', '', '', '', '', '', '', '', '', ''],
+    ['Boss 8: Ula\'tek', 'Maze-roa, Warlord\'s Fury', 'Main Hand', 'Mythic', 344, '2H Strength (War, Pal, DK)', '', '', '', '', 'Mythic Weapon', '⚡ Live Armory ilvl', 'Top 344 ilvl 2H Axe in the game with shadow cleave'],
+    ['Boss 8: Ula\'tek', 'Voracious Heart of Ula\'tek', 'Trinket 1', 'Mythic', 344, 'All DPS / Tanks', '', '', '', '', 'God-Tier Trinket', '⚡ Live Armory ilvl', 'Top execute burst trinket in the game'],
+    ['Boss 8: Ula\'tek', 'Font of Venomous Rage', 'Trinket 2', 'Mythic', 344, 'All Roles', '', '', '', '', 'God-Tier Trinket', '⚡ Live Armory ilvl', 'Primary stat surge and attack speed aura'],
+    ['Boss 8: Ula\'tek', 'Keeper\'s Seething Core', 'Trinket 1', 'Mythic', 344, 'All DPS / Healers', '', '', '', '', 'God-Tier Trinket', '⚡ Live Armory ilvl', 'Stacking execute doom trinket'],
+    ['Boss 8: Ula\'tek', 'Venom Warden\'s Greaves', 'Legs', 'Mythic', 344, 'Plate Legs', '', '', '', '', 'Mythic Legs', '⚡ Live Armory ilvl', 'Max ilvl plate legs with custom socket'],
+    ['Boss 8: Ula\'tek', 'Alluring Bubbleband', 'Ring 2', 'Mythic', 344, 'All Specs', '', '', '', '', 'BiS Ring', '⚡ Live Armory ilvl', 'Mythic 344 ilvl ring with cantrip shield proc'],
+    ['Boss 8: Ula\'tek', 'Forgotten Grotto Girdle', 'Waist', 'Mythic', 344, 'Mail Waist', '', '', '', '', 'Mail Belt', '⚡ Live Armory ilvl', 'Mail belt with crit/haste'],
+
+    // ════════════════════════════════════════════════════════════
+    // 📦 TRASH DROPS & OTHER RAID SOURCES
+    // ════════════════════════════════════════════════════════════
+    ['📦 TRASH DROPS & OTHER RAID SOURCES', '═════════════════════════════════', '', '', '', '', '', '', '', '', '', '', ''],
+    ['Trash Drop', 'Fanged Brute\'s Greatbelt', 'Waist', 'Heroic', 318, 'Plate Waist', '', '', '', '', 'Trash Drop', '⚡ Live Armory ilvl', 'BoE plate belt']
   ];
 
   // Helper to extract numerical ilvl from formatted gear slot strings e.g. "[Tier] 298 (Hero 4/6) - Item"
@@ -1404,6 +1473,11 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
   // If character audit data is provided, auto-calculate live equipped upgrades
   if (mainCharacterData && mainCharacterData.length > 0) {
     chaseItemsCatalog.forEach(row => {
+      // Skip separator rows
+      if (row[0].startsWith('⚔️') || row[0].startsWith('🛡️') || row[0].startsWith('🧭') || row[0].startsWith('🧪') || row[0].startsWith('🐊') || row[0].startsWith('🏛️') || row[0].startsWith('👑') || row[0].startsWith('📦')) {
+        return;
+      }
+
       const cleanItemName = (row[1] || '').toString().toLowerCase().trim();
       const slot = row[2];
       const dropIlvl = Number(row[4]) || 318;
@@ -1492,8 +1566,8 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
             contenders.push({
               name: char['Name'],
               delta: delta,
-              currentIlvl: currentIlvl,
-              slotText: currentSlotText
+              equippedText: currentSlotText,
+              equippedIlvl: currentIlvl
             });
           }
         }
@@ -1505,14 +1579,14 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
       if (contenders.length > 0) {
         const top = contenders[0];
         row[6] = `${top.name} (+${top.delta})`;
-        row[7] = top.slotText;
-        row[8] = top.currentIlvl;
+        row[7] = top.equippedText;
+        row[8] = top.equippedIlvl;
         row[9] = `+${top.delta}`;
         row[11] = '⚡ Live Armory ilvl';
 
         // Top 3 list in Notes
         const top3List = contenders.slice(0, 3).map((c, i) => `${i + 1}. ${c.name} (+${c.delta})`).join(' | ');
-        row[12] = `Live Upgrades: ${top3List} — ${baseNotes}`;
+        row[12] = `${baseNotes} (Top Upgrades: ${top3List})`;
       }
     });
   }
@@ -1556,6 +1630,20 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('⚡').setBackground('#f1f3f4').setFontColor('#3c4043').setRanges(simStatusRange).build());
 
   sheet.setConditionalFormatRules(rules);
+
+  // Style Boss Separator Rows with distinctive Deep Navy / Indigo Banners
+  for (let i = 0; i < chaseItemsCatalog.length; i++) {
+    const rowTitle = (chaseItemsCatalog[i][0] || '').toString();
+    if (rowTitle.startsWith('⚔️') || rowTitle.startsWith('🛡️') || rowTitle.startsWith('🧭') || rowTitle.startsWith('🧪') || rowTitle.startsWith('🐊') || rowTitle.startsWith('🏛️') || rowTitle.startsWith('👑') || rowTitle.startsWith('📦')) {
+      const rowIdx = i + 2;
+      sheet.getRange(rowIdx, 1, 1, sheet.getMaxColumns())
+        .setBackground('#1a237e')
+        .setFontColor('#ffffff')
+        .setFontWeight('bold')
+        .setFontSize(10)
+        .setHorizontalAlignment('left');
+    }
+  }
 
   // Set widths
   sheet.setColumnWidth(1, 240); // Boss
