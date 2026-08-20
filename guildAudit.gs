@@ -1374,13 +1374,14 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
 }
 
 /**
- * Imports a Raidbots Droptimizer Sim Report (JSON) and overlays exact mathematical % DPS upgrades onto the Loot Sheet.
+ * Imports one or multiple Raidbots Droptimizer Sim Reports (JSON) and merges exact mathematical % DPS upgrades onto the Loot Sheet.
+ * Supports pasting multiple report URLs at once and merges newly simmed players cumulatively without overwriting existing data.
  */
 function promptAndImportRaidbotsDroptimizer() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt(
-    'Import Raidbots Droptimizer Sim',
-    'Paste your Raidbots Droptimizer Sim URL or Report ID:\n(e.g., https://www.raidbots.com/simbot/report/abc123xyz or abc123xyz)',
+    'Import Raidbots Droptimizer Sim(s)',
+    'Paste one or multiple Raidbots Droptimizer URLs or Report IDs:\n(You can paste multiple links separated by spaces, commas, or new lines)',
     ui.ButtonSet.OK_CANCEL
   );
 
@@ -1390,24 +1391,51 @@ function promptAndImportRaidbotsDroptimizer() {
 
   const rawInput = response.getResponseText().trim();
   if (!rawInput) {
-    ui.alert('Please enter a valid Raidbots report URL or ID.');
+    ui.alert('Please enter at least one valid Raidbots report URL or ID.');
     return;
   }
 
-  // Extract Report ID
-  let reportId = rawInput.replace(/^.*\/report\//, '').replace(/\/.*$/, '').trim();
-
-  const jsonUrl = `https://www.raidbots.com/reports/${reportId}/data.json`;
-  let simData;
-  try {
-    const fetchResp = UrlFetchApp.fetch(jsonUrl, { muteHttpExceptions: true });
-    if (fetchResp.getResponseCode() !== 200) {
-      ui.alert('Error fetching Raidbots report', `Could not find report "${reportId}". Ensure the report is public and completed.`, ui.ButtonSet.OK);
-      return;
+  // Extract all unique Report IDs from input
+  const tokens = rawInput.split(/[\s,;\n]+/);
+  const reportIds = [];
+  
+  tokens.forEach(tok => {
+    const clean = tok.replace(/^.*\/report\//, '').replace(/\/.*$/, '').trim();
+    if (clean && !reportIds.includes(clean)) {
+      reportIds.push(clean);
     }
-    simData = JSON.parse(fetchResp.getContentText());
-  } catch (e) {
-    ui.alert('Failed to parse Raidbots JSON', `${e}`, ui.ButtonSet.OK);
+  });
+
+  if (reportIds.length === 0) {
+    ui.alert('No valid Raidbots report IDs found in the input.');
+    return;
+  }
+
+  // Batch fetch all report data.json in parallel
+  const requests = reportIds.map(id => ({
+    url: `https://www.raidbots.com/reports/${id}/data.json`,
+    muteHttpExceptions: true
+  }));
+
+  const responses = UrlFetchApp.fetchAll(requests);
+  const simDataList = [];
+  let successCount = 0;
+
+  responses.forEach((resp, idx) => {
+    try {
+      if (resp && resp.getResponseCode() === 200) {
+        simDataList.push(JSON.parse(resp.getContentText()));
+        successCount++;
+      } else {
+        Logger.log(`Failed to fetch report ${reportIds[idx]}: status ${resp ? resp.getResponseCode() : 'unknown'}`);
+      }
+    } catch (e) {
+      Logger.log(`Error parsing JSON for ${reportIds[idx]}: ${e}`);
+    }
+  });
+
+  if (simDataList.length === 0) {
+    ui.alert('Import Failed', 'Could not load valid sim data from the provided report link(s). Ensure the reports are public and complete.', ui.ButtonSet.OK);
     return;
   }
 
@@ -1418,64 +1446,92 @@ function promptAndImportRaidbotsDroptimizer() {
     sheet = ss.getSheetByName(LOOT_SHEET_NAME);
   }
 
-  // Parse Droptimizer Sim Players & Items
-  const itemUpgradeMap = {}; // { 'Item Name': [ { name: 'PlayerName', pct: 8.4, raw: 12000 } ] }
+  const numRows = sheet.getLastRow();
+  if (numRows <= 1) return;
 
-  if (simData && simData.sim) {
+  const range = sheet.getRange(2, 1, numRows - 1, sheet.getLastColumn());
+  const values = range.getValues();
+
+  // Parse existing contenders already recorded in sheet to merge cumulatively
+  const itemUpgradeMap = {};
+
+  values.forEach(row => {
+    const itemName = (row[1] || '').toString().toLowerCase().trim();
+    if (!itemName) return;
+    itemUpgradeMap[itemName] = [];
+
+    // Parse existing Top Contender and Notes if previously simmed
+    const currentNotes = (row[11] || '').toString();
+    if (currentNotes.includes('Raidbots Sim Upgrades:')) {
+      const parts = currentNotes.replace('Raidbots Sim Upgrades:', '').split('|');
+      parts.forEach(p => {
+        const m = p.trim().match(/(?:\d+\.\s*)?([A-Za-z0-9\u00C0-\u024F]+)\s*\(\+([0-9.]+)%\)/);
+        if (m) {
+          itemUpgradeMap[itemName].push({
+            name: m[1],
+            pct: parseFloat(m[2])
+          });
+        }
+      });
+    }
+  });
+
+  // Ingest all fetched sim reports
+  simDataList.forEach(simData => {
+    if (!simData || !simData.sim) return;
     const players = simData.sim.players || [simData.sim.player];
+
     players.forEach(p => {
       if (!p) return;
       const playerName = p.name || 'Unknown';
       const baseDps = p.dps || 1;
 
-      // Scan droptimizer items / variations
       const itemsList = p.items || (p.droptimizer ? p.droptimizer.items : []);
       if (itemsList) {
         itemsList.forEach(it => {
-          const itemName = it.name || it.item_name;
-          if (itemName) {
-            const cleanName = itemName.toLowerCase().trim();
+          const rawItemName = it.name || it.item_name;
+          if (rawItemName) {
+            const cleanName = rawItemName.toLowerCase().trim();
             const dps = it.dps || it.score || baseDps;
             const pctGain = it.pct || it.pct_gain || it.dps_increase_percent || (((dps - baseDps) / baseDps) * 100);
             if (pctGain > 0) {
-              if (!itemUpgradeMap[cleanName]) itemUpgradeMap[cleanName] = [];
-              itemUpgradeMap[cleanName].push({
-                name: playerName,
-                pct: parseFloat(pctGain.toFixed(1)),
-                raw: Math.round(dps - baseDps)
-              });
+              // Find matching item in catalog
+              const matchedKey = Object.keys(itemUpgradeMap).find(k => k.includes(cleanName) || cleanName.includes(k));
+              if (matchedKey) {
+                // Update or insert player's score
+                const existingIdx = itemUpgradeMap[matchedKey].findIndex(e => e.name.toLowerCase() === playerName.toLowerCase());
+                if (existingIdx >= 0) {
+                  itemUpgradeMap[matchedKey][existingIdx].pct = parseFloat(pctGain.toFixed(1));
+                } else {
+                  itemUpgradeMap[matchedKey].push({
+                    name: playerName,
+                    pct: parseFloat(pctGain.toFixed(1))
+                  });
+                }
+              }
             }
           }
         });
       }
     });
-  }
+  });
 
-  // Update Loot & Chase Items Sheet Rows
-  const numRows = sheet.getLastRow();
-  if (numRows > 1) {
-    const range = sheet.getRange(2, 1, numRows - 1, sheet.getLastColumn());
-    const values = range.getValues();
-    let matchedCount = 0;
+  // Re-write merged rankings onto the sheet
+  let totalMatches = 0;
+  values.forEach(row => {
+    const itemName = (row[1] || '').toString().toLowerCase().trim();
+    if (itemUpgradeMap[itemName] && itemUpgradeMap[itemName].length > 0) {
+      const contenders = itemUpgradeMap[itemName].sort((a, b) => b.pct - a.pct);
+      const top = contenders[0];
+      row[6] = `${top.name} (+${top.pct}%)`;
+      row[9] = `+${top.pct}% DPS`;
 
-    values.forEach(row => {
-      const sheetItemName = (row[1] || '').toString().toLowerCase().trim();
-      
-      // Match against Droptimizer items
-      let matchedKey = Object.keys(itemUpgradeMap).find(k => sheetItemName.includes(k) || k.includes(sheetItemName));
-      if (matchedKey && itemUpgradeMap[matchedKey].length > 0) {
-        const contenders = itemUpgradeMap[matchedKey].sort((a, b) => b.pct - a.pct);
-        const top = contenders[0];
-        row[6] = `${top.name} (+${top.pct}%)`;
-        row[9] = `+${top.pct}% DPS`;
-        
-        const top3 = contenders.slice(0, 3).map((c, i) => `${i + 1}. ${c.name} (+${c.pct}%)`).join(' | ');
-        row[11] = `Raidbots Sim Upgrades: ${top3}`;
-        matchedCount++;
-      }
-    });
+      const topList = contenders.slice(0, 5).map((c, i) => `${i + 1}. ${c.name} (+${c.pct}%)`).join(' | ');
+      row[11] = `Raidbots Sim Upgrades: ${topList}`;
+      totalMatches++;
+    }
+  });
 
-    range.setValues(values);
-    ui.alert('Droptimizer Sim Imported!', `Successfully mapped % DPS upgrades for ${matchedCount} chase items from Raidbots Report "${reportId}".`, ui.ButtonSet.OK);
-  }
+  range.setValues(values);
+  ui.alert('Droptimizer Sims Merged!', `Successfully processed ${successCount} report(s) and merged DPS upgrades across ${totalMatches} raid items.`, ui.ButtonSet.OK);
 }
