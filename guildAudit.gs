@@ -36,6 +36,7 @@ function onOpen() {
       .addSeparator()
       .addItem('3. Run Full Audit & Talents', 'updateAllCharacterDataWithBonuses')
       .addItem('4. Create/Refresh Loot & Chase Items Sheet', 'createLootAndChaseItemsSheet')
+      .addItem('5. Import Raidbots Droptimizer Sim', 'promptAndImportRaidbotsDroptimizer')
       .addToUi();
 }
 
@@ -810,7 +811,10 @@ function updateAllCharacterDataWithBonuses() {
   // 4. Update Talents & Builds Companion Sheet
   updateTalentsSheet(mainCharacterData, altCharacterData);
 
-  SpreadsheetApp.getUi().alert('Audit Complete!', `Successfully updated ${mainCharacterData.length} mains and ${altCharacterData.length} alts across Audit and Talents sheets.`, SpreadsheetApp.getUi().ButtonSet.OK);
+  // 5. Update Loot & Chase Items Sheet with live equipped gear upgrades
+  createLootAndChaseItemsSheet(mainCharacterData);
+
+  SpreadsheetApp.getUi().alert('Audit Complete!', `Successfully updated ${mainCharacterData.length} mains and ${altCharacterData.length} alts across Audit, Talents, and Loot sheets.`, SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 /**
@@ -1117,8 +1121,9 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
 /**
  * Creates and formats the Loot & Chase Items reference sheet.
  * Features the current Season 2 raid: The Venomous Abyss (8 Bosses).
+ * Automatically calculates upgrade deltas against live equipped gear if character data is provided.
  */
-function createLootAndChaseItemsSheet() {
+function createLootAndChaseItemsSheet(mainCharacterData) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(LOOT_SHEET_NAME);
   if (!sheet) {
@@ -1173,6 +1178,97 @@ function createLootAndChaseItemsSheet() {
     ['Boss 8: Ula\'tek', 'Fang of Ula\'tek', 'Main Hand', 'Mythic', 344, 'All Weapon Classes (Very Rare)', '', '', '', '', 'Mythic Weapon', 'Top-tier 344 ilvl weapon with cantrip shadow strike']
   ];
 
+  // Helper to extract numerical ilvl from formatted gear slot strings e.g. "[Tier] 298 (Hero 4/6) - Item"
+  const extractIlvl = (slotText) => {
+    if (!slotText || slotText === '-') return 0;
+    const match = slotText.match(/(?:\[.*?\]\s*)?(\d{2,3})/);
+    return match ? parseInt(match[1], 10) : 0;
+  };
+
+  // If character audit data is provided, auto-calculate live equipped upgrades
+  if (mainCharacterData && mainCharacterData.length > 0) {
+    chaseItemsCatalog.forEach(row => {
+      const slot = row[2];
+      const dropIlvl = Number(row[4]) || 318;
+      const targetRole = (row[5] || '').toLowerCase();
+      const baseNotes = row[11];
+
+      const contenders = [];
+
+      mainCharacterData.forEach(char => {
+        if (!char['Name']) return;
+        const charSpec = (char['Spec'] || '').toLowerCase();
+
+        // Check if character matches item targeting
+        let isEligible = true;
+        if (targetRole.includes('tank') && !targetRole.includes('all')) {
+          const isTank = ['protection', 'blood', 'guardian', 'brewmaster', 'vengeance'].some(t => charSpec.includes(t));
+          if (!isTank) isEligible = false;
+        } else if (targetRole.includes('healer') && !targetRole.includes('dps') && !targetRole.includes('all')) {
+          const isHealer = ['restoration', 'holy', 'discipline', 'mistweaver', 'preservation'].some(h => charSpec.includes(h));
+          if (!isHealer) isEligible = false;
+        }
+
+        if (isEligible) {
+          let currentSlotText = '-';
+          let currentIlvl = 0;
+
+          if (slot.includes('Trinket')) {
+            const t1 = char['Trinket 1'] || '-';
+            const t2 = char['Trinket 2'] || '-';
+            const ilvl1 = extractIlvl(t1);
+            const ilvl2 = extractIlvl(t2);
+            if (ilvl1 <= ilvl2 && ilvl1 > 0) {
+              currentSlotText = t1; currentIlvl = ilvl1;
+            } else if (ilvl2 > 0) {
+              currentSlotText = t2; currentIlvl = ilvl2;
+            } else {
+              currentSlotText = t1; currentIlvl = ilvl1;
+            }
+          } else if (slot.includes('Ring')) {
+            const r1 = char['Ring 1'] || '-';
+            const r2 = char['Ring 2'] || '-';
+            const ilvl1 = extractIlvl(r1);
+            const ilvl2 = extractIlvl(r2);
+            if (ilvl1 <= ilvl2 && ilvl1 > 0) {
+              currentSlotText = r1; currentIlvl = ilvl1;
+            } else {
+              currentSlotText = r2; currentIlvl = ilvl2;
+            }
+          } else {
+            currentSlotText = char[slot] || '-';
+            currentIlvl = extractIlvl(currentSlotText);
+          }
+
+          if (currentIlvl > 0) {
+            const delta = dropIlvl - currentIlvl;
+            contenders.push({
+              name: char['Name'],
+              delta: delta,
+              currentIlvl: currentIlvl,
+              slotText: currentSlotText
+            });
+          }
+        }
+      });
+
+      // Sort by largest upgrade delta
+      contenders.sort((a, b) => b.delta - a.delta);
+
+      if (contenders.length > 0) {
+        const top = contenders[0];
+        row[6] = `${top.name} (+${top.delta})`;
+        row[7] = top.slotText;
+        row[8] = top.currentIlvl;
+        row[9] = `+${top.delta}`;
+
+        // Top 3 list in Notes
+        const top3List = contenders.slice(0, 3).map((c, i) => `${i + 1}. ${c.name} (+${c.delta})`).join(' | ');
+        row[11] = `Live Upgrades: ${top3List} — ${baseNotes}`;
+      }
+    });
+  }
+
   const fullData = [lootHeaders, ...chaseItemsCatalog];
 
   sheet.clear();
@@ -1191,7 +1287,9 @@ function createLootAndChaseItemsSheet() {
   headerRange.setBackground('#202124').setFontColor('#ffffff').setFontWeight('bold');
 
   // Bold data
-  sheet.getRange(2, 1, sheet.getMaxRows() - 1, sheet.getMaxColumns()).setFontWeight('bold');
+  if (sheet.getMaxRows() > 1) {
+    sheet.getRange(2, 1, sheet.getMaxRows() - 1, sheet.getMaxColumns()).setFontWeight('bold');
+  }
 
   // Priority Column Conditional Formatting
   const rules = [];
@@ -1212,11 +1310,116 @@ function createLootAndChaseItemsSheet() {
   sheet.setColumnWidth(5, 85);  // Drop ilvl
   sheet.setColumnWidth(6, 240); // Target Specs
   sheet.setColumnWidth(7, 180); // Top Contender
-  sheet.setColumnWidth(8, 220); // Equipped Item
+  sheet.setColumnWidth(8, 260); // Equipped Item
   sheet.setColumnWidth(9, 100); // Equipped ilvl
   sheet.setColumnWidth(10, 140);// Upgrade Delta
   sheet.setColumnWidth(11, 180);// Priority / BiS Tier
-  sheet.setColumnWidth(12, 280);// Notes
+  sheet.setColumnWidth(12, 380);// Notes
+}
 
-  SpreadsheetApp.getUi().alert('Loot & Chase Items Sheet Created!', 'Created the loot distribution and chase items reference sheet with Season 2 (The Venomous Abyss) boss loot tables.', SpreadsheetApp.getUi().ButtonSet.OK);
+/**
+ * Imports a Raidbots Droptimizer Sim Report (JSON) and overlays exact mathematical % DPS upgrades onto the Loot Sheet.
+ */
+function promptAndImportRaidbotsDroptimizer() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.prompt(
+    'Import Raidbots Droptimizer Sim',
+    'Paste your Raidbots Droptimizer Sim URL or Report ID:\n(e.g., https://www.raidbots.com/simbot/report/abc123xyz or abc123xyz)',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (response.getSelectedButton() !== ui.Button.OK) {
+    return;
+  }
+
+  const rawInput = response.getResponseText().trim();
+  if (!rawInput) {
+    ui.alert('Please enter a valid Raidbots report URL or ID.');
+    return;
+  }
+
+  // Extract Report ID
+  let reportId = rawInput.replace(/^.*\/report\//, '').replace(/\/.*$/, '').trim();
+
+  const jsonUrl = `https://www.raidbots.com/reports/${reportId}/data.json`;
+  let simData;
+  try {
+    const fetchResp = UrlFetchApp.fetch(jsonUrl, { muteHttpExceptions: true });
+    if (fetchResp.getResponseCode() !== 200) {
+      ui.alert('Error fetching Raidbots report', `Could not find report "${reportId}". Ensure the report is public and completed.`, ui.ButtonSet.OK);
+      return;
+    }
+    simData = JSON.parse(fetchResp.getContentText());
+  } catch (e) {
+    ui.alert('Failed to parse Raidbots JSON', `${e}`, ui.ButtonSet.OK);
+    return;
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(LOOT_SHEET_NAME);
+  if (!sheet) {
+    createLootAndChaseItemsSheet();
+    sheet = ss.getSheetByName(LOOT_SHEET_NAME);
+  }
+
+  // Parse Droptimizer Sim Players & Items
+  const itemUpgradeMap = {}; // { 'Item Name': [ { name: 'PlayerName', pct: 8.4, raw: 12000 } ] }
+
+  if (simData && simData.sim) {
+    const players = simData.sim.players || [simData.sim.player];
+    players.forEach(p => {
+      if (!p) return;
+      const playerName = p.name || 'Unknown';
+      const baseDps = p.dps || 1;
+
+      // Scan droptimizer items / variations
+      const itemsList = p.items || (p.droptimizer ? p.droptimizer.items : []);
+      if (itemsList) {
+        itemsList.forEach(it => {
+          const itemName = it.name || it.item_name;
+          if (itemName) {
+            const cleanName = itemName.toLowerCase().trim();
+            const dps = it.dps || it.score || baseDps;
+            const pctGain = it.pct || it.pct_gain || it.dps_increase_percent || (((dps - baseDps) / baseDps) * 100);
+            if (pctGain > 0) {
+              if (!itemUpgradeMap[cleanName]) itemUpgradeMap[cleanName] = [];
+              itemUpgradeMap[cleanName].push({
+                name: playerName,
+                pct: parseFloat(pctGain.toFixed(1)),
+                raw: Math.round(dps - baseDps)
+              });
+            }
+          }
+        });
+      }
+    });
+  }
+
+  // Update Loot & Chase Items Sheet Rows
+  const numRows = sheet.getLastRow();
+  if (numRows > 1) {
+    const range = sheet.getRange(2, 1, numRows - 1, sheet.getLastColumn());
+    const values = range.getValues();
+    let matchedCount = 0;
+
+    values.forEach(row => {
+      const sheetItemName = (row[1] || '').toString().toLowerCase().trim();
+      
+      // Match against Droptimizer items
+      let matchedKey = Object.keys(itemUpgradeMap).find(k => sheetItemName.includes(k) || k.includes(sheetItemName));
+      if (matchedKey && itemUpgradeMap[matchedKey].length > 0) {
+        const contenders = itemUpgradeMap[matchedKey].sort((a, b) => b.pct - a.pct);
+        const top = contenders[0];
+        row[6] = `${top.name} (+${top.pct}%)`;
+        row[9] = `+${top.pct}% DPS`;
+        
+        const top3 = contenders.slice(0, 3).map((c, i) => `${i + 1}. ${c.name} (+${c.pct}%)`).join(' | ');
+        row[11] = `Raidbots Sim Upgrades: ${top3}`;
+        matchedCount++;
+      }
+    });
+
+    range.setValues(values);
+    ui.alert('Droptimizer Sim Imported!', `Successfully mapped % DPS upgrades for ${matchedCount} chase items from Raidbots Report "${reportId}".`, ui.ButtonSet.OK);
+  }
 }
