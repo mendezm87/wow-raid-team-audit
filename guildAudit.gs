@@ -1721,28 +1721,56 @@ function promptAndImportRaidbotsDroptimizer() {
   const daysOld = Math.floor((now - latestSimDate) / (1000 * 60 * 60 * 24));
   const simStatusBadge = daysOld > 7 ? `⚠️ Stale (${daysOld}d ago)` : `✅ Simmed (${formattedDate})`;
 
-  // Ingest all fetched sim reports using universal schema detection
+  // Ingest all fetched sim reports using exact itemLibrary dictionary lookup
   simDataList.forEach(simData => {
     if (!simData) return;
 
-    // 1. Determine Player Name
+    // 1. Build Item ID to Name & Slot dictionary from simbot.meta.itemLibrary
+    const itemMap = {};
+    const slotMap = {};
+    const sourceMap = {};
+    const encounters = {};
+
+    if (simData.simbot && simData.simbot.meta && simData.simbot.meta.instanceLibrary) {
+      simData.simbot.meta.instanceLibrary.forEach(inst => {
+        if (inst.encounters) {
+          inst.encounters.forEach(enc => {
+            encounters[enc.id] = enc.name;
+          });
+        }
+      });
+    }
+
+    if (simData.simbot && simData.simbot.meta && simData.simbot.meta.itemLibrary) {
+      simData.simbot.meta.itemLibrary.forEach(it => {
+        itemMap[it.id] = it.name;
+        slotMap[it.id] = it.slot;
+        if (it.source && it.source.encounter && it.source.encounter.name) {
+          sourceMap[it.id] = it.source.encounter.name;
+        } else if (it.source && it.source.encounter && it.source.encounter.id && encounters[it.source.encounter.id]) {
+          sourceMap[it.id] = encounters[it.source.encounter.id];
+        }
+      });
+    }
+
+    // 2. Determine Player Name
     let playerName = 'Unknown';
-    if (simData.simbot && simData.simbot.character && simData.simbot.character.name) {
+    if (simData.simbot && simData.simbot.player) {
+      playerName = simData.simbot.player;
+    } else if (simData.simbot && simData.simbot.character && simData.simbot.character.name) {
       playerName = simData.simbot.character.name;
     } else if (simData.simbot && simData.simbot.meta && simData.simbot.meta.character && simData.simbot.meta.character.name) {
       playerName = simData.simbot.meta.character.name;
     } else if (simData.sim && simData.sim.players && simData.sim.players[0] && simData.sim.players[0].name) {
       playerName = simData.sim.players[0].name;
-    } else if (simData.sim && simData.sim.player && simData.sim.player.name) {
-      playerName = simData.sim.player.name;
     }
 
-    // 2. Determine Baseline DPS
+    // 3. Determine Baseline DPS
     let baseDps = 1;
-    if (simData.sim && simData.sim.statistics && simData.sim.statistics.raid_dps && simData.sim.statistics.raid_dps.mean) {
-      baseDps = simData.sim.statistics.raid_dps.mean;
-    } else if (simData.sim && simData.sim.players && simData.sim.players[0] && simData.sim.players[0].collected_data && simData.sim.players[0].collected_data.dps && simData.sim.players[0].collected_data.dps.mean) {
+    if (simData.sim && simData.sim.players && simData.sim.players[0] && simData.sim.players[0].collected_data && simData.sim.players[0].collected_data.dps && simData.sim.players[0].collected_data.dps.mean) {
       baseDps = simData.sim.players[0].collected_data.dps.mean;
+    } else if (simData.sim && simData.sim.statistics && simData.sim.statistics.raid_dps && simData.sim.statistics.raid_dps.mean) {
+      baseDps = simData.sim.statistics.raid_dps.mean;
     } else if (simData.sim && simData.sim.players && simData.sim.players[0] && simData.sim.players[0].dps) {
       baseDps = simData.sim.players[0].dps;
     } else if (simData.simbot && simData.simbot.baseDps) {
@@ -1751,75 +1779,81 @@ function promptAndImportRaidbotsDroptimizer() {
 
     const itemsToProcess = [];
 
-    // Path A: simbot.droptimizer
-    const droptimizerObj = (simData.simbot && simData.simbot.droptimizer) ||
-                           (simData.sim && simData.sim.droptimizer) ||
-                           (simData.sim && simData.sim.players && simData.sim.players[0] && simData.sim.players[0].droptimizer);
-    if (droptimizerObj) {
-      const itArr = droptimizerObj.items || droptimizerObj.data || droptimizerObj.entries || [];
-      if (Array.isArray(itArr)) {
-        itArr.forEach(it => {
-          const rawName = it.name || it.item_name || it.title || '';
-          const dps = it.dps || it.mean || it.score || (baseDps + (it.raw || 0));
-          let pct = it.pct || it.pct_gain || it.dps_increase_percent;
-          if (pct === undefined && dps > baseDps && baseDps > 1) {
-            pct = ((dps - baseDps) / baseDps) * 100;
-          }
-          if (rawName && pct > 0) {
-            itemsToProcess.push({ name: rawName, pct: parseFloat(pct.toFixed(1)) });
-          }
-        });
-      }
-    }
-
-    // Path B: sim.profilesets / sim.players[0].profilesets
-    const profilesets = (simData.sim && simData.sim.profilesets && simData.sim.profilesets.results) ||
-                        (simData.sim && simData.sim.profilesets) ||
-                        (simData.sim && simData.sim.players && simData.sim.players[0] && simData.sim.players[0].profilesets);
-    if (profilesets) {
-      const list = Array.isArray(profilesets) ? profilesets : (profilesets.results || Object.keys(profilesets).map(k => ({ name: k, ...(typeof profilesets[k] === 'object' ? profilesets[k] : { mean: profilesets[k] }) })));
-      list.forEach(ps => {
-        const psName = ps.name || ps.id || '';
-        const meanDps = ps.mean || ps.dps || ps.dmg || (ps.collected_data && ps.collected_data.dps && ps.collected_data.dps.mean) || 0;
-        if (psName && meanDps > baseDps && baseDps > 1) {
+    // Path A: Standard Raidbots Droptimizer profilesets format
+    if (simData.sim && simData.sim.profilesets && simData.sim.profilesets.results) {
+      simData.sim.profilesets.results.forEach(r => {
+        const parts = r.name.split('/');
+        const itemId = parts[3];
+        const rawName = itemMap[itemId] || r.name;
+        const meanDps = r.mean || 0;
+        if (meanDps > baseDps && baseDps > 1) {
           const pct = ((meanDps - baseDps) / baseDps) * 100;
           if (pct > 0) {
-            itemsToProcess.push({ name: psName, pct: parseFloat(pct.toFixed(1)) });
+            itemsToProcess.push({
+              name: rawName,
+              pct: parseFloat(pct.toFixed(2)),
+              slot: slotMap[itemId] || '',
+              source: sourceMap[itemId] || 'Raid Drop'
+            });
           }
         }
       });
     }
 
-    // Path C: sim.players[0].items
-    if (simData.sim && simData.sim.players && simData.sim.players.length > 0) {
-      simData.sim.players.forEach(p => {
-        const itList = p.items || [];
-        if (Array.isArray(itList)) {
-          itList.forEach(it => {
-            const itName = it.name || it.item_name || '';
-            const itDps = it.dps || it.mean || it.score || 0;
-            let pct = it.pct || it.pct_gain || (((itDps - baseDps) / baseDps) * 100);
-            if (itName && pct > 0) {
-              itemsToProcess.push({ name: itName, pct: parseFloat(pct.toFixed(1)) });
-            }
+    // Path B: Direct items array fallback
+    const droptimizerObj = (simData.simbot && simData.simbot.droptimizer) || (simData.sim && simData.sim.droptimizer);
+    if (droptimizerObj && Array.isArray(droptimizerObj.items)) {
+      droptimizerObj.items.forEach(it => {
+        const rawName = it.name || it.item_name || '';
+        const dps = it.dps || it.mean || 0;
+        let pct = it.pct || it.pct_gain;
+        if (pct === undefined && dps > baseDps && baseDps > 1) {
+          pct = ((dps - baseDps) / baseDps) * 100;
+        }
+        if (rawName && pct > 0) {
+          itemsToProcess.push({
+            name: rawName,
+            pct: parseFloat(pct.toFixed(2)),
+            slot: it.slot || '',
+            source: 'Raid Drop'
           });
         }
       });
     }
 
-    // Match extracted items into itemUpgradeMap
+    // Match extracted items into itemUpgradeMap or add as new catalog entries
     itemsToProcess.forEach(simItem => {
-      const matchedCatalogKey = Object.keys(itemUpgradeMap).find(sheetKey => isItemNameMatch(sheetKey, simItem.name));
-      if (matchedCatalogKey) {
-        const existingIdx = itemUpgradeMap[matchedCatalogKey].findIndex(e => e.name.toLowerCase() === playerName.toLowerCase());
-        if (existingIdx >= 0) {
-          itemUpgradeMap[matchedCatalogKey][existingIdx].pct = simItem.pct;
-        } else {
-          itemUpgradeMap[matchedCatalogKey].push({
-            name: playerName,
-            pct: simItem.pct
-          });
-        }
+      // Find existing match
+      let matchedCatalogKey = Object.keys(itemUpgradeMap).find(sheetKey => isItemNameMatch(sheetKey, simItem.name));
+      
+      if (!matchedCatalogKey) {
+        // If not in catalog, register it dynamically so it's not lost
+        itemUpgradeMap[simItem.name] = [];
+        matchedCatalogKey = simItem.name;
+        
+        // Add row to values array
+        values.push([
+          simItem.source || 'The Venomous Abyss',
+          simItem.name,
+          simItem.slot || 'Gear',
+          'Heroic',
+          318,
+          'All Eligible',
+          '', '', '', '',
+          'Raid Drop',
+          simStatusBadge,
+          ''
+        ]);
+      }
+
+      const existingIdx = itemUpgradeMap[matchedCatalogKey].findIndex(e => e.name.toLowerCase() === playerName.toLowerCase());
+      if (existingIdx >= 0) {
+        itemUpgradeMap[matchedCatalogKey][existingIdx].pct = simItem.pct;
+      } else {
+        itemUpgradeMap[matchedCatalogKey].push({
+          name: playerName,
+          pct: simItem.pct
+        });
       }
     });
   });
@@ -1841,6 +1875,7 @@ function promptAndImportRaidbotsDroptimizer() {
     }
   });
 
-  range.setValues(values);
+  // Save back all updated and newly registered items
+  sheet.getRange(2, 1, values.length, sheet.getLastColumn()).setValues(values);
   ui.alert('Droptimizer Sims Merged!', `Successfully processed ${successCount} report(s) and mapped DPS upgrades across ${totalMatches} raid items.`, ui.ButtonSet.OK);
 }
