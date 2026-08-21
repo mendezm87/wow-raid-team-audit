@@ -1856,6 +1856,44 @@ function isCharacterEligibleForItem(charClass, charSpec, slot, targetSubclass, i
 
   // 2. WEAPONS & OFF-HANDS (Main Hand, Off Hand)
   if (slot === 'Main Hand' || slot === 'Off Hand') {
+    const is2HWeapon = targetSubclass.includes('2h') || targetSubclass.includes('two-hand') || targetSubclass.includes('polearm') || targetSubclass.includes('staff') || targetSubclass.includes('stave') || targetSubclass.includes('bow') || targetSubclass.includes('crossbow') || targetSubclass.includes('gun') || (itemName.includes('2h') || itemName.includes('greatsword') || itemName.includes('greataxe') || itemName.includes('greatmace') || itemName.includes('bardiche') || itemName.includes('warlord\'s fury'));
+
+    const is1HWeapon = (targetSubclass.includes('1h') || targetSubclass.includes('one-hand') || targetSubclass.includes('dagger') || targetSubclass.includes('fist') || targetSubclass.includes('warglaive') || targetSubclass.includes('wand') || targetSubclass.includes('shield') || targetSubclass.includes('off hand') || targetSubclass.includes('off-hand') || targetSubclass.includes('holdable') || itemName.includes('cleaver') || itemName.includes('claw') || itemName.includes('censer')) && !is2HWeapon;
+
+    // Strict 2H Only Melee/Tank specs (Must use 2H, CANNOT use 1H):
+    // - Arms Warrior
+    // - Retribution Paladin
+    // - Blood Death Knight
+    // - Unholy Death Knight
+    // - Survival Hunter
+    // - Feral Druid
+    // - Guardian Druid
+    const isStrictly2HSpec = (charClass === 'warrior' && charSpec.includes('arms')) ||
+                             (charClass === 'paladin' && charSpec.includes('retribution')) ||
+                             (charClass === 'death knight' && (charSpec.includes('blood') || charSpec.includes('unholy'))) ||
+                             (charClass === 'hunter' && charSpec.includes('survival')) ||
+                             (charClass === 'druid' && (charSpec.includes('feral') || charSpec.includes('guardian')));
+
+    if (isStrictly2HSpec && is1HWeapon) {
+      return false;
+    }
+
+    // Strict 1H Only Specs (Must use 1H + Shield/Offhand/DW, CANNOT use 2H Weapons):
+    // - Protection Warrior (1H + Shield)
+    // - Protection Paladin (1H + Shield)
+    // - Enhancement Shaman (Dual Wield 1H)
+    // - Rogue (Assassination, Subtlety, Outlaw - all Dual Wield 1H)
+    // - Demon Hunter (Havoc, Vengeance, Devourer - all Dual Wield 1H)
+    const isStrictly1HSpec = (charClass === 'warrior' && charSpec.includes('protection')) ||
+                             (charClass === 'paladin' && charSpec.includes('protection')) ||
+                             (charClass === 'shaman' && charSpec.includes('enhancement')) ||
+                             charClass === 'rogue' ||
+                             charClass === 'demon hunter';
+
+    if (isStrictly1HSpec && is2HWeapon) {
+      return false;
+    }
+
     // Bows, Guns, Crossbows -> Beast Mastery & Marksmanship Hunters ONLY (Survival is strictly 2H Melee)
     if (targetSubclass.includes('gun') || targetSubclass.includes('bow') || targetSubclass.includes('crossbow')) {
       return charClass === 'hunter' && !charSpec.includes('survival');
