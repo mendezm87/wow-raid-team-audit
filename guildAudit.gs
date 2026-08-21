@@ -1405,6 +1405,31 @@ function getGuildAuditCharacterList(ss) {
   const auditSheet = ss.getSheetByName(SHEET_NAME) || ss.getSheetByName('Guild Audit');
   if (!auditSheet || auditSheet.getLastRow() <= 1) return [];
 
+  // Read assigned raid specs from the "Config" sheet to ensure main spec priority
+  const assignedSpecs = {};
+  const configSheet = ss.getSheetByName('Config');
+  if (configSheet && configSheet.getLastRow() > 1) {
+    const configData = configSheet.getDataRange().getValues();
+    let readingMains = false;
+    configData.forEach(row => {
+      const header = (row[0] || '').toString().toLowerCase().trim();
+      if (header.includes('main character')) {
+        readingMains = true;
+        return;
+      } else if (header.includes('alt character') || header.includes('alts to track')) {
+        readingMains = false;
+        return;
+      }
+      if (readingMains && row[0]) {
+        const cName = row[0].toString().trim().toLowerCase();
+        const cSpec = row[1] ? row[1].toString().trim() : '';
+        if (cName && cSpec) {
+          assignedSpecs[cName] = cSpec;
+        }
+      }
+    });
+  }
+
   const lastCol = auditSheet.getLastColumn();
   const headers = auditSheet.getRange(1, 1, 1, lastCol).getValues()[0];
   const rows = auditSheet.getRange(2, 1, auditSheet.getLastRow() - 1, lastCol).getValues();
@@ -1417,6 +1442,11 @@ function getGuildAuditCharacterList(ss) {
     headers.forEach((h, idx) => {
       charObj[h] = r[idx];
     });
+
+    // Enforce official assigned raid main spec over temporary logged-out off-spec
+    const lowerName = charName.toLowerCase();
+    charObj['MainSpec'] = assignedSpecs[lowerName] || charObj['Expected Spec'] || charObj['Spec'] || '';
+
     list.push(charObj);
   });
   return list;
@@ -1999,8 +2029,9 @@ function isCharacterEligibleForItem(charClass, charSpec, slot, targetSubclass, i
       mainCharacterData.forEach(char => {
         if (!char['Name']) return;
 
-        // Comprehensive Armor, Weapon, Stat & Role Eligibility Engine
-        const isEligible = isCharacterEligibleForItem(char['Class'], char['Spec'], slot, targetRole, cleanItemName);
+        // Comprehensive Armor, Weapon, Stat & Role Eligibility Engine using Assigned Main Spec
+        const mainRaidSpec = char['MainSpec'] || char['Expected Spec'] || char['Spec'];
+        const isEligible = isCharacterEligibleForItem(char['Class'], mainRaidSpec, slot, targetRole, cleanItemName);
 
         if (isEligible) {
           const eq = resolveEquippedItemForChar(char, slot);
