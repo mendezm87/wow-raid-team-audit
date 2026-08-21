@@ -97,9 +97,25 @@ async function sendToGoogleSheets(urls) {
     const response = await fetch(GOOGLE_SHEET_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ urls: urls })
+      body: JSON.stringify({ urls: urls }),
+      redirect: 'follow'
     });
-    return await response.json();
+
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch (parseErr) {
+      if (response.status === 404) {
+        return {
+          success: false,
+          error: `Google Web App URL returned 404 Not Found. Please deploy a new Web App in Google Sheets (Deploy > New deployment > Web app > Access: Anyone) and update GOOGLE_SHEET_WEBHOOK_URL in .env.`
+        };
+      }
+      return {
+        success: false,
+        error: `Google Sheets returned non-JSON response (${response.status}). Please ensure your Web App is deployed with 'Who has access: Anyone'.`
+      };
+    }
   } catch (error) {
     console.error('❌ Failed to forward to Google Sheets:', error);
     return { success: false, error: error.message };

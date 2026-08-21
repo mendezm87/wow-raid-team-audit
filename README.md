@@ -17,6 +17,47 @@ Integrates live data from the **Blizzard Armory API**, **Raidbots Droptimizer Si
 
 ---
 
+## 🤖 Discord Droptimizer Bot (Real-Time Sim Ingestion)
+
+Raiders can share their Raidbots Droptimizer links directly in your guild Discord (e.g. in `#raidbots`) or use `/sim <url>`, and the bot automatically updates the **Loot & Chase Items** sheet in real time!
+
+### ⚡ 3-Minute Setup on Your 24/7 Machine:
+
+1. **Deploy Google Apps Script Web App**:
+   * Open your Google Spreadsheet $\rightarrow$ **Extensions > Apps Script**.
+   * Make sure latest `guildAudit.gs` is pasted and saved (💾).
+   * Click **Deploy > New deployment** in the top right.
+   * Click the ⚙️ gear icon and choose **Web app**.
+   * Set:
+     * **Description**: `Discord Sim Webhook`
+     * **Execute as**: `Me`
+     * **Who has access**: `Anyone` *(Crucial so the bot can post sims)*
+   * Click **Deploy** and copy your **Web App URL** (`https://script.google.com/macros/s/.../exec`).
+
+2. **Configure `.env` on Your Machine**:
+   In `discord-bot/.env`, paste your credentials:
+   ```env
+   DISCORD_BOT_TOKEN=YOUR_BOT_TOKEN_HERE
+   GOOGLE_SHEET_WEBHOOK_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec
+   SIMS_CHANNEL_ID=1375347222216052786
+   ```
+
+3. **Install & Run**:
+   ```bash
+   npm install
+   npm start
+   ```
+
+4. **(Optional) Run in background with PM2**:
+   ```bash
+   npm install -g pm2
+   pm2 start discord-bot/index.js --name "wow-raid-bot"
+   pm2 save
+   pm2 startup
+   ```
+
+---
+
 ## ⚡ Key Features
 
 1. **Live Character Gear & Vault Audit**:
