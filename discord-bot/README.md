@@ -54,15 +54,37 @@ A lightweight Discord Bot that automatically catches Raidbots Droptimizer sim re
 ## 🎮 How Raiders Use It in Discord
 
 ### Method 1: Just Paste the Link
-Whenever a raider runs a Droptimizer sim on [Raidbots.com](https://www.raidbots.com/simbot/droptimizer), they can simply paste their report link into your `#raid-sims` channel:
-```
-https://www.raidbots.com/simbot/report/aM6qT1dQz2CPxVodxJDy5k
-```
-The bot will react with `⏳` $\rightarrow$ `✅` and reply with an embed showing their mapped upgrades!
+Raiders can post either **Raidbots** (DPS/Tanks) or **QE Live** (Healers) links into your `#raid-sims` channel:
+* **DPS & Tanks (Raidbots Droptimizer):**
+  ```text
+  https://www.raidbots.com/simbot/report/aM6qT1dQz2CPxVodxJDy5k
+  ```
+* **Healers (Questionably Epic Live Upgrade Report):**
+  ```text
+  https://questionablyepic.com/live/upgradereport/iukuwubrwnfr
+  ```
+The bot will react with `⏳` $\rightarrow$ `✅` and reply with an embed showing their mapped upgrades! *(Bonus roll personal loot items are automatically excluded)*
 
 ### Method 2: Slash Command
 Raiders can also type:
-```
+```text
 /sim report_url:https://www.raidbots.com/simbot/report/aM6qT1dQz2CPxVodxJDy5k
 ```
-The bot will confirm the sim ingestion and immediately update the Loot Council spreadsheet!
+or
+```text
+/sim report_url:https://questionablyepic.com/live/upgradereport/iukuwubrwnfr
+```
+
+---
+
+## 🔄 Updating Your Bot on a Local / Dedicated Machine
+
+* **If running with PM2:**
+  ```bash
+  git pull
+  pm2 restart wow-raid-bot
+  ```
+* **If running directly with Node:**
+  1. Press `Ctrl + C` in the running terminal.
+  2. Run `git pull`.
+  3. Run `npm start` (or `node index.js`).

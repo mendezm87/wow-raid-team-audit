@@ -48,13 +48,46 @@ Raiders can share their Raidbots Droptimizer links directly in your guild Discor
    npm start
    ```
 
-4. **(Optional) Run in background with PM2**:
+4. **(Optional) Run in background 24/7 with PM2**:
    ```bash
    npm install -g pm2
    pm2 start discord-bot/index.js --name "wow-raid-bot"
    pm2 save
    pm2 startup
    ```
+
+5. **How to Update Your Bot When New Changes are Pushed**:
+   * **If using PM2:**
+     ```bash
+     git pull
+     pm2 restart wow-raid-bot
+     ```
+   * **If running manually in terminal:**
+     1. Stop the bot with `Ctrl + C`.
+     2. Pull the update:
+        ```bash
+        git pull
+        ```
+     3. Restart:
+        ```bash
+        npm start
+        ```
+
+---
+
+## 🎮 How Raiders Use the Bot in Discord
+
+Raiders can post either **Raidbots** (DPS/Tanks) or **QE Live** (Healers) links in your `#sims` channel or use `/sim`:
+
+* **⚔️ DPS & Tanks (Raidbots Droptimizer):**
+  ```text
+  https://www.raidbots.com/simbot/report/aM6qT1dQz2CPxVodxJDy5k
+  ```
+* **🩺 Healers (Questionably Epic Live Upgrade Report):**
+  ```text
+  https://questionablyepic.com/live/upgradereport/iukuwubrwnfr
+  ```
+  *(Note: Personal loot / Bonus Roll items are automatically excluded)*
 
 ---
 
