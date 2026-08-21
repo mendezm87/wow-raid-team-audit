@@ -1471,8 +1471,11 @@ function mapBlizzardInvTypeToSlot(invType) {
     case 'FEET': return 'Feet';
     case 'FINGER': case 'FINGER_1': case 'FINGER_2': case 'RING': return 'Ring 1';
     case 'TRINKET': case 'TRINKET_1': case 'TRINKET_2': return 'Trinket 1';
-    case 'WEAPON': case 'WEAPONMAINHAND': case 'TWOHWEAPON': case 'RANGED': case 'RANGEDRIGHT': case '2H WEAPON': case '1H WEAPON': return 'Main Hand';
-    case 'SHIELD': case 'HOLDABLE': case 'WEAPONOFFHAND': case 'OFF HAND': return 'Off Hand';
+    case 'TWOHWEAPON': return 'Two-Hand (2H)';
+    case 'RANGED': case 'RANGEDRIGHT': return 'Ranged (2H)';
+    case 'WEAPON': case 'WEAPONMAINHAND': case '1H WEAPON': return 'One-Hand (1H)';
+    case 'SHIELD': return 'Off Hand (Shield)';
+    case 'HOLDABLE': case 'WEAPONOFFHAND': case 'OFF HAND': return 'Off Hand';
     default: return 'Gear';
   }
 }
@@ -1570,12 +1573,26 @@ function fetchLiveBlizzardRaidLootTable(config, token) {
           // Strictly include ONLY valid, equippable raid armor, weapons, and accessories
           if (!isExcludedType && !isExcludedQuality && !isNonEquip && (itemClassId === 2 || itemClassId === 4)) {
             let cleanSubclass = (itemData.item_subclass && itemData.item_subclass.name) ? itemData.item_subclass.name : 'All Specs';
-            if (['Neck', 'Ring 1', 'Trinket 1'].includes(slot) && cleanSubclass.toLowerCase() === 'miscellaneous') {
-              cleanSubclass = 'All Specs';
-            } else if (slot === 'Back') {
-              cleanSubclass = 'All Specs';
-            } else if (slot === 'Off Hand' && cleanSubclass.toLowerCase() === 'miscellaneous') {
-              cleanSubclass = 'Caster / Healer Off-Hand';
+            
+            // Format weapon role clearly with 1H / 2H indicator
+            if (itemClassId === 2) {
+              if (invType === 'TWOHWEAPON' && !cleanSubclass.toLowerCase().includes('2h') && !cleanSubclass.toLowerCase().includes('two-hand')) {
+                cleanSubclass = '2H ' + cleanSubclass;
+              } else if ((invType === 'WEAPON' || invType === 'WEAPONMAINHAND') && !cleanSubclass.toLowerCase().includes('1h') && !cleanSubclass.toLowerCase().includes('one-hand') && !['Dagger', 'Warglaive', 'Fist Weapon', 'Wand'].includes(cleanSubclass)) {
+                cleanSubclass = '1H ' + cleanSubclass;
+              } else if (invType === 'RANGED' || invType === 'RANGEDRIGHT') {
+                cleanSubclass = 'Ranged (' + cleanSubclass + ')';
+              } else if (invType === 'SHIELD') {
+                cleanSubclass = 'Shield';
+              } else if (invType === 'HOLDABLE') {
+                cleanSubclass = 'Caster / Healer Off-Hand';
+              }
+            } else {
+              if (['Neck', 'Ring 1', 'Trinket 1'].includes(slot) && cleanSubclass.toLowerCase() === 'miscellaneous') {
+                cleanSubclass = 'All Specs';
+              } else if (slot === 'Back') {
+                cleanSubclass = 'All Specs';
+              }
             }
 
             itemDetailsMap[itemId] = {
@@ -1783,6 +1800,10 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
       } else {
         currentSlotText = r2;
       }
+    } else if (slot.includes('Two-Hand') || slot.includes('One-Hand') || slot.includes('Main Hand') || slot.includes('Ranged')) {
+      currentSlotText = charObj['Main Hand'] || '-';
+    } else if (slot.includes('Off Hand') || slot.includes('Shield')) {
+      currentSlotText = charObj['Off Hand'] || '-';
     } else {
       currentSlotText = charObj[slot] || '-';
     }
