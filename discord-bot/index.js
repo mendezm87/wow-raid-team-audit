@@ -173,4 +173,15 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
 
-client.login(DISCORD_BOT_TOKEN);
+client.on('error', (err) => {
+  console.error('❌ Discord client encountered an error:', err);
+});
+
+console.log(`🔑 Attempting Discord login with token (length: ${DISCORD_BOT_TOKEN ? DISCORD_BOT_TOKEN.trim().length : 0})...`);
+client.login(DISCORD_BOT_TOKEN.trim())
+  .then(() => {
+    console.log('🔗 Discord login initiated successfully...');
+  })
+  .catch((err) => {
+    console.error('❌ CRITICAL: Failed to login to Discord! Please check your DISCORD_BOT_TOKEN in Render environment variables:', err);
+  });
