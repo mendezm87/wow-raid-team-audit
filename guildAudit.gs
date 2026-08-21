@@ -1225,14 +1225,15 @@ function applyFormatting(sheet, headers, characterDataObjects) {
 
 const ARCHON_BOSS_OPTIONS = [
   'All Bosses (Overview)',
-  'Boss 1: Nek\'zali',
-  'Boss 2: Sentinels',
-  'Boss 3: Lost Explorers',
-  'Boss 4: Vashnik',
-  'Boss 5: Sszorak',
-  'Boss 6: Twin Fangs',
-  'Boss 7: Coiled Altar',
-  'Boss 8: Ula\'tek'
+  'Nek\'zali',
+  'Sentinels',
+  'Vashnik',
+  'Explorers',
+  'Sszorak',
+  'The Twin Fangs',
+  'The Coiled Altar',
+  'Ula\'tek',
+  'Nymrissa'
 ];
 
 /**
@@ -1255,10 +1256,10 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   const formatTalentRow = (obj, idx) => {
     const rowNum = idx + 2;
     const specClassSlug = `LOWER(C${rowNum}) & "/" & LOWER(SUBSTITUTE(B${rowNum}, " ", "-"))`;
-    const bossSlugFormula = `IF(F${rowNum}="Boss 1: Nek'zali", "nekzali-the-soulcoiler", IF(F${rowNum}="Boss 2: Sentinels", "entombed-sentinels", IF(F${rowNum}="Boss 3: Lost Explorers", "the-lost-explorers", IF(F${rowNum}="Boss 4: Vashnik", "vashnik-the-malignant", IF(F${rowNum}="Boss 5: Sszorak", "sszorak", IF(F${rowNum}="Boss 6: Twin Fangs", "the-twin-fangs", IF(F${rowNum}="Boss 7: Coiled Altar", "the-coiled-altar", IF(F${rowNum}="Boss 8: Ula'tek", "ulatek", "all-bosses"))))))))`;
+    const bossSlugFormula = `IF(F${rowNum}="Nek'zali", "nekzali", IF(F${rowNum}="Sentinels", "sentinels", IF(F${rowNum}="Vashnik", "vashnik", IF(F${rowNum}="Explorers", "explorers", IF(F${rowNum}="Sszorak", "sszorak", IF(F${rowNum}="The Twin Fangs", "the-twin-fangs", IF(F${rowNum}="The Coiled Altar", "the-coiled-altar", IF(F${rowNum}="Ula'tek", "ulatek", IF(F${rowNum}="Nymrissa", "nymrissa", "all-bosses")))))))))`;
 
-    const archonHeroicFormula = `=HYPERLINK("https://www.archon.gg/wow/builds/" & ${specClassSlug} & "/raid/overview/heroic/" & ${bossSlugFormula}, "Heroic Build")`;
-    const archonMythicFormula = `=HYPERLINK("https://www.archon.gg/wow/builds/" & ${specClassSlug} & "/raid/overview/mythic/" & ${bossSlugFormula}, "Mythic Build")`;
+    const archonHeroicFormula = `=HYPERLINK("https://www.archon.gg/wow/builds/" & ${specClassSlug} & "/raid/overview/heroic/" & ${bossSlugFormula}, "Heroic Build (" & F${rowNum} & ")")`;
+    const archonMythicFormula = `=HYPERLINK("https://www.archon.gg/wow/builds/" & ${specClassSlug} & "/raid/overview/mythic/" & ${bossSlugFormula}, "Mythic Build (" & F${rowNum} & ")")`;
     const wowheadFormula = (obj['Wowhead Guide Link'] && obj['Wowhead Guide Link'] !== '-') 
       ? `=HYPERLINK("${obj['Wowhead Guide Link']}", "Wowhead Guide")`
       : '-';
