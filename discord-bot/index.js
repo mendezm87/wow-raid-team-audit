@@ -28,6 +28,20 @@ const client = new Client({
   ]
 });
 
+client.on('debug', info => {
+  if (info.includes('[WS =>') || info.includes('Heartbeat') || info.includes('Ready') || info.includes('Session') || info.includes('Invalid') || info.includes('400') || info.includes('error') || info.includes('token') || info.includes('login')) {
+    console.log(`[Discord WS] ${info}`);
+  }
+});
+
+client.on('shardError', error => {
+  console.error('[Discord WS Shard Error]:', error);
+});
+
+client.on('shardDisconnect', (event, id) => {
+  console.warn(`[Discord WS Shard ${id} Disconnected]:`, event);
+});
+
 // Helper to extract Raidbots URLs from any message string
 function extractRaidbotsUrls(text) {
   if (!text) return [];
