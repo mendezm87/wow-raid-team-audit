@@ -4,14 +4,18 @@ require('dotenv').config(); // fallback to cwd
 const http = require('http');
 const { Client, GatewayIntentBits, EmbedBuilder, SlashCommandBuilder, REST, Routes } = require('discord.js');
 
-// Simple HTTP health check server for Render.com port binding
-const PORT = process.env.PORT || 3000;
-http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('🤖 WoW Raid Sim Discord Bot is Online & Listening!\n');
-}).listen(PORT, () => {
-  console.log(`🌐 HTTP health server listening on port ${PORT}`);
-});
+// Simple HTTP health check server for Render.com / cloud port binding
+if (process.env.PORT) {
+  const PORT = process.env.PORT;
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('🤖 WoW Raid Sim Discord Bot is Online & Listening!\n');
+  });
+  server.on('error', (e) => console.warn('HTTP server notice:', e.message));
+  server.listen(PORT, () => {
+    console.log(`🌐 HTTP health server listening on port ${PORT}`);
+  });
+}
 
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GOOGLE_SHEET_WEBHOOK_URL = process.env.GOOGLE_SHEET_WEBHOOK_URL;
