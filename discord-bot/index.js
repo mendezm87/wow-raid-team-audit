@@ -77,17 +77,27 @@ async function verifyDiscordToken() {
 }
 verifyDiscordToken();
 
-// Helper to extract Raidbots URLs from any message string
-function extractRaidbotsUrls(text) {
+// Helper to extract Raidbots and QE Live URLs from any message string
+function extractSimUrls(text) {
   if (!text) return [];
-  const regex = /https?:\/\/(?:www\.)?raidbots\.com\/(?:simbot\/)?report\/([A-Za-z0-9_-]{10,35})/gi;
   const urls = [];
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    const reportId = match[1];
-    const fullUrl = `https://www.raidbots.com/simbot/report/${reportId}`;
+
+  // 1. Raidbots Droptimizer Links
+  const rbRegex = /https?:\/\/(?:www\.)?raidbots\.com\/(?:simbot\/)?report\/([A-Za-z0-9_-]{10,35})/gi;
+  let rbMatch;
+  while ((rbMatch = rbRegex.exec(text)) !== null) {
+    const fullUrl = `https://www.raidbots.com/simbot/report/${rbMatch[1]}`;
     if (!urls.includes(fullUrl)) urls.push(fullUrl);
   }
+
+  // 2. QE Live Upgrade Report Links (Healers)
+  const qeRegex = /https?:\/\/(?:www\.)?(?:questionablyepic\.com|qe-live\.com)\/(?:live|ptr)\/upgradereport\/([A-Za-z0-9_-]{8,35})/gi;
+  let qeMatch;
+  while ((qeMatch = qeRegex.exec(text)) !== null) {
+    const fullUrl = `https://questionablyepic.com/live/upgradereport/${qeMatch[1]}`;
+    if (!urls.includes(fullUrl)) urls.push(fullUrl);
+  }
+
   return urls;
 }
 
@@ -127,25 +137,30 @@ function createSimConfirmationEmbed(result, authorName) {
   if (!result || !result.success) {
     return new EmbedBuilder()
       .setColor(0xE11D48) // Crimson red
-      .setTitle('❌ Droptimizer Import Failed')
-      .setDescription(result?.error || 'Could not process the provided Raidbots sim. Please make sure the sim has finished and is set to public.')
+      .setTitle('❌ Sim / Report Import Failed')
+      .setDescription(result?.error || 'Could not process the provided report. Please ensure the link is public and valid.')
       .setFooter({ text: 'WoW Raid Team Audit' })
       .setTimestamp();
   }
 
+  const isQELive = result.platform === 'QE Live';
+  const embedTitle = isQELive ? '🩺 QE Live Healer Report Imported' : '✅ Droptimizer Sim Imported to Loot Council';
+  const roleType = isQELive ? 'HPS' : 'DPS';
+  const note = isQELive ? '\n*(Bonus roll personal loot items were automatically excluded)*' : '';
+
   const embed = new EmbedBuilder()
     .setColor(0x10B981) // Emerald green
-    .setTitle('✅ Droptimizer Sim Imported to Loot Council')
-    .setDescription(`Successfully mapped upgrades for **${result.players?.join(', ') || authorName}** to the guild spreadsheet!`)
+    .setTitle(embedTitle)
+    .setDescription(`Successfully mapped upgrades for **${result.players?.join(', ') || authorName}** to the guild spreadsheet!${note}`)
     .addFields(
       { name: '📊 Total Raid Drops Mapped', value: `${result.itemsMapped || 0} items`, inline: true },
-      { name: '⚡ Sim Reports Merged', value: `${result.reportsProcessed || 1} report(s)`, inline: true }
+      { name: '⚡ Source', value: isQELive ? 'QE Live (Healer Math)' : 'Raidbots Droptimizer', inline: true }
     )
     .setFooter({ text: 'Prey Guild Audit • Loot Council Synced' })
     .setTimestamp();
 
   if (result.topUpgrades && result.topUpgrades.length > 0) {
-    const topList = result.topUpgrades.slice(0, 3).map((up, i) => `${i + 1}. **${up.item}** (+${up.pct}% DPS)`).join('\n');
+    const topList = result.topUpgrades.slice(0, 3).map((up, i) => `${i + 1}. **${up.item}** (+${up.pct}% ${roleType})`).join('\n');
     embed.addFields({ name: '🌟 Top Simulated Upgrades', value: topList, inline: false });
   }
 
@@ -153,16 +168,16 @@ function createSimConfirmationEmbed(result, authorName) {
 }
 
 client.once('ready', async () => {
-  console.log(`🤖 Logged in as ${client.user.tag}! Ready to ingest Raidbots sims.`);
+  console.log(`🤖 Logged in as ${client.user.tag}! Ready to ingest Raidbots & QE Live reports.`);
 
   // Register Slash Command /sim
   const commands = [
     new SlashCommandBuilder()
       .setName('sim')
-      .setDescription('Submit your Raidbots Droptimizer link to the Guild Loot Council spreadsheet')
+      .setDescription('Submit your Raidbots Droptimizer (DPS/Tank) or QE Live (Healer) report link')
       .addStringOption(option =>
         option.setName('report_url')
-          .setDescription('Your Raidbots Droptimizer report link (e.g. https://www.raidbots.com/simbot/report/...)')
+          .setDescription('Raidbots link (raidbots.com/...) or QE Live report link (questionablyepic.com/...)')
           .setRequired(true)
       )
   ];
@@ -177,7 +192,7 @@ client.once('ready', async () => {
   }
 });
 
-// 1. Auto-listen in channel for pasted Raidbots links
+// 1. Auto-listen in channel for pasted Raidbots or QE Live links
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
@@ -191,10 +206,10 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  const urls = extractRaidbotsUrls(message.content);
+  const urls = extractSimUrls(message.content);
   if (urls.length === 0) return;
 
-  console.log(`📥 Detected ${urls.length} Raidbots link(s) from ${message.author.username} in #${message.channel.name}`);
+  console.log(`📥 Detected ${urls.length} sim/report link(s) from ${message.author.username} in #${message.channel.name}`);
   
   // React with hourglass while processing
   try { await message.react('⏳'); } catch (e) {}
@@ -221,11 +236,11 @@ client.on('interactionCreate', async (interaction) => {
 
   if (interaction.commandName === 'sim') {
     const inputUrl = interaction.options.getString('report_url');
-    const urls = extractRaidbotsUrls(inputUrl);
+    const urls = extractSimUrls(inputUrl);
 
     if (urls.length === 0) {
       await interaction.reply({
-        content: '⚠️ Please provide a valid Raidbots Droptimizer report link (e.g. `https://www.raidbots.com/simbot/report/aM6qT1dQz2CPxVodxJDy5k`).',
+        content: '⚠️ Please provide a valid Raidbots link (`https://www.raidbots.com/simbot/report/...`) or QE Live Upgrade Report link (`https://questionablyepic.com/live/upgradereport/...`).',
         ephemeral: true
       });
       return;

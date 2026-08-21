@@ -2609,8 +2609,205 @@ function processAndIngestRaidbotsSims(input) {
 }
 
 /**
+ * Ingests a Questionably Epic Live (QE Live) Upgrade Report for Healers.
+ * Excludes Personal Loot / Bonus Roll items ('dropType === bonus').
+ * Maps raid item HPS upgrades directly to the Loot & Chase Items sheet.
+ */
+function processAndIngestQELiveReport(reportUrlOrId) {
+  if (!reportUrlOrId) return { success: false, error: 'No QE Live URL provided.' };
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(LOOT_SHEET_NAME);
+  if (!sheet) {
+    createLootAndChaseItemsSheet();
+    sheet = ss.getSheetByName(LOOT_SHEET_NAME);
+  }
+
+  // Extract Report ID
+  const match = reportUrlOrId.toString().match(/(?:upgradereport\/|reportID=)?([A-Za-z0-9_-]{8,35})/i);
+  const reportId = match ? match[1] : reportUrlOrId.toString().trim();
+  if (!reportId) {
+    return { success: false, error: 'Could not parse a valid QE Live Report ID.' };
+  }
+
+  const apiUrl = `https://questionablyepic.com/api/getUpgradeReport.php?reportID=${reportId}`;
+  let reportData = null;
+  try {
+    const resp = UrlFetchApp.fetch(apiUrl, { muteHttpExceptions: true });
+    if (resp.getResponseCode() !== 200) {
+      return { success: false, error: `QE Live API returned status ${resp.getResponseCode()}` };
+    }
+    const raw = resp.getContentText();
+    reportData = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (typeof reportData === 'string') reportData = JSON.parse(reportData);
+  } catch (err) {
+    return { success: false, error: `Failed to fetch or parse QE Live report: ${err.message}` };
+  }
+
+  if (!reportData || !reportData.results) {
+    return { success: false, error: 'QE Live report returned no results data.' };
+  }
+
+  const playerName = (reportData.playername || reportData.player || 'Healer').toString().trim();
+  const spec = reportData.spec || 'Healer';
+  const now = new Date();
+  const dateStr = Utilities.formatDate(now, Session.getScriptTimeZone() || 'GMT', 'MMM d, yyyy');
+  const simStatusBadge = `✅ QE Live (${dateStr})`;
+
+  // Read existing sheet rows
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow <= 1) return { success: false, error: 'Loot & Chase Items sheet is empty.' };
+
+  const values = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+
+  // Read itemUpgradeMap from existing sheet rows
+  const itemUpgradeMap = {};
+  values.forEach(row => {
+    const itemName = (row[1] || '').toString().trim();
+    if (itemName && !itemName.startsWith('═══')) {
+      itemUpgradeMap[itemName] = [];
+      const notes = (row[12] || '').toString();
+      const matchContenders = notes.match(/\d+\.\s+([A-Za-z0-9\u00C0-\u024F]+)\s+\(\+([0-9.]+)%\)/g);
+      if (matchContenders) {
+        matchContenders.forEach(entry => {
+          const m = entry.match(/\d+\.\s+([A-Za-z0-9\u00C0-\u024F]+)\s+\(\+([0-9.]+)%\)/);
+          if (m) {
+            itemUpgradeMap[itemName].push({ name: m[1], pct: parseFloat(m[2]) });
+          }
+        });
+      }
+    }
+  });
+
+  const raidUpgrades = [];
+  const topUpgradesSummary = [];
+
+  // Filter QE Live items:
+  // 1. OMIT Bonus Roll items (personal loot)
+  // 2. OMIT Non-raid drops
+  // 3. OMIT 0 or negative upgrades
+  reportData.results.forEach(r => {
+    if (r.dropType === 'bonus') return; // Explicitly exclude bonus roll personal loot
+    if (r.dropLoc && r.dropLoc.toLowerCase() !== 'raid') return;
+    if (!r.percDiff || r.percDiff <= 0) return;
+
+    const pct = parseFloat(r.percDiff.toFixed(2));
+    const itemId = r.item;
+    raidUpgrades.push({
+      itemId: itemId,
+      pct: pct,
+      level: r.level
+    });
+  });
+
+  // Match items to sheet rows by Blizzard ID in Column 13 (Notes)
+  let totalMatches = 0;
+  raidUpgrades.forEach(up => {
+    let matchedRow = values.find(row => {
+      const notes = (row[12] || '').toString();
+      const idMatch = notes.match(/Blizzard ID:\s*(\d+)/i);
+      return idMatch && parseInt(idMatch[1], 10) === up.itemId;
+    });
+
+    if (matchedRow) {
+      const sheetItemName = matchedRow[1];
+      if (!itemUpgradeMap[sheetItemName]) itemUpgradeMap[sheetItemName] = [];
+      
+      const existingIdx = itemUpgradeMap[sheetItemName].findIndex(e => e.name.toLowerCase() === playerName.toLowerCase());
+      if (existingIdx >= 0) {
+        if (up.pct > itemUpgradeMap[sheetItemName][existingIdx].pct) {
+          itemUpgradeMap[sheetItemName][existingIdx].pct = up.pct;
+        }
+      } else {
+        itemUpgradeMap[sheetItemName].push({ name: playerName, pct: up.pct });
+      }
+
+      topUpgradesSummary.push({ item: sheetItemName, pct: up.pct });
+      totalMatches++;
+    }
+  });
+
+  // Load raider equipment from "Guild Audit" tab
+  const charList = getGuildAuditCharacterList(sheet.getParent());
+  const charMap = {};
+  charList.forEach(c => { if (c['Name']) charMap[c['Name'].toLowerCase()] = c; });
+
+  const extractIlvl = (slotText) => {
+    if (!slotText || slotText === '-') return 0;
+    const match = slotText.match(/(?:\[.*?\]\s*)?(\d{2,3})/);
+    return match ? parseInt(match[1], 10) : 0;
+  };
+
+  // Re-write merged rankings onto the sheet
+  values.forEach(row => {
+    const sheetItemName = (row[1] || '').toString().trim();
+    if (itemUpgradeMap[sheetItemName] && itemUpgradeMap[sheetItemName].length > 0) {
+      const contenders = itemUpgradeMap[sheetItemName].sort((a, b) => b.pct - a.pct);
+      const top = contenders[0];
+      row[6] = `${top.name} (+${top.pct}%)`;
+      row[9] = `+${top.pct}%`;
+      row[11] = simStatusBadge;
+
+      const topList = contenders.slice(0, 5).map((c, i) => `${i + 1}. ${c.name} (+${c.pct}%)`).join(' | ');
+      row[12] = `Sim / QE Live Upgrades: ${topList}`;
+
+      const topChar = charMap[top.name.toLowerCase()];
+      if (topChar) {
+        const slot = row[2] || '';
+        let currentSlotText = '-';
+        if (slot.includes('Trinket')) {
+          const t1 = topChar['Trinket 1'] || '-';
+          const t2 = topChar['Trinket 2'] || '-';
+          const ilvl1 = extractIlvl(t1);
+          const ilvl2 = extractIlvl(t2);
+          currentSlotText = (ilvl1 <= ilvl2 && ilvl1 > 0) ? t1 : (ilvl2 > 0 ? t2 : t1);
+        } else if (slot.includes('Ring')) {
+          const r1 = topChar['Ring 1'] || '-';
+          const r2 = topChar['Ring 2'] || '-';
+          const ilvl1 = extractIlvl(r1);
+          const ilvl2 = extractIlvl(r2);
+          currentSlotText = (ilvl1 <= ilvl2 && ilvl1 > 0) ? r1 : (ilvl2 > 0 ? r2 : r1);
+        } else if (slot.includes('Two-Hand') || slot.includes('One-Hand') || slot.includes('Main Hand') || slot.includes('Ranged')) {
+          currentSlotText = topChar['Main Hand'] || '-';
+        } else if (slot.includes('Off Hand') || slot.includes('Shield')) {
+          currentSlotText = topChar['Off Hand'] || '-';
+        } else {
+          currentSlotText = topChar[slot] || '-';
+        }
+        row[7] = currentSlotText;
+        row[8] = extractIlvl(currentSlotText) || '-';
+      }
+    }
+  });
+
+  sheet.getRange(2, 1, values.length, sheet.getLastColumn()).setValues(values);
+
+  return {
+    success: true,
+    platform: 'QE Live',
+    reportsProcessed: 1,
+    players: [playerName],
+    itemsMapped: totalMatches,
+    topUpgrades: topUpgradesSummary.sort((a, b) => b.pct - a.pct).slice(0, 5),
+    message: `Successfully mapped QE Live healer upgrades for ${playerName} (${spec}) across ${totalMatches} raid items (Bonus rolls excluded).`
+  };
+}
+
+/**
+ * Universal router for incoming sim/report submissions (Raidbots or QE Live).
+ */
+function processUniversalSimOrReport(input) {
+  const str = (input || '').toString();
+  if (str.includes('questionablyepic.com') || str.includes('qe-live.com') || str.includes('upgradereport')) {
+    return processAndIngestQELiveReport(str);
+  }
+  return processAndIngestRaidbotsSims(str);
+}
+
+/**
  * Google Apps Script Web App POST Endpoint
- * Receives webhook calls from the Discord Bot when raiders paste sim links.
+ * Receives webhook calls from the Discord Bot when raiders paste Raidbots or QE Live links.
  */
 function doPost(e) {
   try {
@@ -2629,11 +2826,11 @@ function doPost(e) {
     if (!simInput) {
       return ContentService.createTextOutput(JSON.stringify({
         status: 'error',
-        message: 'No Raidbots URL or report ID found in request body.'
+        message: 'No Raidbots or QE Live URL found in request body.'
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    const result = processAndIngestRaidbotsSims(simInput);
+    const result = processUniversalSimOrReport(simInput);
     return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
     return ContentService.createTextOutput(JSON.stringify({
@@ -2649,7 +2846,7 @@ function doPost(e) {
 function doGet(e) {
   return ContentService.createTextOutput(JSON.stringify({
     status: 'online',
-    service: 'WoW Raid Team Audit Sim Webhook',
+    service: 'WoW Raid Team Audit Sim & QE Live Webhook',
     timestamp: new Date().toISOString()
   })).setMimeType(ContentService.MimeType.JSON);
 }
