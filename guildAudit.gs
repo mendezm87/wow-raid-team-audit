@@ -44,7 +44,7 @@ function onOpen() {
 const ALL_WOW_SPECS = [
   'Affliction', 'Arcane', 'Arms', 'Assassination', 'Augmentation',
   'Balance', 'Beast Mastery', 'Blood', 'Brewmaster', 'Demonology',
-  'Destruction', 'Devastation', 'Discipline', 'Elemental', 'Enhancement',
+  'Destruction', 'Devastation', 'Devourer', 'Discipline', 'Elemental', 'Enhancement',
   'Feral', 'Fire', 'Frost', 'Fury', 'Guardian',
   'Havoc', 'Holy', 'Marksmanship', 'Mistweaver', 'Outlaw',
   'Preservation', 'Protection', 'Restoration', 'Retribution', 'Shadow',
@@ -879,6 +879,7 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
         if (item.slot.type === 'MAIN_HAND') charRow['Main Hand'] = formatItemDisplay(item);
         if (item.slot.type === 'OFF_HAND') charRow['Off Hand'] = formatItemDisplay(item);
         if (item.slot.type === 'NECK') charRow['Neck'] = formatItemDisplay(item);
+        if (item.slot.type === 'BACK') charRow['Back'] = formatItemDisplay(item);
         if (item.slot.type === 'WAIST') charRow['Waist'] = formatItemDisplay(item);
         if (item.slot.type === 'FEET') charRow['Feet'] = formatItemDisplay(item);
         if (item.slot.type === 'WRIST') charRow['Wrist'] = formatItemDisplay(item);
