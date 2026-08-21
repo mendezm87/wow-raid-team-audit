@@ -1,4 +1,5 @@
 const SHEET_NAME = 'Guild Audit'; 
+const AUDIT_SHEET_NAME = SHEET_NAME;
 const TALENTS_SHEET_NAME = 'Talents & Builds';
 const LOOT_SHEET_NAME = 'Loot & Chase Items';
 
@@ -1401,7 +1402,7 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
  */
 function getGuildAuditCharacterList(ss) {
   if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
-  const auditSheet = ss.getSheetByName(AUDIT_SHEET_NAME);
+  const auditSheet = ss.getSheetByName(SHEET_NAME) || ss.getSheetByName('Guild Audit');
   if (!auditSheet || auditSheet.getLastRow() <= 1) return [];
 
   const lastCol = auditSheet.getLastColumn();
