@@ -1,0 +1,14 @@
+{
+  "name": "wow-raid-team-audit",
+  "version": "1.0.0",
+  "description": "WoW Raid Team Audit & Discord Droptimizer Bot",
+  "main": "discord-bot/index.js",
+  "scripts": {
+    "start": "node discord-bot/index.js",
+    "bot": "node discord-bot/index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5"
+  }
+}
