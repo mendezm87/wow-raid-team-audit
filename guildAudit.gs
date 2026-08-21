@@ -1524,40 +1524,53 @@ function fetchLiveBlizzardRaidLootTable(config, token) {
       if (resp && resp.getResponseCode() === 200) {
         try {
           const itemData = JSON.parse(resp.getContentText());
-          itemDetailsMap[itemId] = {
-            name: itemData.name,
-            slot: mapBlizzardInvTypeToSlot(itemData.inventory_type ? itemData.inventory_type.type : ''),
-            subclass: itemData.item_subclass ? itemData.item_subclass.name : 'All Specs',
-            quality: itemData.quality ? itemData.quality.type : '',
-            level: itemData.level || 318
-          };
+          const itemClassId = (itemData.item_class && itemData.item_class.id) ? itemData.item_class.id : 0;
+          const itemClassName = (itemData.item_class && itemData.item_class.name) ? itemData.item_class.name.toLowerCase() : '';
+          const subclassName = (itemData.item_subclass && itemData.item_subclass.name) ? itemData.item_subclass.name.toLowerCase() : '';
+          const invType = itemData.inventory_type ? (itemData.inventory_type.type || '').toUpperCase() : 'NON_EQUIP';
+          const itemName = itemData.name || '';
+
+          // Omit decor, junk, pets, mounts, toys, recipes, reagents, consumables
+          const isExcluded = ['junk', 'mount', 'companion pets', 'pet', 'toy', 'holiday', 'recipe', 'reagent', 'housing', 'decor', 'consumable', 'currency'].some(ex => subclassName.includes(ex) || itemClassName.includes(ex));
+          const isTierCurio = itemName.includes('Curio') || itemName.includes('Idol') || itemName.includes('Token') || itemName.includes('Flame');
+          const isEquippableGear = (itemClassId === 2 || itemClassId === 4) && invType !== 'NON_EQUIP';
+
+          if (isTierCurio || (isEquippableGear && !isExcluded)) {
+            itemDetailsMap[itemId] = {
+              name: itemName,
+              slot: mapBlizzardInvTypeToSlot(invType),
+              subclass: (itemData.item_subclass && itemData.item_subclass.name) ? itemData.item_subclass.name : 'All Specs',
+              quality: itemData.quality ? itemData.quality.type : '',
+              level: itemData.level || 318
+            };
+          }
         } catch (e) {
           Logger.log(`Error parsing item ${itemId}: ${e}`);
         }
       }
     });
 
-    // 3. Construct the official catalog
+    // 3. Construct the official catalog (filtered to equippable raid gear only)
     const catalog = [];
     encounterItemMap.forEach(entry => {
       catalog.push([entry.encounter.banner, '═════════════════════════════════', '', '', '', '', '', '', '', '', '', '', '']);
       entry.items.forEach(it => {
         const details = itemDetailsMap[it.id];
-        const itemName = (details && details.name) ? details.name : it.name;
-        const slot = (details && details.slot) ? details.slot : 'Gear';
-        const target = (details && details.subclass) ? details.subclass : 'All Specs';
-        catalog.push([
-          entry.encounter.name,
-          itemName,
-          slot,
-          'Heroic',
-          318,
-          target,
-          '', '', '', '',
-          'Raid Drop',
-          '⚡ Live Armory ilvl',
-          `Blizzard ID: ${it.id}`
-        ]);
+        // Only include verified equippable gear
+        if (details) {
+          catalog.push([
+            entry.encounter.name,
+            details.name,
+            details.slot,
+            'Heroic',
+            318,
+            details.subclass,
+            '', '', '', '',
+            'Raid Drop',
+            '⚡ Live Armory ilvl',
+            `Blizzard ID: ${it.id}`
+          ]);
+        }
       });
     });
 
