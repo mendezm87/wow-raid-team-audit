@@ -1527,20 +1527,32 @@ function fetchLiveBlizzardRaidLootTable(config, token) {
           const itemClassId = (itemData.item_class && itemData.item_class.id) ? itemData.item_class.id : 0;
           const itemClassName = (itemData.item_class && itemData.item_class.name) ? itemData.item_class.name.toLowerCase() : '';
           const subclassName = (itemData.item_subclass && itemData.item_subclass.name) ? itemData.item_subclass.name.toLowerCase() : '';
+          const qualityType = (itemData.quality && itemData.quality.type) ? itemData.quality.type.toUpperCase() : '';
           const invType = itemData.inventory_type ? (itemData.inventory_type.type || '').toUpperCase() : 'NON_EQUIP';
           const itemName = itemData.name || '';
+          const slot = mapBlizzardInvTypeToSlot(invType);
 
-          // Omit decor, junk, pets, mounts, toys, recipes, reagents, consumables
-          const isExcluded = ['junk', 'mount', 'companion pets', 'pet', 'toy', 'holiday', 'recipe', 'reagent', 'housing', 'decor', 'consumable', 'currency'].some(ex => subclassName.includes(ex) || itemClassName.includes(ex));
-          const isTierCurio = itemName.includes('Curio') || itemName.includes('Idol') || itemName.includes('Token') || itemName.includes('Flame');
-          const isEquippableGear = (itemClassId === 2 || itemClassId === 4) && invType !== 'NON_EQUIP';
+          // Omit cosmetics, junk, pets, mounts, toys, recipes, reagents, consumables, quest items
+          const isExcludedType = ['junk', 'mount', 'companion pets', 'pet', 'toy', 'holiday', 'recipe', 'reagent', 'housing', 'decor', 'consumable', 'currency', 'cosmetic', 'quest', 'profession'].some(ex => subclassName.includes(ex) || itemClassName.includes(ex));
+          const isExcludedQuality = qualityType === 'COSMETIC' || qualityType === 'POOR';
+          const isNonEquip = invType === 'NON_EQUIP' || slot === 'Gear';
 
-          if (isTierCurio || (isEquippableGear && !isExcluded)) {
+          // Strictly include ONLY valid, equippable raid armor, weapons, and accessories
+          if (!isExcludedType && !isExcludedQuality && !isNonEquip && (itemClassId === 2 || itemClassId === 4)) {
+            let cleanSubclass = (itemData.item_subclass && itemData.item_subclass.name) ? itemData.item_subclass.name : 'All Specs';
+            if (['Neck', 'Ring 1', 'Trinket 1'].includes(slot) && cleanSubclass.toLowerCase() === 'miscellaneous') {
+              cleanSubclass = 'All Specs';
+            } else if (slot === 'Back') {
+              cleanSubclass = 'All Specs';
+            } else if (slot === 'Off Hand' && cleanSubclass.toLowerCase() === 'miscellaneous') {
+              cleanSubclass = 'Caster / Healer Off-Hand';
+            }
+
             itemDetailsMap[itemId] = {
               name: itemName,
-              slot: mapBlizzardInvTypeToSlot(invType),
-              subclass: (itemData.item_subclass && itemData.item_subclass.name) ? itemData.item_subclass.name : 'All Specs',
-              quality: itemData.quality ? itemData.quality.type : '',
+              slot: slot,
+              subclass: cleanSubclass,
+              quality: qualityType,
               level: itemData.level || 318
             };
           }
