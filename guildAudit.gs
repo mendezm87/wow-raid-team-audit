@@ -1397,6 +1397,31 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
 }
 
 /**
+ * Reads all raider rows from the "Guild Audit" tab to extract equipped gear & ilvl.
+ */
+function getGuildAuditCharacterList(ss) {
+  if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+  const auditSheet = ss.getSheetByName(AUDIT_SHEET_NAME);
+  if (!auditSheet || auditSheet.getLastRow() <= 1) return [];
+
+  const lastCol = auditSheet.getLastColumn();
+  const headers = auditSheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const rows = auditSheet.getRange(2, 1, auditSheet.getLastRow() - 1, lastCol).getValues();
+
+  const list = [];
+  rows.forEach(r => {
+    const charName = (r[0] || '').toString().trim();
+    if (!charName) return;
+    const charObj = {};
+    headers.forEach((h, idx) => {
+      charObj[h] = r[idx];
+    });
+    list.push(charObj);
+  });
+  return list;
+}
+
+/**
  * Creates and formats the Loot & Chase Items reference sheet.
  * Features the current Season 2 raid: The Venomous Abyss (8 Bosses) with distinct boss separator banners.
  * Automatically calculates upgrade deltas against live equipped gear if character data is provided.
@@ -1517,6 +1542,43 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     return match ? parseInt(match[1], 10) : 0;
   };
 
+  // Helper to lookup equipped item and ilvl for a character and slot
+  const resolveEquippedItemForChar = (charObj, slot) => {
+    if (!charObj) return { text: '-', ilvl: 0 };
+    let currentSlotText = '-';
+    if (slot.includes('Trinket')) {
+      const t1 = charObj['Trinket 1'] || '-';
+      const t2 = charObj['Trinket 2'] || '-';
+      const ilvl1 = extractIlvl(t1);
+      const ilvl2 = extractIlvl(t2);
+      if (ilvl1 <= ilvl2 && ilvl1 > 0) {
+        currentSlotText = t1;
+      } else if (ilvl2 > 0) {
+        currentSlotText = t2;
+      } else {
+        currentSlotText = t1;
+      }
+    } else if (slot.includes('Ring')) {
+      const r1 = charObj['Ring 1'] || '-';
+      const r2 = charObj['Ring 2'] || '-';
+      const ilvl1 = extractIlvl(r1);
+      const ilvl2 = extractIlvl(r2);
+      if (ilvl1 <= ilvl2 && ilvl1 > 0) {
+        currentSlotText = r1;
+      } else {
+        currentSlotText = r2;
+      }
+    } else {
+      currentSlotText = charObj[slot] || '-';
+    }
+    return { text: currentSlotText, ilvl: extractIlvl(currentSlotText) };
+  };
+
+  // If mainCharacterData wasn't passed directly, load character gear from the "Guild Audit" sheet!
+  if (!mainCharacterData || mainCharacterData.length === 0) {
+    mainCharacterData = getGuildAuditCharacterList(ss);
+  }
+
   // Check if sheet exists and read existing sim data map to prioritize sims over raw ilvl
   const existingSimData = {};
   if (sheet.getLastRow() > 1) {
@@ -1524,6 +1586,8 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     existingValues.forEach(row => {
       const itemName = (row[1] || '').toString().toLowerCase().trim();
       const topContender = (row[6] || '').toString();
+      const currentEquipped = (row[7] || '').toString();
+      const equippedIlvl = row[8];
       const upgradeDelta = (row[9] || '').toString();
       const simStatus = (row[11] || '').toString();
       const notes = (row[12] || '').toString();
@@ -1532,6 +1596,8 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
       if (notes.includes('Raidbots Sim Upgrades:') || upgradeDelta.includes('% DPS') || simStatus.includes('Simmed')) {
         existingSimData[itemName] = {
           topContender: topContender,
+          currentEquipped: currentEquipped,
+          equippedIlvl: equippedIlvl,
           upgradeDelta: upgradeDelta,
           simStatus: simStatus || '✅ Simmed',
           notes: notes
@@ -1540,7 +1606,7 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     });
   }
 
-  // If character audit data is provided, auto-calculate live equipped upgrades
+  // If character audit data is available, auto-calculate live equipped upgrades
   if (mainCharacterData && mainCharacterData.length > 0) {
     chaseItemsCatalog.forEach(row => {
       // Skip separator rows
@@ -1562,22 +1628,13 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
         row[12] = existingSimData[cleanItemName].notes;
 
         // Update live equipped item & ilvl for the top contender
-        const topNameMatch = row[6].match(/^([A-Za-z0-9\u00C0-\u024F]+)/);
+        const topNameMatch = (row[6] || '').match(/^([A-Za-z0-9\u00C0-\u024F]+)/);
         if (topNameMatch) {
           const topChar = mainCharacterData.find(c => c['Name'] && c['Name'].toLowerCase() === topNameMatch[1].toLowerCase());
           if (topChar) {
-            let currentSlotText = topChar[slot] || '-';
-            if (slot.includes('Trinket')) {
-              const t1 = topChar['Trinket 1'] || '-';
-              const t2 = topChar['Trinket 2'] || '-';
-              currentSlotText = (extractIlvl(t1) <= extractIlvl(t2) && extractIlvl(t1) > 0) ? t1 : t2;
-            } else if (slot.includes('Ring')) {
-              const r1 = topChar['Ring 1'] || '-';
-              const r2 = topChar['Ring 2'] || '-';
-              currentSlotText = (extractIlvl(r1) <= extractIlvl(r2) && extractIlvl(r1) > 0) ? r1 : r2;
-            }
-            row[7] = currentSlotText;
-            row[8] = extractIlvl(currentSlotText);
+            const eq = resolveEquippedItemForChar(topChar, slot);
+            row[7] = eq.text;
+            row[8] = eq.ilvl || '-';
           }
         }
         return;
@@ -1601,43 +1658,14 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
         }
 
         if (isEligible) {
-          let currentSlotText = '-';
-          let currentIlvl = 0;
-
-          if (slot.includes('Trinket')) {
-            const t1 = char['Trinket 1'] || '-';
-            const t2 = char['Trinket 2'] || '-';
-            const ilvl1 = extractIlvl(t1);
-            const ilvl2 = extractIlvl(t2);
-            if (ilvl1 <= ilvl2 && ilvl1 > 0) {
-              currentSlotText = t1; currentIlvl = ilvl1;
-            } else if (ilvl2 > 0) {
-              currentSlotText = t2; currentIlvl = ilvl2;
-            } else {
-              currentSlotText = t1; currentIlvl = ilvl1;
-            }
-          } else if (slot.includes('Ring')) {
-            const r1 = char['Ring 1'] || '-';
-            const r2 = char['Ring 2'] || '-';
-            const ilvl1 = extractIlvl(r1);
-            const ilvl2 = extractIlvl(r2);
-            if (ilvl1 <= ilvl2 && ilvl1 > 0) {
-              currentSlotText = r1; currentIlvl = ilvl1;
-            } else {
-              currentSlotText = r2; currentIlvl = ilvl2;
-            }
-          } else {
-            currentSlotText = char[slot] || '-';
-            currentIlvl = extractIlvl(currentSlotText);
-          }
-
-          if (currentIlvl > 0) {
-            const delta = dropIlvl - currentIlvl;
+          const eq = resolveEquippedItemForChar(char, slot);
+          if (eq.ilvl > 0) {
+            const delta = dropIlvl - eq.ilvl;
             contenders.push({
               name: char['Name'],
               delta: delta,
-              equippedText: currentSlotText,
-              equippedIlvl: currentIlvl
+              equippedText: eq.text,
+              equippedIlvl: eq.ilvl
             });
           }
         }
@@ -2051,6 +2079,17 @@ function processAndIngestRaidbotsSims(input) {
     });
   });
 
+  // Load existing character gear from "Guild Audit" tab to populate equipped items/ilvl
+  const charList = getGuildAuditCharacterList(sheet.getParent());
+  const charMap = {};
+  charList.forEach(c => { if (c['Name']) charMap[c['Name'].toLowerCase()] = c; });
+
+  const extractIlvl = (slotText) => {
+    if (!slotText || slotText === '-') return 0;
+    const match = slotText.match(/(?:\[.*?\]\s*)?(\d{2,3})/);
+    return match ? parseInt(match[1], 10) : 0;
+  };
+
   // Re-write merged rankings onto the sheet
   let totalMatches = 0;
   values.forEach(row => {
@@ -2064,6 +2103,31 @@ function processAndIngestRaidbotsSims(input) {
 
       const topList = contenders.slice(0, 5).map((c, i) => `${i + 1}. ${c.name} (+${c.pct}%)`).join(' | ');
       row[12] = `Raidbots Sim Upgrades: ${topList}`;
+
+      // Populate live equipped item and ilvl for the top contender!
+      const topChar = charMap[top.name.toLowerCase()];
+      if (topChar) {
+        const slot = row[2] || '';
+        let currentSlotText = '-';
+        if (slot.includes('Trinket')) {
+          const t1 = topChar['Trinket 1'] || '-';
+          const t2 = topChar['Trinket 2'] || '-';
+          const ilvl1 = extractIlvl(t1);
+          const ilvl2 = extractIlvl(t2);
+          currentSlotText = (ilvl1 <= ilvl2 && ilvl1 > 0) ? t1 : (ilvl2 > 0 ? t2 : t1);
+        } else if (slot.includes('Ring')) {
+          const r1 = topChar['Ring 1'] || '-';
+          const r2 = topChar['Ring 2'] || '-';
+          const ilvl1 = extractIlvl(r1);
+          const ilvl2 = extractIlvl(r2);
+          currentSlotText = (ilvl1 <= ilvl2 && ilvl1 > 0) ? r1 : (ilvl2 > 0 ? r2 : r1);
+        } else {
+          currentSlotText = topChar[slot] || '-';
+        }
+        row[7] = currentSlotText;
+        row[8] = extractIlvl(currentSlotText) || '-';
+      }
+
       totalMatches++;
     }
   });
