@@ -20,12 +20,17 @@ if (!DISCORD_BOT_TOKEN || !GOOGLE_SHEET_WEBHOOK_URL) {
   process.exit(1);
 }
 
+const USER_AGENT = 'DiscordBot (https://github.com/mendezm87/wow-raid-team-audit, 1.0.0)';
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent
-  ]
+  ],
+  rest: {
+    userAgentAppendix: 'WoWRaidTeamAuditBot/1.0'
+  }
 });
 
 client.on('debug', info => {
@@ -44,13 +49,21 @@ client.on('shardDisconnect', (event, id) => {
 async function verifyDiscordToken() {
   try {
     const res = await fetch('https://discord.com/api/v10/users/@me', {
-      headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN.trim()}` }
+      headers: {
+        'Authorization': `Bot ${DISCORD_BOT_TOKEN.trim()}`,
+        'User-Agent': USER_AGENT
+      }
     });
-    const data = await res.json();
-    if (res.status === 200) {
-      console.log(`✅ Token verified successfully! Bot username: ${data.username}#${data.discriminator || '0'} (ID: ${data.id})`);
-    } else {
-      console.error(`❌ Token verification failed (${res.status}):`, data);
+    const text = await res.text();
+    try {
+      const data = JSON.parse(text);
+      if (res.status === 200) {
+        console.log(`✅ Token verified successfully! Bot username: ${data.username}#${data.discriminator || '0'} (ID: ${data.id})`);
+      } else {
+        console.error(`❌ Token verification failed (${res.status}):`, data);
+      }
+    } catch (e) {
+      console.error(`❌ Discord API returned non-JSON (${res.status}): ${text.slice(0, 150)}`);
     }
   } catch (err) {
     console.error('❌ Network error testing Discord API:', err);
