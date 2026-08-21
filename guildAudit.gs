@@ -1598,18 +1598,20 @@ function fetchLiveBlizzardRaidLootTable(config, token) {
               primaryStatLabel = 'Intellect';
             }
 
-            // Format weapon role clearly with 1H / 2H indicator and primary stat
-            if (itemClassId === 2) {
+            // Format Shields, Off-Hands, Weapons, and Accessories with clear role and primary stat
+            if (invType === 'SHIELD' || slot === 'Off Hand (Shield)') {
+              cleanSubclass = 'Shield';
+              if (primaryStatLabel) cleanSubclass += ` (${primaryStatLabel})`;
+            } else if (invType === 'HOLDABLE' || slot === 'Off Hand') {
+              cleanSubclass = 'Caster / Healer Off-Hand';
+              if (primaryStatLabel) cleanSubclass += ` (${primaryStatLabel})`;
+            } else if (itemClassId === 2) {
               if (invType === 'TWOHWEAPON' && !cleanSubclass.toLowerCase().includes('2h') && !cleanSubclass.toLowerCase().includes('two-hand')) {
                 cleanSubclass = '2H ' + cleanSubclass;
               } else if ((invType === 'WEAPON' || invType === 'WEAPONMAINHAND') && !cleanSubclass.toLowerCase().includes('1h') && !cleanSubclass.toLowerCase().includes('one-hand') && !['Dagger', 'Warglaive', 'Fist Weapon', 'Wand'].includes(cleanSubclass)) {
                 cleanSubclass = '1H ' + cleanSubclass;
               } else if (invType === 'RANGED' || invType === 'RANGEDRIGHT') {
                 cleanSubclass = 'Ranged (' + cleanSubclass + ')';
-              } else if (invType === 'SHIELD') {
-                cleanSubclass = 'Shield';
-              } else if (invType === 'HOLDABLE') {
-                cleanSubclass = 'Caster / Healer Off-Hand';
               }
 
               if (primaryStatLabel && !cleanSubclass.includes(primaryStatLabel)) {
