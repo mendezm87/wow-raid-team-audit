@@ -1423,9 +1423,155 @@ function getGuildAuditCharacterList(ss) {
 }
 
 /**
+ * Maps Blizzard API inventory type enums to spreadsheet slot names.
+ */
+function mapBlizzardInvTypeToSlot(invType) {
+  if (!invType) return 'Gear';
+  const type = (typeof invType === 'object' ? (invType.type || invType.name || '') : invType).toString().toUpperCase();
+  switch (type) {
+    case 'HEAD': return 'Head';
+    case 'NECK': return 'Neck';
+    case 'SHOULDER': case 'SHOULDERS': return 'Shoulders';
+    case 'CLOAK': case 'BACK': return 'Back';
+    case 'CHEST': case 'ROBE': return 'Chest';
+    case 'WRIST': case 'WRISTS': return 'Wrist';
+    case 'HANDS': return 'Hands';
+    case 'WAIST': return 'Waist';
+    case 'LEGS': return 'Legs';
+    case 'FEET': return 'Feet';
+    case 'FINGER': case 'FINGER_1': case 'FINGER_2': case 'RING': return 'Ring 1';
+    case 'TRINKET': case 'TRINKET_1': case 'TRINKET_2': return 'Trinket 1';
+    case 'WEAPON': case 'WEAPONMAINHAND': case 'TWOHWEAPON': case 'RANGED': case 'RANGEDRIGHT': case '2H WEAPON': case '1H WEAPON': return 'Main Hand';
+    case 'SHIELD': case 'HOLDABLE': case 'WEAPONOFFHAND': case 'OFF HAND': return 'Off Hand';
+    default: return 'Gear';
+  }
+}
+
+/**
+ * Queries Blizzard's official Game Data Journal API for all 8 raid encounters in The Venomous Abyss.
+ * Fetches item metadata, inventory slot, armor subclass, and drop information directly from Blizzard.
+ */
+function fetchLiveBlizzardRaidLootTable(config, token) {
+  if (!config || !token) return null;
+  const region = (config.REGION || 'us').toLowerCase();
+  const apiHost = getApiHost(config);
+  const headers = {
+    'Authorization': 'Bearer ' + token,
+    'Battlenet-Namespace': `static-${region}`
+  };
+
+  const ENCOUNTERS = [
+    { id: 2888, name: "Boss 1: Nek'zali the Soulcoiler", banner: "⚔️ BOSS 1: NEK'ZALI THE SOULCOILER" },
+    { id: 2874, name: "Boss 2: Entombed Sentinels", banner: "🛡️ BOSS 2: ENTOMBED SENTINELS" },
+    { id: 2894, name: "Boss 3: The Lost Explorers", banner: "🧭 BOSS 3: THE LOST EXPLORERS" },
+    { id: 2882, name: "Boss 4: Vashnik the Malignant", banner: "🧪 BOSS 4: VASHNIK THE MALIGNANT" },
+    { id: 2871, name: "Boss 5: Sszorak", banner: "🐊 BOSS 5: SSZORAK" },
+    { id: 2887, name: "Boss 6: The Twin Fangs", banner: "⚔️ BOSS 6: THE TWIN FANGS" },
+    { id: 2883, name: "Boss 7: The Coiled Altar", banner: "🏛️ BOSS 7: THE COILED ALTAR" },
+    { id: 2895, name: "Boss 8: Ula'tek", banner: "👑 BOSS 8: ULA'TEK (FINAL BOSS)" }
+  ];
+
+  try {
+    // 1. Fetch encounter drops in parallel
+    const encRequests = ENCOUNTERS.map(e => ({
+      url: `${apiHost}/data/wow/journal-encounter/${e.id}?locale=en_US`,
+      headers: headers,
+      muteHttpExceptions: true
+    }));
+
+    const encResponses = UrlFetchApp.fetchAll(encRequests);
+    const encounterItemMap = [];
+    const allItemIds = new Set();
+
+    encResponses.forEach((resp, idx) => {
+      const enc = ENCOUNTERS[idx];
+      const itemsForThisBoss = [];
+      if (resp && resp.getResponseCode() === 200) {
+        try {
+          const encData = JSON.parse(resp.getContentText());
+          if (encData && encData.items) {
+            encData.items.forEach(itEntry => {
+              const itId = itEntry.item ? itEntry.item.id : itEntry.id;
+              const itName = itEntry.item ? itEntry.item.name : (itEntry.name || '');
+              if (itId) {
+                itemsForThisBoss.push({ id: itId, name: itName });
+                allItemIds.add(itId);
+              }
+            });
+          }
+        } catch (err) {
+          Logger.log(`Error parsing encounter ${enc.id}: ${err}`);
+        }
+      }
+      encounterItemMap.push({ encounter: enc, items: itemsForThisBoss });
+    });
+
+    if (allItemIds.size === 0) return null;
+
+    // 2. Fetch all item metadata in parallel
+    const itemIdsArray = Array.from(allItemIds);
+    const itemRequests = itemIdsArray.map(id => ({
+      url: `${apiHost}/data/wow/item/${id}?locale=en_US`,
+      headers: headers,
+      muteHttpExceptions: true
+    }));
+
+    const itemResponses = UrlFetchApp.fetchAll(itemRequests);
+    const itemDetailsMap = {};
+
+    itemResponses.forEach((resp, idx) => {
+      const itemId = itemIdsArray[idx];
+      if (resp && resp.getResponseCode() === 200) {
+        try {
+          const itemData = JSON.parse(resp.getContentText());
+          itemDetailsMap[itemId] = {
+            name: itemData.name,
+            slot: mapBlizzardInvTypeToSlot(itemData.inventory_type ? itemData.inventory_type.type : ''),
+            subclass: itemData.item_subclass ? itemData.item_subclass.name : 'All Specs',
+            quality: itemData.quality ? itemData.quality.type : '',
+            level: itemData.level || 318
+          };
+        } catch (e) {
+          Logger.log(`Error parsing item ${itemId}: ${e}`);
+        }
+      }
+    });
+
+    // 3. Construct the official catalog
+    const catalog = [];
+    encounterItemMap.forEach(entry => {
+      catalog.push([entry.encounter.banner, '═════════════════════════════════', '', '', '', '', '', '', '', '', '', '', '']);
+      entry.items.forEach(it => {
+        const details = itemDetailsMap[it.id];
+        const itemName = (details && details.name) ? details.name : it.name;
+        const slot = (details && details.slot) ? details.slot : 'Gear';
+        const target = (details && details.subclass) ? details.subclass : 'All Specs';
+        catalog.push([
+          entry.encounter.name,
+          itemName,
+          slot,
+          'Heroic',
+          318,
+          target,
+          '', '', '', '',
+          'Raid Drop',
+          '⚡ Live Armory ilvl',
+          `Blizzard ID: ${it.id}`
+        ]);
+      });
+    });
+
+    return catalog.length > ENCOUNTERS.length ? catalog : null;
+  } catch (err) {
+    Logger.log(`Failed to fetch live loot table from Blizzard API: ${err}`);
+    return null;
+  }
+}
+
+/**
  * Creates and formats the Loot & Chase Items reference sheet.
  * Features the current Season 2 raid: The Venomous Abyss (8 Bosses) with distinct boss separator banners.
- * Automatically calculates upgrade deltas against live equipped gear if character data is provided.
+ * Automatically queries Blizzard Journal API for complete drop tables and calculates upgrade deltas.
  */
 function createLootAndChaseItemsSheet(mainCharacterData) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1441,7 +1587,13 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     'Sim Status / Last Updated', 'Loot Council Notes'
   ];
 
-  const chaseItemsCatalog = [
+  // Try live Blizzard API sync first for 100% complete loot tables!
+  const config = getConfigurationFromSheet();
+  const token = config ? getAccessToken(config) : null;
+  let chaseItemsCatalog = (config && token) ? fetchLiveBlizzardRaidLootTable(config, token) : null;
+
+  if (!chaseItemsCatalog || chaseItemsCatalog.length === 0) {
+    chaseItemsCatalog = [
     // ════════════════════════════════════════════════════════════
     // ⚔️ BOSS 1: NEK'ZALI THE SOULCOILER
     // ════════════════════════════════════════════════════════════
@@ -1540,7 +1692,8 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     ['Other Raid Drop', 'Swelling Sea Spaulders', 'Shoulders', 'Heroic', 318, 'Mail Shoulders', '', '', '', '', 'Mail Shoulders', '⚡ Live Armory ilvl', 'Haste/Mastery mail shoulders (ID: 268226)'],
     ['Other Raid Drop', 'Forgotten Grotto Girdle', 'Waist', 'Heroic', 318, 'Mail Waist', '', '', '', '', 'Mail Belt', '⚡ Live Armory ilvl', 'Mail belt with crit/haste (ID: 268244)'],
     ['Other Raid Drop', 'Alluring Bubbleband', 'Ring 1', 'Heroic', 318, 'All Specs', '', '', '', '', 'BiS Ring', '⚡ Live Armory ilvl', 'Heroic 318 ring with shield proc (ID: 268266)']
-  ];
+    ];
+  }
 
   // Helper to extract numerical ilvl from formatted gear slot strings e.g. "[Tier] 298 (Hero 4/6) - Item"
   const extractIlvl = (slotText) => {
