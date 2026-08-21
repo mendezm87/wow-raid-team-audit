@@ -29,9 +29,7 @@ const client = new Client({
 });
 
 client.on('debug', info => {
-  if (info.includes('[WS =>') || info.includes('Heartbeat') || info.includes('Ready') || info.includes('Session') || info.includes('Invalid') || info.includes('400') || info.includes('error') || info.includes('token') || info.includes('login')) {
-    console.log(`[Discord WS] ${info}`);
-  }
+  console.log(`[Discord WS] ${info}`);
 });
 
 client.on('shardError', error => {
@@ -41,6 +39,24 @@ client.on('shardError', error => {
 client.on('shardDisconnect', (event, id) => {
   console.warn(`[Discord WS Shard ${id} Disconnected]:`, event);
 });
+
+// Direct REST Token verification
+async function verifyDiscordToken() {
+  try {
+    const res = await fetch('https://discord.com/api/v10/users/@me', {
+      headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN.trim()}` }
+    });
+    const data = await res.json();
+    if (res.status === 200) {
+      console.log(`✅ Token verified successfully! Bot username: ${data.username}#${data.discriminator || '0'} (ID: ${data.id})`);
+    } else {
+      console.error(`❌ Token verification failed (${res.status}):`, data);
+    }
+  } catch (err) {
+    console.error('❌ Network error testing Discord API:', err);
+  }
+}
+verifyDiscordToken();
 
 // Helper to extract Raidbots URLs from any message string
 function extractRaidbotsUrls(text) {
