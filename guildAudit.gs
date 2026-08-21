@@ -2165,7 +2165,28 @@ function isCharacterEligibleForItem(charClass, charSpec, slot, targetSubclass, i
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('God-Tier').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges(prioRange).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('BiS').setBackground('#f3e8ff').setFontColor('#6b21a8').setRanges(prioRange).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Rare').setBackground('#ffedd5').setFontColor('#9a3412').setRanges(prioRange).build());
-rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Tier').setBackground('#d1fae5').setFontColor('#065f46').setRanges(prioRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Tier').setBackground('#d1fae5').setFontColor('#065f46').setRanges(prioRange).build());
+
+  // Top Contender Column (Column G) Conditional Formatting:
+  // Green if simmed (% DPS / ✅ Simmed), Yellow if unsimmed / Live Armory ilvl (⚡)
+  const topContenderColIdx = lootHeaders.indexOf('Top Contender (Assigned)') + 1;
+  const topContenderRange = [sheet.getRange(2, topContenderColIdx, sheet.getMaxRows(), 1)];
+  
+  // 1. Simmed -> Soft Green
+  rules.push(SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied(`=AND($G2<>"", $G2<>"-", OR(ISNUMBER(SEARCH("%", $J2)), ISNUMBER(SEARCH("Simmed", $L2)), ISNUMBER(SEARCH("✅", $L2))))`)
+    .setBackground('#d1fae5')
+    .setFontColor('#065f46')
+    .setRanges(topContenderRange)
+    .build());
+
+  // 2. Unsimmed (⚡ Live Armory / +ilvl) -> Soft Yellow
+  rules.push(SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied(`=AND($G2<>"", $G2<>"-", NOT(ISNUMBER(SEARCH("════", $B2))), OR(ISNUMBER(SEARCH("+", $J2)), ISNUMBER(SEARCH("⚡", $L2)), ISNUMBER(SEARCH("Armory", $L2))))`)
+    .setBackground('#fef3c7')
+    .setFontColor('#92400e')
+    .setRanges(topContenderRange)
+    .build());
 
   // Sim Status Column Conditional Formatting
   const simStatusColIdx = lootHeaders.indexOf('Sim Status / Last Updated') + 1;
