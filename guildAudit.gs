@@ -1918,10 +1918,14 @@ function processAndIngestRaidbotsSims(input) {
       simData.simbot.meta.itemLibrary.forEach(it => {
         itemMap[it.id] = it.name;
         slotMap[it.id] = it.slot;
-        if (it.source && it.source.encounter && it.source.encounter.name) {
+        if (it.encounter && it.encounter.name) {
+          sourceMap[it.id] = it.encounter.name;
+        } else if (it.source && it.source.encounter && it.source.encounter.name) {
           sourceMap[it.id] = it.source.encounter.name;
-        } else if (it.source && it.source.encounter && it.source.encounter.id && encounters[it.source.encounter.id]) {
-          sourceMap[it.id] = encounters[it.source.encounter.id];
+        } else if (it.sources && it.sources[0] && it.sources[0].encounterId && encounters[it.sources[0].encounterId]) {
+          sourceMap[it.id] = encounters[it.sources[0].encounterId];
+        } else if (it.encounterId && encounters[it.encounterId]) {
+          sourceMap[it.id] = encounters[it.encounterId];
         }
       });
     }
