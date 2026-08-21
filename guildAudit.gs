@@ -1684,7 +1684,7 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('God-Tier').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges(prioRange).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('BiS').setBackground('#f3e8ff').setFontColor('#6b21a8').setRanges(prioRange).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Rare').setBackground('#ffedd5').setFontColor('#9a3412').setRanges(prioRange).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Tier').setBackground('#d1fae5').setFontColor('#065f46').setRanges(prioRange).build());
+rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Tier').setBackground('#d1fae5').setFontColor('#065f46').setRanges(prioRange).build());
 
   // Sim Status Column Conditional Formatting
   const simStatusColIdx = lootHeaders.indexOf('Sim Status / Last Updated') + 1;
@@ -1758,7 +1758,6 @@ function isItemNameMatch(sheetItem, simItem) {
 
 /**
  * Imports one or multiple Raidbots Droptimizer Sim Reports (JSON) and merges exact mathematical % DPS upgrades onto the Loot Sheet.
- * Supports pasting multiple report URLs at once and merges newly simmed players cumulatively without overwriting existing data.
  */
 function promptAndImportRaidbotsDroptimizer() {
   const ui = SpreadsheetApp.getUi();
@@ -1778,20 +1777,38 @@ function promptAndImportRaidbotsDroptimizer() {
     return;
   }
 
+  const result = processAndIngestRaidbotsSims(rawInput);
+  if (result.success) {
+    ui.alert('Droptimizer Sims Merged!', `Successfully processed ${result.reportsProcessed} report(s) (${result.players.join(', ')}) and mapped DPS upgrades across ${result.itemsMapped} raid items.`, ui.ButtonSet.OK);
+  } else {
+    ui.alert('Import Failed', result.error || 'No valid reports could be processed.', ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Core engine to ingest Raidbots Droptimizer sims from strings, URLs, or webhooks.
+ */
+function processAndIngestRaidbotsSims(input) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(LOOT_SHEET_NAME);
+  if (!sheet) {
+    createLootAndChaseItemsSheet();
+    sheet = ss.getSheetByName(LOOT_SHEET_NAME);
+  }
+
   // Extract all unique Report IDs from input
-  const tokens = rawInput.split(/[\s,;\n]+/);
+  const tokens = (typeof input === 'string' ? input : JSON.stringify(input)).split(/[\s,;\n"']+/);
   const reportIds = [];
   
   tokens.forEach(tok => {
     const clean = tok.replace(/^.*\/report\//, '').replace(/\/.*$/, '').trim();
-    if (clean && !reportIds.includes(clean)) {
+    if (clean && /^[A-Za-z0-9_-]{10,35}$/.test(clean) && !reportIds.includes(clean)) {
       reportIds.push(clean);
     }
   });
 
   if (reportIds.length === 0) {
-    ui.alert('No valid Raidbots report IDs found in the input.');
-    return;
+    return { success: false, error: 'No valid Raidbots report IDs found in input.' };
   }
 
   // Batch fetch all report data.json in parallel
@@ -1805,45 +1822,37 @@ function promptAndImportRaidbotsDroptimizer() {
   let successCount = 0;
 
   responses.forEach((resp, idx) => {
-    try {
-      if (resp && resp.getResponseCode() === 200) {
-        simDataList.push(JSON.parse(resp.getContentText()));
+    if (resp && resp.getResponseCode() === 200) {
+      try {
+        const parsed = JSON.parse(resp.getContentText());
+        simDataList.push(parsed);
         successCount++;
-      } else {
-        Logger.log(`Failed to fetch report ${reportIds[idx]}: status ${resp ? resp.getResponseCode() : 'unknown'}`);
+      } catch (e) {
+        Logger.log(`Failed to parse sim data JSON for report ID: ${reportIds[idx]}`);
       }
-    } catch (e) {
-      Logger.log(`Error parsing JSON for ${reportIds[idx]}: ${e}`);
     }
   });
 
   if (simDataList.length === 0) {
-    ui.alert('Import Failed', 'Could not load valid sim data from the provided report link(s). Ensure the reports are public and complete.', ui.ButtonSet.OK);
-    return;
+    return { success: false, error: 'Failed to fetch sim report JSON from Raidbots. Ensure the report URL is public and finished simming.' };
   }
 
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(LOOT_SHEET_NAME);
-  if (!sheet) {
+  // Read existing Loot & Chase Items sheet data
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) {
     createLootAndChaseItemsSheet();
-    sheet = ss.getSheetByName(LOOT_SHEET_NAME);
   }
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
 
-  const numRows = sheet.getLastRow();
-  if (numRows <= 1) return;
-
-  const range = sheet.getRange(2, 1, numRows - 1, sheet.getLastColumn());
-  const values = range.getValues();
-
-  // Map of sheet item -> array of { name: 'PlayerName', pct: 8.4 }
+  // Build itemUpgradeMap
   const itemUpgradeMap = {};
-
   values.forEach(row => {
     const itemName = (row[1] || '').toString().trim();
-    if (!itemName) return;
+    if (!itemName || row[0].toString().startsWith('⚔️') || row[0].toString().startsWith('🛡️') || row[0].toString().startsWith('🧭') || row[0].toString().startsWith('🧪') || row[0].toString().startsWith('🐊') || row[0].toString().startsWith('🏛️') || row[0].toString().startsWith('👑') || row[0].toString().startsWith('📦')) {
+      return;
+    }
     itemUpgradeMap[itemName] = [];
 
-    // Parse existing Top Contender and Notes if previously simmed
     const currentNotes = (row[12] || '').toString();
     if (currentNotes.includes('Raidbots Sim Upgrades:')) {
       const parts = currentNotes.replace('Raidbots Sim Upgrades:', '').split('|');
@@ -1859,7 +1868,6 @@ function promptAndImportRaidbotsDroptimizer() {
     }
   });
 
-  // Calculate Freshness Badge
   const now = Date.now();
   let latestSimDate = now;
   simDataList.forEach(s => {
@@ -1873,7 +1881,9 @@ function promptAndImportRaidbotsDroptimizer() {
   const daysOld = Math.floor((now - latestSimDate) / (1000 * 60 * 60 * 24));
   const simStatusBadge = daysOld > 7 ? `⚠️ Stale (${daysOld}d ago)` : `✅ Simmed (${formattedDate})`;
 
-  // Ingest all fetched sim reports using exact itemLibrary dictionary lookup
+  const processedPlayers = [];
+  const topUpgradesSummary = [];
+
   simDataList.forEach(simData => {
     if (!simData) return;
 
@@ -1905,48 +1915,64 @@ function promptAndImportRaidbotsDroptimizer() {
       });
     }
 
-    // 2. Determine Player Name
     let playerName = 'Unknown';
     if (simData.simbot && simData.simbot.player) {
       playerName = simData.simbot.player;
-    } else if (simData.simbot && simData.simbot.character && simData.simbot.character.name) {
-      playerName = simData.simbot.character.name;
-    } else if (simData.simbot && simData.simbot.meta && simData.simbot.meta.character && simData.simbot.meta.character.name) {
-      playerName = simData.simbot.meta.character.name;
     } else if (simData.sim && simData.sim.players && simData.sim.players[0] && simData.sim.players[0].name) {
       playerName = simData.sim.players[0].name;
     }
+    if (!processedPlayers.includes(playerName)) processedPlayers.push(playerName);
 
-    // 3. Determine Baseline DPS
-    let baseDps = 1;
-    if (simData.sim && simData.sim.players && simData.sim.players[0] && simData.sim.players[0].collected_data && simData.sim.players[0].collected_data.dps && simData.sim.players[0].collected_data.dps.mean) {
-      baseDps = simData.sim.players[0].collected_data.dps.mean;
-    } else if (simData.sim && simData.sim.statistics && simData.sim.statistics.raid_dps && simData.sim.statistics.raid_dps.mean) {
-      baseDps = simData.sim.statistics.raid_dps.mean;
-    } else if (simData.sim && simData.sim.players && simData.sim.players[0] && simData.sim.players[0].dps) {
-      baseDps = simData.sim.players[0].dps;
-    } else if (simData.simbot && simData.simbot.baseDps) {
-      baseDps = simData.simbot.baseDps;
+    let baseDps = 0;
+    if (simData.sim && simData.sim.players && simData.sim.players[0] && simData.sim.players[0].collected_data && simData.sim.players[0].collected_data.dps) {
+      baseDps = simData.sim.players[0].collected_data.dps.mean || 0;
+    } else if (simData.sim && simData.sim.statistics && simData.sim.statistics.raid_dps) {
+      baseDps = simData.sim.statistics.raid_dps.mean || 0;
     }
 
     const itemsToProcess = [];
 
-    // Path A: Standard Raidbots Droptimizer profilesets format
-    if (simData.sim && simData.sim.profilesets && simData.sim.profilesets.results) {
-      simData.sim.profilesets.results.forEach(r => {
-        const parts = r.name.split('/');
-        const itemId = parts[3];
-        const rawName = itemMap[itemId] || r.name;
-        const meanDps = r.mean || 0;
-        if (meanDps > baseDps && baseDps > 1) {
-          const pct = ((meanDps - baseDps) / baseDps) * 100;
-          if (pct > 0) {
-            itemsToProcess.push({
-              name: rawName,
-              pct: parseFloat(pct.toFixed(2)),
-              slot: slotMap[itemId] || '',
-              source: sourceMap[itemId] || 'Raid Drop'
-            });
+    // Path A: Profilesets results
+    if (simData.sim && simData.sim.profilesets && Array.isArray(simData.sim.profilesets.results)) {
+      simData.sim.profilesets.results.forEach(res => {
+        const profileName = (res.name || '').toString();
+        const parts = profileName.split('/');
+        let resolvedItemName = '';
+        let resolvedSlot = '';
+        let resolvedSource = '';
+
+        if (parts.length >= 4) {
+          const itemId = parseInt(parts[3], 10);
+          if (itemId && itemMap[itemId]) {
+            resolvedItemName = itemMap[itemId];
+            resolvedSlot = slotMap[itemId] || '';
+            resolvedSource = sourceMap[itemId] || '';
+          }
+        }
+
+        if (!resolvedItemName) {
+          resolvedItemName = profileName.replace(/^[0-9\/]+/, '').replace(/[\/0-9]+$/, '').trim();
+        }
+
+        const simDps = res.mean || res.dps || 0;
+        let pct = res.pct || res.pct_gain;
+        if (pct === undefined && simDps > baseDps && baseDps > 1) {
+          pct = ((simDps - baseDps) / baseDps) * 100;
+        }
+
+        if (resolvedItemName && pct > 0) {
+          const existing = itemsToProcess.find(it => isItemNameMatch(it.name, resolvedItemName));
+          if (!existing || pct > existing.pct) {
+            if (existing) {
+              existing.pct = parseFloat(pct.toFixed(2));
+            } else {
+              itemsToProcess.push({
+                name: resolvedItemName,
+                pct: parseFloat(pct.toFixed(2)),
+                slot: resolvedSlot,
+                source: resolvedSource
+              });
+            }
           }
         }
       });
@@ -2029,5 +2055,59 @@ function promptAndImportRaidbotsDroptimizer() {
 
   // Save back all updated and newly registered items
   sheet.getRange(2, 1, values.length, sheet.getLastColumn()).setValues(values);
-  ui.alert('Droptimizer Sims Merged!', `Successfully processed ${successCount} report(s) and mapped DPS upgrades across ${totalMatches} raid items.`, ui.ButtonSet.OK);
+
+  return {
+    success: true,
+    reportsProcessed: successCount,
+    players: processedPlayers,
+    itemsMapped: totalMatches,
+    topUpgrades: topUpgradesSummary,
+    message: `Successfully mapped DPS upgrades for ${processedPlayers.join(', ')} across ${totalMatches} raid items.`
+  };
+}
+
+/**
+ * Google Apps Script Web App POST Endpoint
+ * Receives webhook calls from the Discord Bot when raiders paste sim links.
+ */
+function doPost(e) {
+  try {
+    let payload = null;
+    if (e && e.postData && e.postData.contents) {
+      try {
+        payload = JSON.parse(e.postData.contents);
+      } catch (err) {
+        payload = e.parameter;
+      }
+    } else if (e && e.parameter) {
+      payload = e.parameter;
+    }
+
+    const simInput = (payload && (payload.url || payload.urls || payload.report_url || payload.content || payload.text)) || '';
+    if (!simInput) {
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'error',
+        message: 'No Raidbots URL or report ID found in request body.'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    const result = processAndIngestRaidbotsSims(simInput);
+    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: error.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * Google Apps Script Web App GET Endpoint (Health Check)
+ */
+function doGet(e) {
+  return ContentService.createTextOutput(JSON.stringify({
+    status: 'online',
+    service: 'WoW Raid Team Audit Sim Webhook',
+    timestamp: new Date().toISOString()
+  })).setMimeType(ContentService.MimeType.JSON);
 }

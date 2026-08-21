@@ -1,0 +1,16 @@
+{
+  "name": "wow-raid-sim-discord-bot",
+  "version": "1.0.0",
+  "description": "Discord Bot that automatically ingests Raidbots Droptimizer sims from Discord channels and syncs with Google Sheets Loot Council.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
