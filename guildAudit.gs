@@ -1644,19 +1644,53 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
 
       // 2. FALLBACK: For unsimmed items, calculate Live Equipped ilvl Delta
       const contenders = [];
+      const CLASS_ARMOR = {
+        'warrior': 'plate', 'paladin': 'plate', 'death knight': 'plate',
+        'hunter': 'mail', 'shaman': 'mail', 'evoker': 'mail',
+        'rogue': 'leather', 'druid': 'leather', 'monk': 'leather', 'demon hunter': 'leather',
+        'priest': 'cloth', 'mage': 'cloth', 'warlock': 'cloth'
+      };
 
       mainCharacterData.forEach(char => {
         if (!char['Name']) return;
+        const charClass = (char['Class'] || '').toLowerCase();
         const charSpec = (char['Spec'] || '').toLowerCase();
+        const charArmor = CLASS_ARMOR[charClass] || '';
 
-        // Check if character matches item targeting
+        // Comprehensive Armor, Stat & Role Eligibility Engine
         let isEligible = true;
-        if (targetRole.includes('tank') && !targetRole.includes('all')) {
-          const isTank = ['protection', 'blood', 'guardian', 'brewmaster', 'vengeance'].some(t => charSpec.includes(t));
-          if (!isTank) isEligible = false;
-        } else if (targetRole.includes('healer') && !targetRole.includes('dps') && !targetRole.includes('all')) {
-          const isHealer = ['restoration', 'holy', 'discipline', 'mistweaver', 'preservation'].some(h => charSpec.includes(h));
-          if (!isHealer) isEligible = false;
+
+        // Armor type check (Plate, Mail, Leather, Cloth)
+        if (targetRole.includes('plate') && charArmor !== 'plate') isEligible = false;
+        else if (targetRole.includes('mail') && charArmor !== 'mail') isEligible = false;
+        else if (targetRole.includes('leather') && charArmor !== 'leather') isEligible = false;
+        else if (targetRole.includes('cloth') && charArmor !== 'cloth') isEligible = false;
+
+        // Role check (Tank, Healer)
+        if (isEligible) {
+          if (targetRole.includes('tank') && !targetRole.includes('all')) {
+            const isTank = ['protection', 'blood', 'guardian', 'brewmaster', 'vengeance'].some(t => charSpec.includes(t));
+            if (!isTank) isEligible = false;
+          } else if (targetRole.includes('healer') && !targetRole.includes('dps') && !targetRole.includes('all')) {
+            const isHealer = ['restoration', 'holy', 'discipline', 'mistweaver', 'preservation'].some(h => charSpec.includes(h));
+            if (!isHealer) isEligible = false;
+          }
+        }
+
+        // Primary Stat & Weapon Type check
+        if (isEligible) {
+          if (targetRole.includes('strength') || targetRole.includes('str')) {
+            const isStr = ['warrior', 'death knight'].includes(charClass) || (charClass === 'paladin' && !charSpec.includes('holy'));
+            if (!isStr && !targetRole.includes('agi') && !targetRole.includes('all')) isEligible = false;
+          }
+          if (targetRole.includes('agility') || targetRole.includes('agi')) {
+            const isAgi = ['rogue', 'demon hunter', 'hunter'].includes(charClass) || (charClass === 'druid' && (charSpec.includes('feral') || charSpec.includes('guardian'))) || (charClass === 'monk' && !charSpec.includes('mistweaver')) || (charClass === 'shaman' && charSpec.includes('enhancement'));
+            if (!isAgi && !targetRole.includes('str') && !targetRole.includes('all')) isEligible = false;
+          }
+          if (targetRole.includes('intellect') || targetRole.includes('int')) {
+            const isInt = ['mage', 'warlock', 'priest', 'evoker'].includes(charClass) || (charClass === 'paladin' && charSpec.includes('holy')) || (charClass === 'druid' && (charSpec.includes('balance') || charSpec.includes('restoration'))) || (charClass === 'shaman' && !charSpec.includes('enhancement')) || (charClass === 'monk' && charSpec.includes('mistweaver'));
+            if (!isInt && !targetRole.includes('all')) isEligible = false;
+          }
         }
 
         if (isEligible) {
