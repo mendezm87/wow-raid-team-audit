@@ -1047,16 +1047,34 @@ function applyFormatting(sheet, headers, characterDataObjects) {
   sheet.setFrozenRows(1);
 
   // Header styling
-  const headerRange = sheet.getRange(1, 1, 1, sheet.getMaxColumns());
-  headerRange.setBackground('#202124').setFontColor('#ffffff').setFontWeight('bold');
-  
-  if (sheet.getMaxRows() > 1 && sheet.getMaxColumns() > 3) {
-    sheet.getRange(2, 4, sheet.getMaxRows() - 1, sheet.getMaxColumns() - 3).setFontWeight("bold");
+  const lastRow = sheet.getLastRow();
+  const totalCols = sheet.getMaxColumns();
+
+  // Clear previous conditional formatting rules
+  sheet.clearConditionalFormatRules();
+
+  // 1. Executive Grid & Row Alignment
+  const fullDataRange = sheet.getDataRange();
+  fullDataRange.setVerticalAlignment('middle');
+  fullDataRange.setFontFamily('Roboto');
+
+  // Header styling (Tailwind Slate 800)
+  const headerRange = sheet.getRange(1, 1, 1, totalCols);
+  headerRange.setBackground('#1e293b')
+    .setFontColor('#f8fafc')
+    .setFontWeight('bold')
+    .setFontSize(10)
+    .setHorizontalAlignment('center');
+  sheet.setRowHeight(1, 34);
+
+  if (lastRow > 1) {
+    sheet.setRowHeights(2, lastRow - 1, 28);
+    sheet.getRange(2, 1, lastRow - 1, totalCols).setFontSize(9).setFontWeight('bold');
   }
 
   const rules = [];
 
-  // 1. Class Colors for Name, Class, Spec (Consolidated multi-range rule)
+  // 2. Class Colors with high-contrast text
   const nameColIndex = headers.indexOf('Name') + 1;
   const classColIndex = headers.indexOf('Class') + 1;
   const specColIndex = headers.indexOf('Spec') + 1;
@@ -1066,27 +1084,30 @@ function applyFormatting(sheet, headers, characterDataObjects) {
   if (specColIndex > 0) classAndSpecRanges.push(sheet.getRange(2, specColIndex, sheet.getMaxRows(), 1));
 
   if (classAndSpecRanges.length > 0) {
+    const darkBgClasses = ['Death Knight', 'Demon Hunter', 'Shaman', 'Warlock'];
     for (const className in CLASS_COLORS) {
+      const fontColor = darkBgClasses.includes(className) ? '#ffffff' : '#0f172a';
       rules.push(SpreadsheetApp.newConditionalFormatRule()
         .whenFormulaSatisfied(`=$B2="${className}"`)
         .setBackground(CLASS_COLORS[className])
-        .setFontColor('#000000')
+        .setFontColor(fontColor)
         .setRanges(classAndSpecRanges)
         .build());
     }
   }
 
-  // 2. Raid Ready Column Rules
+  // 3. Raid Ready Column Rules (Soft Modern Pills)
   const raidReadyColIdx = headers.indexOf('Raid Ready');
   if (raidReadyColIdx > -1) {
     const rrRange = [sheet.getRange(2, raidReadyColIdx + 1, sheet.getMaxRows(), 1)];
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("READY").setBackground("#34a853").setFontColor("#ffffff").setRanges(rrRange).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Missing").setBackground("#ea4335").setFontColor("#ffffff").setRanges(rrRange).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Socket").setBackground("#ea4335").setFontColor("#ffffff").setRanges(rrRange).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Tier").setBackground("#fbbc04").setFontColor("#000000").setRanges(rrRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("READY").setBackground("#d1fae5").setFontColor("#065f46").setRanges(rrRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Missing").setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(rrRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Socket").setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(rrRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Off-Spec").setBackground("#fef3c7").setFontColor("#92400e").setRanges(rrRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Tier").setBackground("#fef3c7").setFontColor("#92400e").setRanges(rrRange).build());
   }
 
-  // 3. Upgrade Tracks & Gear Slots (Multi-range consolidation: 7 rules instead of 112)
+  // 4. Upgrade Tracks & Gear Slots (Modern Tailwind Badges)
   const gearCols = [
     'Head', 'Shoulders', 'Chest', 'Hands', 'Legs',
     'Main Hand', 'Off Hand', 'Trinket 1', 'Trinket 2',
@@ -1098,41 +1119,41 @@ function applyFormatting(sheet, headers, characterDataObjects) {
     .map(idx => sheet.getRange(2, idx, sheet.getMaxRows(), 1));
 
   if (gearRanges.length > 0) {
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Myth").setBackground("#ff8000").setFontColor("#000000").setRanges(gearRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Hero").setBackground("#a335ee").setFontColor("#ffffff").setRanges(gearRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Champion").setBackground("#0070dd").setFontColor("#ffffff").setRanges(gearRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Veteran").setBackground("#1eff00").setFontColor("#000000").setRanges(gearRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Explorer").setBackground("#9e9e9e").setFontColor("#ffffff").setRanges(gearRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Adventurer").setBackground("#9e9e9e").setFontColor("#ffffff").setRanges(gearRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Crafted").setBackground("#f28b82").setFontColor("#000000").setRanges(gearRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Myth").setBackground("#ffedd5").setFontColor("#9a3412").setRanges(gearRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Hero").setBackground("#f3e8ff").setFontColor("#6b21a8").setRanges(gearRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Champion").setBackground("#e0f2fe").setFontColor("#075985").setRanges(gearRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Veteran").setBackground("#dcfce7").setFontColor("#166534").setRanges(gearRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Explorer").setBackground("#f1f5f9").setFontColor("#475569").setRanges(gearRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Adventurer").setBackground("#f1f5f9").setFontColor("#475569").setRanges(gearRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Crafted").setBackground("#fce7f3").setFontColor("#831843").setRanges(gearRanges).build());
   }
 
-  // 4. Tier Set Progress Rules
+  // 5. Tier Set Progress Rules (Soft Badges)
   const tierSetColIdx = headers.indexOf('Tier Set');
   if (tierSetColIdx > -1) {
     const tsRange = [sheet.getRange(2, tierSetColIdx + 1, sheet.getMaxRows(), 1)];
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("5/5").setBackground("#34a853").setFontColor("#ffffff").setRanges(tsRange).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("4/5").setBackground("#34a853").setFontColor("#ffffff").setRanges(tsRange).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("3/5").setBackground("#fbbc04").setFontColor("#000000").setRanges(tsRange).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("2/5").setBackground("#fbbc04").setFontColor("#000000").setRanges(tsRange).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("1/5").setBackground("#ea4335").setFontColor("#ffffff").setRanges(tsRange).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("0/5").setBackground("#ea4335").setFontColor("#ffffff").setRanges(tsRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("5/5").setBackground("#d1fae5").setFontColor("#065f46").setRanges(tsRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("4/5").setBackground("#d1fae5").setFontColor("#065f46").setRanges(tsRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("3/5").setBackground("#fef3c7").setFontColor("#92400e").setRanges(tsRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("2/5").setBackground("#fef3c7").setFontColor("#92400e").setRanges(tsRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("1/5").setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(tsRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("0/5").setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(tsRange).build());
   }
 
-  // 5. Empty Sockets & Imperfect Gems Rules
+  // 6. Sockets & Imperfect Gems Rules
   const emptySocketsColIdx = headers.indexOf('Empty Sockets');
   if (emptySocketsColIdx > -1) {
     const esRange = [sheet.getRange(2, emptySocketsColIdx + 1, sheet.getMaxRows(), 1)];
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThan(0).setBackground("#ea4335").setFontColor("#ffffff").setRanges(esRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThan(0).setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(esRange).build());
   }
 
   const imperfectGemsColIdx = headers.indexOf('Imperfect Gems');
   if (imperfectGemsColIdx > -1) {
     const igRange = [sheet.getRange(2, imperfectGemsColIdx + 1, sheet.getMaxRows(), 1)];
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThan(0).setBackground("#fbbc04").setFontColor("#000000").setRanges(igRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThan(0).setBackground("#fef3c7").setFontColor("#92400e").setRanges(igRange).build());
   }
 
-  // 6. Enchants Rules (Multi-range consolidation: 5 rules instead of 45)
+  // 7. Enchants Rules (Multi-range consolidation)
   const enchantCols = [
     'Enchant Main Hand', 'Enchant Off Hand', 'Enchant Head', 'Enchant Shoulder',
     'Enchant Chest', 'Enchant Legs', 'Enchant Feet', 'Enchant Ring 1', 'Enchant Ring 2'
@@ -1143,27 +1164,26 @@ function applyFormatting(sheet, headers, characterDataObjects) {
     .map(idx => sheet.getRange(2, idx, sheet.getMaxRows(), 1));
 
   if (enchantRanges.length > 0) {
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Tier2").setBackground("#34a853").setFontColor("#ffffff").setRanges(enchantRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Tier1").setBackground("#fbbc04").setFontColor("#000000").setRanges(enchantRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Rune of").setBackground("#34a853").setFontColor("#ffffff").setRanges(enchantRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("N/A").setBackground("#e0e0e0").setFontColor("#555555").setRanges(enchantRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Missing").setBackground("#ea4335").setFontColor("#ffffff").setRanges(enchantRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Tier2").setBackground("#d1fae5").setFontColor("#065f46").setRanges(enchantRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Rune of").setBackground("#d1fae5").setFontColor("#065f46").setRanges(enchantRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Tier1").setBackground("#fef3c7").setFontColor("#92400e").setRanges(enchantRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("N/A").setBackground("#f8fafc").setFontColor("#94a3b8").setRanges(enchantRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Missing").setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(enchantRanges).build());
   }
   
-  // 7. Great Vault Styling & Borders
+  // 8. Great Vault Styling & Borders
   const gvRaid1_idx = headers.indexOf('GV Raid 1') + 1;
   const gvRaid3_idx = headers.indexOf('GV Raid 3') + 1;
   const gvMplus1_idx = headers.indexOf('GV M+ 1') + 1;
   const gvMplus3_idx = headers.indexOf('GV M+ 3') + 1;
-  const lastDataRow = sheet.getLastRow();
-  const medium_border = SpreadsheetApp.BorderStyle.SOLID_MEDIUM;
+  const thin_border = SpreadsheetApp.BorderStyle.SOLID;
 
-  if (gvRaid1_idx > 0 && gvRaid3_idx > 0 && lastDataRow > 1) {
-    sheet.getRange(1, gvRaid1_idx, lastDataRow, 3).setBorder(true, true, true, true, false, false, '#000000', medium_border);
+  if (gvRaid1_idx > 0 && gvRaid3_idx > 0 && lastRow > 1) {
+    sheet.getRange(1, gvRaid1_idx, lastRow, 3).setBorder(true, true, true, true, false, false, '#94a3b8', thin_border);
   }
 
-  if (gvMplus1_idx > 0 && gvMplus3_idx > 0 && lastDataRow > 1) {
-    sheet.getRange(1, gvMplus1_idx, lastDataRow, 3).setBorder(true, true, true, true, false, false, '#000000', medium_border);
+  if (gvMplus1_idx > 0 && gvMplus3_idx > 0 && lastRow > 1) {
+    sheet.getRange(1, gvMplus1_idx, lastRow, 3).setBorder(true, true, true, true, false, false, '#94a3b8', thin_border);
   }
 
   const gvRaidCols = ['GV Raid 1', 'GV Raid 2', 'GV Raid 3'];
@@ -1173,10 +1193,10 @@ function applyFormatting(sheet, headers, characterDataObjects) {
     .map(idx => sheet.getRange(2, idx, sheet.getMaxRows(), 1));
 
   if (gvRaidRanges.length > 0) {
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(VAULT_MAPPING.raid.lfr.toString()).setBackground("#1eff00").setFontColor("#000000").setRanges(gvRaidRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(VAULT_MAPPING.raid.normal.toString()).setBackground("#0070dd").setFontColor("#ffffff").setRanges(gvRaidRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(VAULT_MAPPING.raid.heroic.toString()).setBackground("#a335ee").setFontColor("#ffffff").setRanges(gvRaidRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(VAULT_MAPPING.raid.mythic.toString()).setBackground("#ff8000").setFontColor("#000000").setRanges(gvRaidRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(VAULT_MAPPING.raid.mythic.toString()).setBackground("#ffedd5").setFontColor("#9a3412").setRanges(gvRaidRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(VAULT_MAPPING.raid.heroic.toString()).setBackground("#f3e8ff").setFontColor("#6b21a8").setRanges(gvRaidRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(VAULT_MAPPING.raid.normal.toString()).setBackground("#e0f2fe").setFontColor("#075985").setRanges(gvRaidRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(VAULT_MAPPING.raid.lfr.toString()).setBackground("#dcfce7").setFontColor("#166534").setRanges(gvRaidRanges).build());
   }
 
   const gvMplusCols = ['GV M+ 1', 'GV M+ 2', 'GV M+ 3'];
@@ -1186,23 +1206,26 @@ function applyFormatting(sheet, headers, characterDataObjects) {
     .map(idx => sheet.getRange(2, idx, sheet.getMaxRows(), 1));
 
   if (gvMplusRanges.length > 0) {
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(331).setBackground("#ff8000").setFontColor("#000000").setRanges(gvMplusRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(312).setBackground("#a335ee").setFontColor("#ffffff").setRanges(gvMplusRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(299).setBackground("#0070dd").setFontColor("#ffffff").setRanges(gvMplusRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(292).setBackground("#1eff00").setFontColor("#000000").setRanges(gvMplusRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(331).setBackground("#ffedd5").setFontColor("#9a3412").setRanges(gvMplusRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(312).setBackground("#f3e8ff").setFontColor("#6b21a8").setRanges(gvMplusRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(299).setBackground("#e0f2fe").setFontColor("#075985").setRanges(gvMplusRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(292).setBackground("#dcfce7").setFontColor("#166534").setRanges(gvMplusRanges).build());
   }
 
-  // M+ Rating Color (Batch updated in 1 single call)
+  // 9. M+ Rating Color (Batch updated in 1 single call with high-contrast text)
   const mPlusRatingColIdx = headers.indexOf('M+ Rating') + 1;
   if (mPlusRatingColIdx > 0 && characterDataObjects && characterDataObjects.length > 0) {
     const backgrounds = characterDataObjects.map(charData => [(charData && charData['M+ Rating Color']) ? charData['M+ Rating Color'] : '#ffffff']);
-    const fontColors = characterDataObjects.map(() => ['#000000']);
+    const fontColors = characterDataObjects.map(charData => {
+      const col = (charData && charData['M+ Rating Color']) ? charData['M+ Rating Color'].toLowerCase() : '';
+      return (col.includes('ff8000') || col.includes('a335ee') || col.includes('0070dd')) ? '#ffffff' : '#0f172a';
+    });
     sheet.getRange(2, mPlusRatingColIdx, backgrounds.length, 1).setBackgrounds(backgrounds).setFontColors(fontColors);
   }
 
   sheet.setConditionalFormatRules(rules);
 
-  // Set column widths directly (Fast 1-pass execution without getColumnWidth overhead)
+  // Set column widths directly
   const minWidths = {
     'Name': 130, 'Class': 110, 'Spec': 130, 'iLvl': 70,
     'Raid Ready': 460, 'M+ Rating': 95, 'Tier Set': 140,
@@ -1258,13 +1281,13 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
     const specClassSlug = `LOWER(C${rowNum}) & "/" & LOWER(SUBSTITUTE(B${rowNum}, " ", "-"))`;
     const bossSlugFormula = `IF(F${rowNum}="Nek'zali", "nekzali", IF(F${rowNum}="Sentinels", "sentinels", IF(F${rowNum}="Vashnik", "vashnik", IF(F${rowNum}="Explorers", "explorers", IF(F${rowNum}="Sszorak", "sszorak", IF(F${rowNum}="The Twin Fangs", "the-twin-fangs", IF(F${rowNum}="The Coiled Altar", "the-coiled-altar", IF(F${rowNum}="Ula'tek", "ulatek", IF(F${rowNum}="Nymrissa", "nymrissa", "all-bosses")))))))))`;
 
-    const archonHeroicFormula = `=HYPERLINK("https://www.archon.gg/wow/builds/" & ${specClassSlug} & "/raid/overview/heroic/" & ${bossSlugFormula}, "Heroic Build (" & F${rowNum} & ")")`;
-    const archonMythicFormula = `=HYPERLINK("https://www.archon.gg/wow/builds/" & ${specClassSlug} & "/raid/overview/mythic/" & ${bossSlugFormula}, "Mythic Build (" & F${rowNum} & ")")`;
+    const archonHeroicFormula = `=HYPERLINK("https://www.archon.gg/wow/builds/" & ${specClassSlug} & "/raid/overview/heroic/" & ${bossSlugFormula}, "⚡ Heroic (" & F${rowNum} & ")")`;
+    const archonMythicFormula = `=HYPERLINK("https://www.archon.gg/wow/builds/" & ${specClassSlug} & "/raid/overview/mythic/" & ${bossSlugFormula}, "⚔️ Mythic (" & F${rowNum} & ")")`;
     const wowheadFormula = (obj['Wowhead Guide Link'] && obj['Wowhead Guide Link'] !== '-') 
-      ? `=HYPERLINK("${obj['Wowhead Guide Link']}", "Wowhead Guide")`
+      ? `=HYPERLINK("${obj['Wowhead Guide Link']}", "📖 Wowhead Guide")`
       : '-';
     const droptimizerFormula = (obj['Droptimizer Link'] && obj['Droptimizer Link'] !== '-')
-      ? `=HYPERLINK("${obj['Droptimizer Link']}", "1-Click Sim Link")`
+      ? `=HYPERLINK("${obj['Droptimizer Link']}", "🎲 1-Click Sim")`
       : '-';
 
     return [
@@ -1296,22 +1319,29 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   const outputData = [talentHeaders, ...finalRows];
   sheet.clear();
   sheet.clearFormats();
+  sheet.clearConditionalFormatRules();
   sheet.getRange(1, 1, outputData.length, outputData[0].length).setValues(outputData);
 
   // Formatting
   const fullRange = sheet.getDataRange();
   fullRange.setHorizontalAlignment('center');
+  fullRange.setVerticalAlignment('middle');
+  fullRange.setFontFamily('Roboto');
   fullRange.setNumberFormat('@');
   sheet.setFrozenColumns(1);
   sheet.setFrozenRows(1);
 
   // Header styling
   const headerRange = sheet.getRange(1, 1, 1, sheet.getMaxColumns());
-  headerRange.setBackground('#202124').setFontColor('#ffffff').setFontWeight('bold');
+  headerRange.setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
+  sheet.setRowHeight(1, 34);
 
-  // Bold data
-  if (sheet.getMaxRows() > 1) {
-    sheet.getRange(2, 1, sheet.getMaxRows() - 1, sheet.getMaxColumns()).setFontWeight('bold');
+  // Row heights & fonts
+  if (outputData.length > 1) {
+    sheet.setRowHeights(2, outputData.length - 1, 28);
+    sheet.getRange(2, 1, outputData.length - 1, sheet.getMaxColumns()).setFontSize(9).setFontWeight('bold');
+    // Set monospace styling for Talent String (Column 5)
+    sheet.getRange(2, 5, outputData.length - 1, 1).setFontFamily('Consolas').setFontSize(8).setFontWeight('normal');
   }
 
   // Class colors for Name, Class, Spec
@@ -1321,44 +1351,46 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
     sheet.getRange(2, 3, sheet.getMaxRows(), 1)  // Spec
   ];
   const rules = [];
+  const darkBgClasses = ['Death Knight', 'Demon Hunter', 'Shaman', 'Warlock'];
   for (const className in CLASS_COLORS) {
+    const fontColor = darkBgClasses.includes(className) ? '#ffffff' : '#0f172a';
     rules.push(SpreadsheetApp.newConditionalFormatRule()
       .whenFormulaSatisfied(`=$B2="${className}"`)
       .setBackground(CLASS_COLORS[className])
-      .setFontColor('#000000')
+      .setFontColor(fontColor)
       .setRanges(classAndSpecRanges)
       .build());
   }
 
-  // Raid Ready column formatting
+  // Raid Ready column formatting (Soft Modern Badges)
   const raidReadyColIdx = talentHeaders.indexOf('Raid Ready') + 1;
   const rrRange = [sheet.getRange(2, raidReadyColIdx, sheet.getMaxRows(), 1)];
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('READY').setBackground('#34a853').setFontColor('#ffffff').setRanges(rrRange).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Missing').setBackground('#ea4335').setFontColor('#ffffff').setRanges(rrRange).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Tier').setBackground('#fbbc04').setFontColor('#000000').setRanges(rrRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('READY').setBackground('#d1fae5').setFontColor('#065f46').setRanges(rrRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Missing').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges(rrRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Tier').setBackground('#fef3c7').setFontColor('#92400e').setRanges(rrRange).build());
 
   sheet.setConditionalFormatRules(rules);
 
-  // Add Data Validation Dropdown for Boss Build Selector (Column F)
-  if (sheet.getMaxRows() > 1) {
+  // Add Data Validation Dropdown for Boss Build Selector (Column F) ONLY on populated character rows
+  if (outputData.length > 1) {
     const bossRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(ARCHON_BOSS_OPTIONS, true)
       .setAllowInvalid(true)
       .build();
-    sheet.getRange(2, 6, sheet.getMaxRows() - 1, 1).setDataValidation(bossRule);
+    sheet.getRange(2, 6, outputData.length - 1, 1).setDataValidation(bossRule);
   }
 
   // Set widths
   sheet.setColumnWidth(1, 130); // Name
   sheet.setColumnWidth(2, 110); // Class
   sheet.setColumnWidth(3, 130); // Spec
-  sheet.setColumnWidth(4, 230); // Hero Talents
+  sheet.setColumnWidth(4, 210); // Hero Talents
   sheet.setColumnWidth(5, 480); // Talent String
   sheet.setColumnWidth(6, 210); // Archon Boss Dropdown
-  sheet.setColumnWidth(7, 150); // Archon Heroic
-  sheet.setColumnWidth(8, 150); // Archon Mythic
+  sheet.setColumnWidth(7, 165); // Archon Heroic
+  sheet.setColumnWidth(8, 165); // Archon Mythic
   sheet.setColumnWidth(9, 150); // Wowhead Guide
-  sheet.setColumnWidth(10, 160); // Raidbots Droptimizer
+  sheet.setColumnWidth(10, 150); // Raidbots Droptimizer
   sheet.setColumnWidth(11, 80); // ilvl
   sheet.setColumnWidth(12, 460);// Raid Ready
 }
@@ -1622,50 +1654,55 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
 
   sheet.clear();
   sheet.clearFormats();
+  sheet.clearConditionalFormatRules();
   sheet.getRange(1, 1, fullData.length, fullData[0].length).setValues(fullData);
 
   // Formatting
   const fullRange = sheet.getDataRange();
   fullRange.setHorizontalAlignment('center');
+  fullRange.setVerticalAlignment('middle');
+  fullRange.setFontFamily('Roboto');
   fullRange.setNumberFormat('@');
   sheet.setFrozenColumns(2);
   sheet.setFrozenRows(1);
 
   // Header styling
   const headerRange = sheet.getRange(1, 1, 1, sheet.getMaxColumns());
-  headerRange.setBackground('#202124').setFontColor('#ffffff').setFontWeight('bold');
+  headerRange.setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
+  sheet.setRowHeight(1, 34);
 
-  // Bold data
-  if (sheet.getMaxRows() > 1) {
-    sheet.getRange(2, 1, sheet.getMaxRows() - 1, sheet.getMaxColumns()).setFontWeight('bold');
+  // Data rows
+  if (fullData.length > 1) {
+    sheet.setRowHeights(2, fullData.length - 1, 28);
+    sheet.getRange(2, 1, fullData.length - 1, sheet.getMaxColumns()).setFontSize(9).setFontWeight('bold');
   }
 
-  // Priority Column Conditional Formatting
+  // Priority Column Conditional Formatting (Soft Badges)
   const rules = [];
   const prioColIdx = lootHeaders.indexOf('Priority / BiS Tier') + 1;
   const prioRange = [sheet.getRange(2, prioColIdx, sheet.getMaxRows(), 1)];
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('BiS').setBackground('#a335ee').setFontColor('#ffffff').setRanges(prioRange).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Rare').setBackground('#ff8000').setFontColor('#000000').setRanges(prioRange).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Tier').setBackground('#34a853').setFontColor('#ffffff').setRanges(prioRange).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('God-Tier').setBackground('#ff0055').setFontColor('#ffffff').setRanges(prioRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('God-Tier').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges(prioRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('BiS').setBackground('#f3e8ff').setFontColor('#6b21a8').setRanges(prioRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Rare').setBackground('#ffedd5').setFontColor('#9a3412').setRanges(prioRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Tier').setBackground('#d1fae5').setFontColor('#065f46').setRanges(prioRange).build());
 
   // Sim Status Column Conditional Formatting
   const simStatusColIdx = lootHeaders.indexOf('Sim Status / Last Updated') + 1;
   const simStatusRange = [sheet.getRange(2, simStatusColIdx, sheet.getMaxRows(), 1)];
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('✅').setBackground('#34a853').setFontColor('#ffffff').setRanges(simStatusRange).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('⚠️').setBackground('#fbbc04').setFontColor('#000000').setRanges(simStatusRange).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('⚡').setBackground('#f1f3f4').setFontColor('#3c4043').setRanges(simStatusRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('✅').setBackground('#d1fae5').setFontColor('#065f46').setRanges(simStatusRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('⚠️').setBackground('#fef3c7').setFontColor('#92400e').setRanges(simStatusRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('⚡').setBackground('#f1f5f9').setFontColor('#475569').setRanges(simStatusRange).build());
 
   sheet.setConditionalFormatRules(rules);
 
-  // Style Boss Separator Rows with distinctive Deep Navy / Indigo Banners
+  // Style Boss Separator Rows with distinctive Dark Slate / Indigo Banners
   for (let i = 0; i < chaseItemsCatalog.length; i++) {
     const rowTitle = (chaseItemsCatalog[i][0] || '').toString();
     if (rowTitle.startsWith('⚔️') || rowTitle.startsWith('🛡️') || rowTitle.startsWith('🧭') || rowTitle.startsWith('🧪') || rowTitle.startsWith('🐊') || rowTitle.startsWith('🏛️') || rowTitle.startsWith('👑') || rowTitle.startsWith('📦')) {
       const rowIdx = i + 2;
       sheet.getRange(rowIdx, 1, 1, sheet.getMaxColumns())
-        .setBackground('#1a237e')
-        .setFontColor('#ffffff')
+        .setBackground('#0f172a')
+        .setFontColor('#f8fafc')
         .setFontWeight('bold')
         .setFontSize(10)
         .setHorizontalAlignment('left');
