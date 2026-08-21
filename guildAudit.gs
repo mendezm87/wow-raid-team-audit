@@ -1856,9 +1856,9 @@ function isCharacterEligibleForItem(charClass, charSpec, slot, targetSubclass, i
 
   // 2. WEAPONS & OFF-HANDS (Main Hand, Off Hand)
   if (slot === 'Main Hand' || slot === 'Off Hand') {
-    // Bows, Guns, Crossbows -> Hunters ONLY
+    // Bows, Guns, Crossbows -> Beast Mastery & Marksmanship Hunters ONLY (Survival is strictly 2H Melee)
     if (targetSubclass.includes('gun') || targetSubclass.includes('bow') || targetSubclass.includes('crossbow')) {
-      return charClass === 'hunter';
+      return charClass === 'hunter' && !charSpec.includes('survival');
     }
     // Warglaives -> Demon Hunters ONLY
     if (targetSubclass.includes('warglaive')) {
@@ -1884,35 +1884,38 @@ function isCharacterEligibleForItem(charClass, charSpec, slot, targetSubclass, i
     // 2H Axes, 2H Swords, 2H Maces -> Str/Agi 2H Melee (Warrior, DK, Ret Paladin, Survival Hunter, Feral/Guardian Druid)
     if (targetSubclass.includes('2h axe') || targetSubclass.includes('2h sword') || targetSubclass.includes('2h mace') || (targetSubclass.includes('axe') && !targetSubclass.includes('1h') && (itemName.includes('2h') || itemName.includes('cleaver') || itemName.includes('fury') || itemName.includes('axe')))) {
       if (['mage', 'warlock', 'priest', 'rogue', 'demon hunter', 'evoker'].includes(charClass)) return false;
+      if (charClass === 'hunter' && !charSpec.includes('survival')) return false; // BM and MM Hunters use Ranged only!
       if (charClass === 'druid' && !['feral', 'guardian'].some(s => charSpec.includes(s))) return false;
       if (charClass === 'paladin' && charSpec.includes('holy')) return false;
       if (charClass === 'shaman') return false;
       if (charClass === 'monk') return false;
     }
-    // 1H Axes / Cleavers -> Melee physical classes. NO Pure Casters!
+    // 1H Axes / Cleavers -> Melee physical classes. NO Pure Casters, NO Ranged Hunters!
     if (targetSubclass.includes('axe') || targetSubclass.includes('cleaver')) {
       if (['mage', 'warlock', 'priest', 'druid'].includes(charClass)) return false;
-      if (charClass === 'hunter' && !charSpec.includes('survival')) return false;
+      if (charClass === 'hunter') return false; // Survival is 2H only, BM/MM is Ranged
       if (charClass === 'paladin' && charSpec.includes('holy')) return false;
       if (charClass === 'shaman' && !charSpec.includes('enhancement')) return false;
     }
-    // Daggers -> Rogue, Mage, Priest, Warlock, Druid, Evoker, Shaman, Devourer DH. NO Plate classes!
+    // Daggers -> Rogue, Mage, Priest, Warlock, Druid, Evoker, Shaman, Devourer DH. NO Plate classes, NO Hunters!
     if (targetSubclass.includes('dagger')) {
-      if (['warrior', 'paladin', 'death knight'].includes(charClass)) return false;
-      if (charClass === 'hunter') return false;
+      if (['warrior', 'paladin', 'death knight', 'hunter'].includes(charClass)) return false;
       if (charClass === 'demon hunter' && !charSpec.includes('devourer')) return false;
     }
-    // Fist Weapons -> Rogue, Monk, DH, Enh Shaman, Druid, Evoker, Warrior. NO Cloth/Paladin/DK!
+    // Fist Weapons -> Rogue, Monk, DH, Enh Shaman, Druid, Evoker, Warrior. NO Cloth/Paladin/DK/Hunter!
     if (targetSubclass.includes('fist')) {
-      if (['mage', 'warlock', 'priest', 'paladin', 'death knight'].includes(charClass)) return false;
+      if (['mage', 'warlock', 'priest', 'paladin', 'death knight', 'hunter'].includes(charClass)) return false;
     }
-    // Polearms -> Str/Agi 2H Melee. NO Casters or Rogues/DH!
+    // Polearms -> Str/Agi 2H Melee (Warrior, Ret Paladin, Blood/Unholy DK, Survival Hunter, Feral/Guardian Druid, Brew/WW Monk)
     if (targetSubclass.includes('polearm')) {
       if (['mage', 'warlock', 'priest', 'rogue', 'demon hunter', 'evoker', 'shaman'].includes(charClass)) return false;
+      if (charClass === 'hunter' && !charSpec.includes('survival')) return false;
+      if (charClass === 'paladin' && charSpec.includes('holy')) return false;
     }
-    // Staves -> Casters/Healers + Druid / Monk / Survival Hunter. NO DK, Paladin, Rogue, Warrior!
+    // Staves -> Casters/Healers + Feral/Guardian Druid, Monk, Survival Hunter. NO DK, Paladin, Rogue, Warrior, BM/MM Hunter!
     if (targetSubclass.includes('staff') || targetSubclass.includes('stave')) {
       if (['paladin', 'death knight', 'rogue', 'warrior', 'demon hunter'].includes(charClass)) return false;
+      if (charClass === 'hunter' && !charSpec.includes('survival')) return false;
     }
     // 1H Maces -> Paladin, Warrior, DK, Rogue, Monk, Priest, Shaman, Druid, Evoker. NO Mage/Warlock/Hunter/DH!
     if (targetSubclass.includes('mace') && !targetSubclass.includes('2h')) {
@@ -1920,7 +1923,7 @@ function isCharacterEligibleForItem(charClass, charSpec, slot, targetSubclass, i
     }
     // 1H Swords -> Warrior, Paladin, DK, Rogue, Monk, DH, Mage, Warlock. NO Priest/Shaman/Druid/Hunter!
     if (targetSubclass.includes('sword') && !targetSubclass.includes('2h')) {
-      if (['priest', 'shaman', 'druid'].includes(charClass)) return false;
+      if (['priest', 'shaman', 'druid', 'hunter'].includes(charClass)) return false;
     }
   }
 
