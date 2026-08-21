@@ -116,13 +116,20 @@ client.once('ready', async () => {
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
-  // If a specific SIMS_CHANNEL_ID is configured, only listen there
-  if (SIMS_CHANNEL_ID && message.channel.id !== SIMS_CHANNEL_ID) return;
+  // Flexible channel filter: matches Channel ID, Channel Name (e.g. "raidbots"), or Channel with "#" (e.g. "#raidbots")
+  if (SIMS_CHANNEL_ID) {
+    const cleanTarget = SIMS_CHANNEL_ID.toString().trim().replace(/^#/, '').toLowerCase();
+    const isIdMatch = message.channel.id === SIMS_CHANNEL_ID.trim();
+    const isNameMatch = message.channel.name && message.channel.name.toLowerCase() === cleanTarget;
+    if (!isIdMatch && !isNameMatch) {
+      return;
+    }
+  }
 
   const urls = extractRaidbotsUrls(message.content);
   if (urls.length === 0) return;
 
-  console.log(`📥 Detected ${urls.length} Raidbots link(s) from ${message.author.username}`);
+  console.log(`📥 Detected ${urls.length} Raidbots link(s) from ${message.author.username} in #${message.channel.name}`);
   
   // React with hourglass while processing
   try { await message.react('⏳'); } catch (e) {}
