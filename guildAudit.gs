@@ -1425,6 +1425,7 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     ['Boss 1: Nek\'zali the Soulcoiler', 'Warhelm of the Consecrated Flame', 'Head', 'Heroic', 318, 'All Classes (Tier Helm)', '', '', '', '', 'Tier Helm', '⚡ Live Armory ilvl', 'Unlocks tier 2pc/4pc bonus'],
     ['Boss 1: Nek\'zali the Soulcoiler', 'Skullguard of the Risen Sacrifice', 'Head', 'Heroic', 318, 'Plate Helm', '', '', '', '', 'Non-Tier Helm', '⚡ Live Armory ilvl', 'Crit/Mastery plate helm'],
     ['Boss 1: Nek\'zali the Soulcoiler', 'Swelling Sea Spaulders', 'Shoulders', 'Heroic', 318, 'Mail Shoulders', '', '', '', '', 'Mail Shoulders', '⚡ Live Armory ilvl', 'Haste/Mastery mail shoulders'],
+    ['Boss 1: Nek\'zali the Soulcoiler', 'Unpossessed Skullsash', 'Waist', 'Heroic', 318, 'Cloth Waist', '', '', '', '', 'Cloth Belt', '⚡ Live Armory ilvl', 'Haste/Mastery cloth belt'],
 
     // ════════════════════════════════════════════════════════════
     // 🛡️ BOSS 2: ENTOMBED SENTINELS
@@ -1434,6 +1435,7 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     ['Boss 2: Entombed Sentinels', 'Pauldrons of the Consecrated Flame', 'Shoulders', 'Heroic', 318, 'All Classes (Tier Shoulders)', '', '', '', '', 'Tier Shoulders', '⚡ Live Armory ilvl', 'Unlocks tier 2pc/4pc bonus'],
     ['Boss 2: Entombed Sentinels', 'Pauldrons of the Forgotten Sacrifice', 'Shoulders', 'Heroic', 318, 'Plate Shoulders', '', '', '', '', 'Plate Shoulders', '⚡ Live Armory ilvl', 'High strength plate shoulders'],
     ['Boss 2: Entombed Sentinels', 'Sentinel\'s Vitriolic Chain', 'Neck', 'Heroic', 318, 'All Specs', '', '', '', '', 'BiS Neck', '⚡ Live Armory ilvl', 'Haste/Versatility neck with socket'],
+    ['Boss 2: Entombed Sentinels', 'Slitherscale Girdle', 'Waist', 'Heroic', 318, 'Mail Waist', '', '', '', '', 'Mail Belt', '⚡ Live Armory ilvl', 'Crit/Versatility mail belt'],
     ['Boss 2: Entombed Sentinels', 'Entombed Cultist\'s Sabatons', 'Feet', 'Heroic', 318, 'Plate Feet', '', '', '', '', 'Plate Boots', '⚡ Live Armory ilvl', 'Plate boots with mastery'],
 
     // ════════════════════════════════════════════════════════════
@@ -1442,7 +1444,9 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     ['🧭 BOSS 3: THE LOST EXPLORERS', '═════════════════════════════════', '', '', '', '', '', '', '', '', '', '', ''],
     ['Boss 3: The Lost Explorers', 'Gebbo\'s Bottomless Bag', 'Trinket 2', 'Heroic', 318, 'All DPS / Healers', '', '', '', '', 'BiS A-Tier', '⚡ Live Armory ilvl', 'Trinket proc with random utility / stat surge'],
     ['Boss 3: The Lost Explorers', 'Bulwark of the Consecrated Flame', 'Chest', 'Heroic', 318, 'All Classes (Tier Chest)', '', '', '', '', 'Tier Chest', '⚡ Live Armory ilvl', 'Tier chest piece token'],
+    ['Boss 3: The Lost Explorers', 'Battle Gi of the Monkey King', 'Chest', 'Heroic', 318, 'Leather Chest', '', '', '', '', 'Leather Chest', '⚡ Live Armory ilvl', 'Agility/Intellect leather chest'],
     ['Boss 3: The Lost Explorers', 'Reckless Spirit Breastplate', 'Chest', 'Heroic', 318, 'Plate Chest', '', '', '', '', 'Plate Chest', '⚡ Live Armory ilvl', 'Plate chest with crit/haste'],
+    ['Boss 3: The Lost Explorers', 'Restless Spirit Shackles', 'Wrist', 'Heroic', 318, 'Mail Wrist', '', '', '', '', 'Mail Wrists', '⚡ Live Armory ilvl', 'Haste/Crit mail bracers'],
     ['Boss 3: The Lost Explorers', 'Shellbound Bracers', 'Wrist', 'Heroic', 318, 'Plate Wrist', '', '', '', '', 'Plate Wrists', '⚡ Live Armory ilvl', 'Plate bracers with custom socket'],
 
     // ════════════════════════════════════════════════════════════
@@ -1450,8 +1454,10 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     // ════════════════════════════════════════════════════════════
     ['🧪 BOSS 4: VASHNIK THE MALIGNANT', '═════════════════════════════════', '', '', '', '', '', '', '', '', '', '', ''],
     ['Boss 4: Vashnik the Malignant', 'Malignant Toothed Edge', 'Main Hand', 'Heroic', 318, '1H Agi / Str (War, Pal, DK, DH, Rogue)', '', '', '', '', 'Major Weapon', '⚡ Live Armory ilvl', 'Fast 1H weapon with shadow damage proc'],
+    ['Boss 4: Vashnik the Malignant', 'Vashnik\'s Sanguine Rancor', 'Main Hand', 'Heroic', 318, '1H Dagger / Agi', '', '', '', '', 'Heroic Weapon', '⚡ Live Armory ilvl', 'Fast 1H agility dagger with bleed proc'],
     ['Boss 4: Vashnik the Malignant', 'Gauntlets of the Consecrated Flame', 'Hands', 'Heroic', 318, 'All Classes (Tier Gloves)', '', '', '', '', 'Tier Gloves', '⚡ Live Armory ilvl', 'Tier gloves token'],
     ['Boss 4: Vashnik the Malignant', 'Scaleplate Strangulators', 'Hands', 'Heroic', 318, 'Plate Gloves', '', '', '', '', 'Plate Gloves', '⚡ Live Armory ilvl', 'Plate gloves with haste/crit'],
+    ['Boss 4: Vashnik the Malignant', 'Bespittled Slitherslippers', 'Feet', 'Heroic', 318, 'Leather Feet', '', '', '', '', 'Leather Boots', '⚡ Live Armory ilvl', 'Mastery leather boots'],
     ['Boss 4: Vashnik the Malignant', 'Vile Alchemist\'s Band', 'Ring 1', 'Heroic', 318, 'All Specs', '', '', '', '', 'BiS Ring', '⚡ Live Armory ilvl', 'Haste/Crit ring with cantrip poison proc'],
 
     // ════════════════════════════════════════════════════════════
@@ -1459,6 +1465,7 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     // ════════════════════════════════════════════════════════════
     ['🐊 BOSS 5: SSZORAK', '═════════════════════════════════', '', '', '', '', '', '', '', '', '', '', ''],
     ['Boss 5: Sszorak', 'Sszorak\'s Ferocity', 'Trinket 2', 'Heroic', 318, 'Strength / Agility DPS', '', '', '', '', 'God-Tier Trinket', '⚡ Live Armory ilvl', 'Primary stat surge and attack speed aura'],
+    ['Boss 5: Sszorak', 'Abyssal Broodfiend\'s Bardiche', 'Main Hand', 'Heroic', 318, '2H Agi / Str Weapon', '', '', '', '', 'Heroic 2H Weapon', '⚡ Live Armory ilvl', 'High weapon damage 2H polearm'],
     ['Boss 5: Sszorak', 'Greaves of the Consecrated Flame', 'Legs', 'Heroic', 318, 'All Classes (Tier Legs)', '', '', '', '', 'Tier Legs', '⚡ Live Armory ilvl', 'Tier legs token'],
     ['Boss 5: Sszorak', 'Chausses of Unbound Rancor', 'Legs', 'Heroic', 318, 'Plate Legs', '', '', '', '', 'Plate Legs', '⚡ Live Armory ilvl', 'Plate legs with crit/mastery'],
     ['Boss 5: Sszorak', 'Apex Brute\'s Claw Ring', 'Ring 2', 'Heroic', 318, 'All Specs', '', '', '', '', 'BiS Ring', '⚡ Live Armory ilvl', 'Mastery/Versatility high stat ring'],
@@ -1470,6 +1477,8 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     ['Boss 6: The Twin Fangs', 'Bound Serpent\'s Jade Eye', 'Trinket 1', 'Heroic', 318, 'Melee DPS / Hunters / Casters', '', '', '', '', 'BiS S-Tier', '⚡ Live Armory ilvl', 'Venom stacking DoT that executes at low health'],
     ['Boss 6: The Twin Fangs', 'Amulet of the Twin Fangs', 'Neck', 'Heroic', 318, 'All Specs', '', '', '', '', 'BiS Neck', '⚡ Live Armory ilvl', 'High crit/haste amulet'],
     ['Boss 6: The Twin Fangs', 'Silken Voodoo Drape', 'Back', 'Heroic', 318, 'All Specs', '', '', '', '', 'BiS Cloak', '⚡ Live Armory ilvl', 'Max item level cloak with avoidance'],
+    ['Boss 6: The Twin Fangs', 'Ruthless Slaughtergrips', 'Hands', 'Heroic', 318, 'Mail Hands', '', '', '', '', 'Mail Gloves', '⚡ Live Armory ilvl', 'Haste/Crit mail gloves'],
+    ['Boss 6: The Twin Fangs', 'Sash of the Forlorn Vessel', 'Waist', 'Heroic', 318, 'Leather Waist', '', '', '', '', 'Leather Belt', '⚡ Live Armory ilvl', 'Crit/Mastery leather belt'],
     ['Boss 6: The Twin Fangs', 'Scaled Fiend\'s Warboots', 'Feet', 'Heroic', 318, 'Plate Feet', '', '', '', '', 'Plate Boots', '⚡ Live Armory ilvl', 'High armor plate boots'],
 
     // ════════════════════════════════════════════════════════════
@@ -1478,6 +1487,7 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     ['🏛️ BOSS 7: THE COILED ALTAR', '═════════════════════════════════', '', '', '', '', '', '', '', '', '', '', ''],
     ['Boss 7: The Coiled Altar', 'Aqirbane Reliquary', 'Trinket 2', 'Heroic', 318, 'All Roles', '', '', '', '', 'Very Rare BiS', '⚡ Live Armory ilvl', 'Special void altar proc burst trinket'],
     ['Boss 7: The Coiled Altar', 'Zul\'jin\'s Guillotine Technique', 'Main Hand', 'Heroic', 318, '2H Strength / Agility', '', '', '', '', 'Major 2H Weapon', '⚡ Live Armory ilvl', 'High weapon damage 2H polearm/axe'],
+    ['Boss 7: The Coiled Altar', 'Coiled Hex Legguards', 'Legs', 'Heroic', 318, 'Mail Legs', '', '', '', '', 'Mail Legs', '⚡ Live Armory ilvl', 'Mastery/Crit mail legs'],
     ['Boss 7: The Coiled Altar', 'Girdle of Toxic Regret', 'Waist', 'Heroic', 318, 'Plate Waist', '', '', '', '', 'Plate Belt', '⚡ Live Armory ilvl', 'Plate belt with haste/crit'],
     ['Boss 7: The Coiled Altar', 'Amani Summoning Shawl', 'Back', 'Heroic', 318, 'All Specs', '', '', '', '', 'BiS Cloak', '⚡ Live Armory ilvl', 'Mastery cloak with speed bonus'],
 
@@ -1485,13 +1495,13 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     // 👑 BOSS 8: ULA'TEK (FINAL BOSS)
     // ════════════════════════════════════════════════════════════
     ['👑 BOSS 8: ULA\'TEK (FINAL BOSS)', '═════════════════════════════════', '', '', '', '', '', '', '', '', '', '', ''],
-    ['Boss 8: Ula\'tek', 'Maze-roa, Warlord\'s Fury', 'Main Hand', 'Mythic', 344, '2H Strength (War, Pal, DK)', '', '', '', '', 'Mythic Weapon', '⚡ Live Armory ilvl', 'Top 344 ilvl 2H Axe in the game with shadow cleave'],
-    ['Boss 8: Ula\'tek', 'Voracious Heart of Ula\'tek', 'Trinket 1', 'Mythic', 344, 'All DPS / Tanks', '', '', '', '', 'God-Tier Trinket', '⚡ Live Armory ilvl', 'Top execute burst trinket in the game'],
-    ['Boss 8: Ula\'tek', 'Font of Venomous Rage', 'Trinket 2', 'Mythic', 344, 'All Roles', '', '', '', '', 'God-Tier Trinket', '⚡ Live Armory ilvl', 'Primary stat surge and attack speed aura'],
-    ['Boss 8: Ula\'tek', 'Keeper\'s Seething Core', 'Trinket 1', 'Mythic', 344, 'All DPS / Healers', '', '', '', '', 'God-Tier Trinket', '⚡ Live Armory ilvl', 'Stacking execute doom trinket'],
-    ['Boss 8: Ula\'tek', 'Venom Warden\'s Greaves', 'Legs', 'Mythic', 344, 'Plate Legs', '', '', '', '', 'Mythic Legs', '⚡ Live Armory ilvl', 'Max ilvl plate legs with custom socket'],
-    ['Boss 8: Ula\'tek', 'Alluring Bubbleband', 'Ring 2', 'Mythic', 344, 'All Specs', '', '', '', '', 'BiS Ring', '⚡ Live Armory ilvl', 'Mythic 344 ilvl ring with cantrip shield proc'],
-    ['Boss 8: Ula\'tek', 'Forgotten Grotto Girdle', 'Waist', 'Mythic', 344, 'Mail Waist', '', '', '', '', 'Mail Belt', '⚡ Live Armory ilvl', 'Mail belt with crit/haste'],
+    ['Boss 8: Ula\'tek', 'Maze-roa, Warlord\'s Fury', 'Main Hand', 'Heroic', 318, '2H Strength (War, Pal, DK)', '', '', '', '', 'Heroic Weapon', '⚡ Live Armory ilvl', 'Top 318 ilvl 2H Axe with shadow cleave'],
+    ['Boss 8: Ula\'tek', 'Voracious Heart of Ula\'tek', 'Trinket 1', 'Heroic', 318, 'All DPS / Tanks', '', '', '', '', 'God-Tier Trinket', '⚡ Live Armory ilvl', 'Top execute burst trinket in the game'],
+    ['Boss 8: Ula\'tek', 'Font of Venomous Rage', 'Trinket 2', 'Heroic', 318, 'All Roles', '', '', '', '', 'God-Tier Trinket', '⚡ Live Armory ilvl', 'Primary stat surge and attack speed aura'],
+    ['Boss 8: Ula\'tek', 'Keeper\'s Seething Core', 'Trinket 1', 'Heroic', 318, 'All DPS / Healers', '', '', '', '', 'God-Tier Trinket', '⚡ Live Armory ilvl', 'Stacking execute doom trinket'],
+    ['Boss 8: Ula\'tek', 'Venom Warden\'s Greaves', 'Legs', 'Heroic', 318, 'Plate Legs', '', '', '', '', 'Heroic Legs', '⚡ Live Armory ilvl', 'Plate legs with custom socket'],
+    ['Boss 8: Ula\'tek', 'Alluring Bubbleband', 'Ring 2', 'Heroic', 318, 'All Specs', '', '', '', '', 'BiS Ring', '⚡ Live Armory ilvl', 'Heroic 318 ilvl ring with cantrip shield proc'],
+    ['Boss 8: Ula\'tek', 'Forgotten Grotto Girdle', 'Waist', 'Heroic', 318, 'Mail Waist', '', '', '', '', 'Mail Belt', '⚡ Live Armory ilvl', 'Mail belt with crit/haste'],
 
     // ════════════════════════════════════════════════════════════
     // 📦 TRASH DROPS & OTHER RAID SOURCES
