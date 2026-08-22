@@ -515,12 +515,12 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
     return [];
   }
 
-  // --- PASS 1: Batch fetch all Blizzard API payloads in parallel ---
+  // --- PASS 1: Batch fetch all Blizzard API and Raider.IO payloads in parallel ---
   const requests = [];
   filteredRoster.forEach(char => {
     const realm = char.realmSlug || config.GUILD_REALM_SLUG;
     const name = char.name.toLowerCase();
-    const region = config.REGION || 'us';
+    const region = (config.REGION || 'us').toLowerCase();
     const baseUrl = `https://${region}.api.blizzard.com/profile/wow/character/${realm}/${name}`;
 
     requests.push({ url: `${baseUrl}?namespace=profile-${region}&locale=en_US`, headers: { 'Authorization': `Bearer ${token}` }, muteHttpExceptions: true });
@@ -529,6 +529,7 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
     requests.push({ url: `${baseUrl}/mythic-keystone-profile?namespace=profile-${region}&locale=en_US`, headers: { 'Authorization': `Bearer ${token}` }, muteHttpExceptions: true });
     requests.push({ url: `${baseUrl}/encounters/raids?namespace=profile-${region}&locale=en_US`, headers: { 'Authorization': `Bearer ${token}` }, muteHttpExceptions: true });
     requests.push({ url: `${baseUrl}/specializations?namespace=profile-${region}&locale=en_US`, headers: { 'Authorization': `Bearer ${token}` }, muteHttpExceptions: true });
+    requests.push({ url: `https://raider.io/api/v1/characters/profile?region=${region}&realm=${realm}&name=${encodeURIComponent(name)}&fields=mythic_plus_weekly_runs`, muteHttpExceptions: true });
   });
 
   const responses = UrlFetchApp.fetchAll(requests);
@@ -536,7 +537,7 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
 
   for (let i = 0; i < filteredRoster.length; i++) {
     const char = filteredRoster[i];
-    const offset = i * 6;
+    const offset = i * 7;
 
     const profileResp = responses[offset];
     const equipResp = responses[offset + 1];
@@ -544,6 +545,7 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
     const mplusResp = responses[offset + 3];
     const raidResp = responses[offset + 4];
     const specResp = responses[offset + 5];
+    const raiderIoResp = responses[offset + 6];
 
     batchedPayloads.push({
       character: char,
@@ -552,7 +554,8 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
       reputationsData: (repResp && repResp.getResponseCode() === 200) ? JSON.parse(repResp.getContentText()) : null,
       mplusData: (mplusResp && mplusResp.getResponseCode() === 200) ? JSON.parse(mplusResp.getContentText()) : null,
       raidData: (raidResp && raidResp.getResponseCode() === 200) ? JSON.parse(raidResp.getContentText()) : null,
-      specializationsData: (specResp && specResp.getResponseCode() === 200) ? JSON.parse(specResp.getContentText()) : null
+      specializationsData: (specResp && specResp.getResponseCode() === 200) ? JSON.parse(specResp.getContentText()) : null,
+      raiderIoData: (raiderIoResp && raiderIoResp.getResponseCode() === 200) ? JSON.parse(raiderIoResp.getContentText()) : null
     });
   }
 
@@ -586,7 +589,7 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
   // --- PASS 2: Process Character Rows ---
   const characterDataObjects = [];
   for (const item of batchedPayloads) {
-    const { character, profileData, equipmentData, reputationsData, mplusData, raidData, specializationsData } = item;
+    const { character, profileData, equipmentData, reputationsData, mplusData, raidData, specializationsData, raiderIoData } = item;
     const charName = character.name;
 
     let charRow = {
@@ -733,12 +736,38 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
           else if (weeklyMythicKills >= 2) { charRow['GV Raid 1'] = VAULT_MAPPING.raid.mythic; }
         }
 
-        // Mythic+ Vault Slots
-        if (mplusData.current_period.best_runs) {
-          const sortedRuns = mplusData.current_period.best_runs.sort((a, b) => b.keystone_level - a.keystone_level);
-          if (sortedRuns.length >= 1) charRow['GV M+ 1'] = VAULT_MAPPING.mplus[sortedRuns[0].keystone_level] || '-';
-          if (sortedRuns.length >= 4) charRow['GV M+ 2'] = VAULT_MAPPING.mplus[sortedRuns[3].keystone_level] || '-';
-          if (sortedRuns.length >= 8) charRow['GV M+ 3'] = VAULT_MAPPING.mplus[sortedRuns[7].keystone_level] || '-';
+        // Mythic+ Vault Slots (Hybrid Blizzard API + Raider.IO Engine)
+        let allWeeklyMplusRuns = [];
+
+        // Source A: Blizzard API best_runs
+        if (mplusData && mplusData.current_period && mplusData.current_period.best_runs && Array.isArray(mplusData.current_period.best_runs)) {
+          mplusData.current_period.best_runs.forEach(r => {
+            if (r.keystone_level && r.keystone_level > 0) {
+              allWeeklyMplusRuns.push({
+                level: r.keystone_level,
+                dungeon: (r.dungeon && r.dungeon.name) ? r.dungeon.name : ''
+              });
+            }
+          });
+        }
+
+        // Source B: Raider.IO mythic_plus_weekly_runs (Includes duplicate dungeons and untimed runs!)
+        if (raiderIoData && raiderIoData.mythic_plus_weekly_runs && Array.isArray(raiderIoData.mythic_plus_weekly_runs)) {
+          const rioRuns = raiderIoData.mythic_plus_weekly_runs
+            .map(r => ({ level: r.mythic_level || 0, dungeon: r.dungeon || '' }))
+            .filter(r => r.level > 0);
+
+          // If Raider.IO tracked more completed runs than Blizzard's deduplicated list, use the full list!
+          if (rioRuns.length > allWeeklyMplusRuns.length) {
+            allWeeklyMplusRuns = rioRuns;
+          }
+        }
+
+        if (allWeeklyMplusRuns.length > 0) {
+          const sortedRuns = allWeeklyMplusRuns.sort((a, b) => b.level - a.level);
+          if (sortedRuns.length >= 1) charRow['GV M+ 1'] = VAULT_MAPPING.mplus[sortedRuns[0].level] || (sortedRuns[0].level >= 10 ? 318 : '-');
+          if (sortedRuns.length >= 4) charRow['GV M+ 2'] = VAULT_MAPPING.mplus[sortedRuns[3].level] || (sortedRuns[3].level >= 10 ? 318 : '-');
+          if (sortedRuns.length >= 8) charRow['GV M+ 3'] = VAULT_MAPPING.mplus[sortedRuns[7].level] || (sortedRuns[7].level >= 10 ? 318 : '-');
         }
       }
     }
