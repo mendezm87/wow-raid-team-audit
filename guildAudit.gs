@@ -3366,10 +3366,11 @@ function syncWarcraftLogsSeasonAttendance() {
   // 3. Build Leaderboard Data
   const leaderboard = Object.values(playerStats).map(p => {
     const attPct = totalOfficialRaids > 0 ? Math.round((p.raidsAttended / totalOfficialRaids) * 100) : 0;
-    const onTimePct = p.raidsAttended > 0 ? Math.round((p.onTimeCount / p.raidsAttended) * 100) : 100;
+    const onTimePct = p.raidsAttended > 0 ? Math.round((p.onTimeCount / p.raidsAttended) * 100) : 0;
     
     let reliabilityRating = '⭐⭐⭐⭐⭐ Punctual Core';
-    if (attPct < 60) reliabilityRating = '⚠️ Inconsistent';
+    if (attPct === 0) reliabilityRating = '⚠️ Inactive / Absent';
+    else if (attPct < 60) reliabilityRating = '⚠️ Inconsistent';
     else if (attPct < 80) reliabilityRating = '⭐ Standby / Bench';
     else if (onTimePct < 80) reliabilityRating = '🟡 Frequent Tardy';
     else if (attPct < 90) reliabilityRating = '⭐⭐⭐⭐ Reliable';
@@ -3381,6 +3382,7 @@ function syncWarcraftLogsSeasonAttendance() {
       totalRaids: totalOfficialRaids,
       attendancePct: attPct,
       onTimePct: onTimePct,
+      onTimeDisplay: p.raidsAttended > 0 ? `${onTimePct}%` : 'N/A',
       onTimeCount: p.onTimeCount,
       lateCount: p.lateCount,
       bossKills: p.totalBossKillsAttended,
@@ -3432,7 +3434,7 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
       p.name,
       p.spec || 'Main Spec',
       `${p.attendancePct}%`,
-      `${p.onTimePct}%`,
+      p.onTimeDisplay,
       `${p.raidsAttended} / ${p.totalRaids}`,
       p.lateCount,
       p.bossKills,
@@ -3504,15 +3506,17 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
   sheet.setColumnWidth(8, 220); // Boss Kills / WCL Link
   sheet.setColumnWidth(9, 180); // Reliability Tier
 
-  // Attendance % Soft Conditional Formatting
+  // Attendance & On-Time Soft Conditional Formatting
   const rules = [];
   const attRange = [sheet.getRange(6, 4, leaderboard.length, 1)];
   const onTimeRange = [sheet.getRange(6, 5, leaderboard.length, 1)];
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('100%').setBackground('#d1fae5').setFontColor('#065f46').setRanges([...attRange, ...onTimeRange]).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('100%').setBackground('#d1fae5').setFontColor('#065f46').setRanges([...attRange, ...onTimeRange]).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('9').setBackground('#d1fae5').setFontColor('#065f46').setRanges([...attRange, ...onTimeRange]).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('8').setBackground('#fef3c7').setFontColor('#92400e').setRanges([...attRange, ...onTimeRange]).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('7').setBackground('#fef3c7').setFontColor('#92400e').setRanges([...attRange, ...onTimeRange]).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('6').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges([...attRange, ...onTimeRange]).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('0%').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges(attRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('N/A').setBackground('#f1f5f9').setFontColor('#64748b').setRanges(onTimeRange).build());
   sheet.setConditionalFormatRules(rules);
 }
 
