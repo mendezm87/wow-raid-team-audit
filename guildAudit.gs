@@ -3481,13 +3481,15 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
   sheet.getRange('A4:I4').setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
   sheet.getRange('A5:I5').setBackground('#334155').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(9).setHorizontalAlignment('center');
 
+  // Section 2: Historical Ledger Headers (Accurately computed offsets)
+  const ledgerTitleRow = leaderboard.length + 8;
   const ledgerHeaderRow = leaderboard.length + 9;
-  sheet.getRange(ledgerHeaderRow, 1, 1, 9).setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
-  sheet.getRange(ledgerHeaderRow + 1, 1, 1, 9).setBackground('#334155').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(9).setHorizontalAlignment('center');
+  sheet.getRange(ledgerTitleRow, 1, 1, 9).setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
+  sheet.getRange(ledgerHeaderRow, 1, 1, 9).setBackground('#334155').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(9).setHorizontalAlignment('center');
 
-  // Alternating Row Colors for Ledger
+  // Alternating Row Colors for Ledger Data
   for (let rowIdx = 0; rowIdx < raidLedger.length; rowIdx++) {
-    const targetRow = ledgerHeaderRow + 2 + rowIdx;
+    const targetRow = ledgerHeaderRow + 1 + rowIdx;
     const bgColor = rowIdx % 2 === 0 ? '#ffffff' : '#f8fafc';
     sheet.getRange(targetRow, 1, 1, 9).setBackground(bgColor).setFontSize(9).setVerticalAlignment('middle');
     sheet.getRange(targetRow, 1).setHorizontalAlignment('center'); // Date
@@ -3510,13 +3512,15 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
   const rules = [];
   const attRange = [sheet.getRange(6, 4, leaderboard.length, 1)];
   const onTimeRange = [sheet.getRange(6, 5, leaderboard.length, 1)];
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('100%').setBackground('#d1fae5').setFontColor('#065f46').setRanges([...attRange, ...onTimeRange]).build());
+
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('100%').setBackground('#d1fae5').setFontColor('#065f46').setRanges([...attRange, ...onTimeRange]).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('9').setBackground('#d1fae5').setFontColor('#065f46').setRanges([...attRange, ...onTimeRange]).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('8').setBackground('#fef3c7').setFontColor('#92400e').setRanges([...attRange, ...onTimeRange]).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('7').setBackground('#fef3c7').setFontColor('#92400e').setRanges([...attRange, ...onTimeRange]).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('6').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges([...attRange, ...onTimeRange]).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('0%').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges(attRange).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('N/A').setBackground('#f1f5f9').setFontColor('#64748b').setRanges(onTimeRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('5').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges([...attRange, ...onTimeRange]).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('0%').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges(attRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('N/A').setBackground('#f1f5f9').setFontColor('#64748b').setRanges(onTimeRange).build());
   sheet.setConditionalFormatRules(rules);
 }
 
