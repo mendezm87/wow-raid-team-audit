@@ -56,26 +56,73 @@ const ALL_WOW_SPECS = [
 ];
 
 /**
- * Applies Google Sheets interactive dropdown validation for WoW specs on the Config sheet.
+ * Applies Google Sheets interactive dropdown validation for WoW specs and Main Character Owners on the Config sheet.
  */
 function applyConfigDropdowns(sheet) {
   if (!sheet) return;
+
+  const data = sheet.getDataRange().getValues();
+  const mainCharacterNames = [];
+  let altsStartRow = -1;
+
+  for (let r = 0; r < data.length; r++) {
+    const row0 = (data[r][0] || '').toString().toLowerCase().trim();
+    if (row0.includes('alt character') || row0.includes('alts to track')) {
+      altsStartRow = r + 1; // 1-indexed row of Alts header
+    } else if (r >= 5 && altsStartRow === -1 && data[r][0] && !row0.includes('main character')) {
+      const name = data[r][0].toString().trim();
+      if (name && !mainCharacterNames.includes(name)) {
+        mainCharacterNames.push(name);
+      }
+    }
+  }
+
+  // 1. WoW Specializations Dropdown Rule
   const specRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(ALL_WOW_SPECS, true)
     .setAllowInvalid(true)
     .build();
 
-  // Apply dropdown to Column B for character rows
-  sheet.getRange('B7:B50').setDataValidation(specRule);
-  sheet.getRange('B52:B100').setDataValidation(specRule);
+  // 2. Main Character Owner Dropdown Rule (Built from active main characters)
+  const mainOwnersList = mainCharacterNames.length > 0 ? mainCharacterNames : ['Jevo', 'Rawria', 'Castite', 'Aemonnd'];
+  const mainOwnerRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(mainOwnersList, true)
+    .setAllowInvalid(true)
+    .build();
+
+  // Apply Spec Dropdowns to Mains (Column B, rows 7 to altsStartRow - 1)
+  const mainsEndRow = altsStartRow > 7 ? altsStartRow - 1 : 40;
+  sheet.getRange(7, 2, mainsEndRow - 6, 1).setDataValidation(specRule);
+
+  // Apply Owner & Spec Dropdowns to Alts (Column B = Owner Dropdown, Column C = Spec Dropdown)
+  if (altsStartRow > 0) {
+    const altDataStartRow = altsStartRow + 1;
+    // Set Alts Table Header with clear column titles
+    sheet.getRange(altsStartRow, 1, 1, 4).setValues([[
+      'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If different)'
+    ]]).setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
+
+    // Column B for Alts: Main Character Owner dropdown
+    sheet.getRange(altDataStartRow, 2, 40, 1).setDataValidation(mainOwnerRule);
+    // Column C for Alts: WoW Spec dropdown
+    sheet.getRange(altDataStartRow, 3, 40, 1).setDataValidation(specRule);
+  }
+
+  // Section Headers Styling
+  sheet.getRange('A1:B1').merge().setHorizontalAlignment('center').setFontWeight('bold').setBackground('#0f172a').setFontColor('#f8fafc');
+  sheet.getRange('A6:C6').setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
+  if (sheet.getRange('A6').getValue().toString().includes('Main Characters')) {
+    sheet.getRange('A6:C6').setValues([['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If different)']]);
+  }
 
   // Set generous column widths
-  sheet.setColumnWidth(1, 190); // Main Character Name
-  sheet.setColumnWidth(2, 240); // Assigned Raid Spec (Dropdown)
-  sheet.setColumnWidth(3, 160); // Realm
-  sheet.setColumnWidth(4, 280); // Vault Reference
-  sheet.setColumnWidth(5, 90);  // Vault ilvl
-  sheet.setColumnWidth(6, 110); // Track
+  sheet.setColumnWidth(1, 190); // Main Character Name / Alt Name
+  sheet.setColumnWidth(2, 240); // Assigned Spec (Mains) / Main Owner (Alts)
+  sheet.setColumnWidth(3, 200); // Realm (Mains) / Assigned Spec (Alts)
+  sheet.setColumnWidth(4, 180); // Realm (Alts) / Vault Reference
+  sheet.setColumnWidth(5, 260); // Vault Reference
+  sheet.setColumnWidth(6, 90);  // Vault ilvl
+  sheet.setColumnWidth(7, 110); // Track
 }
 
 function createConfigSheet() {
