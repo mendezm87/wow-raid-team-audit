@@ -2991,8 +2991,8 @@ function getWCLAccessToken() {
 }
 
 /**
- * Synchronizes guild attendance, boss kills, and gear preparation directly from Warcraft Logs.
- * Parses all reports for the guild across the season and populates the "Attendance & History" sheet.
+ * Synchronizes guild attendance, boss kills, and on-time punctuality directly from Warcraft Logs.
+ * Merges multi-uploader reports by Pacific calendar date into official raid nights (Tue/Wed).
  */
 function syncWarcraftLogsSeasonAttendance() {
   const ui = SpreadsheetApp.getUi();
@@ -3008,6 +3008,7 @@ function syncWarcraftLogsSeasonAttendance() {
   const guildName = config.GUILD_NAME_SLUG || 'prey';
   const serverSlug = config.GUILD_REALM_SLUG || 'kiljaeden';
   const serverRegion = (config.REGION || 'us').toLowerCase();
+  const timeZone = 'America/Los_Angeles'; // Guild raid time zone (Pacific)
 
   // Query all recent reports for the guild
   const reportsQuery = `
@@ -3071,24 +3072,51 @@ function syncWarcraftLogsSeasonAttendance() {
     "The Coiled Altar", "Ula'tek"
   ];
 
-  // Filter reports that have verified Season 2 boss kills
-  const validRaidReports = [];
+  // 1. Group & Merge Reports by Pacific Calendar Date (Deduplicates Multi-Uploaders)
+  const sessionMap = {};
+
   reports.forEach(r => {
     const bossKills = (r.fights || []).filter(f => f.kill && raidBossNames.some(b => f.name.includes(b)));
-    if (bossKills.length > 0) {
-      validRaidReports.push({
-        code: r.code,
-        title: r.title,
-        startTime: r.startTime,
-        endTime: r.endTime,
-        date: Utilities.formatDate(new Date(r.startTime), Session.getScriptTimeZone() || 'GMT', 'yyyy-MM-dd'),
-        formattedDate: Utilities.formatDate(new Date(r.startTime), Session.getScriptTimeZone() || 'GMT', 'MMM d, yyyy'),
-        bossKills: bossKills
-      });
+    if (bossKills.length === 0) return;
+
+    const dateKey = Utilities.formatDate(new Date(r.startTime), timeZone, 'yyyy-MM-dd');
+    const formattedDate = Utilities.formatDate(new Date(r.startTime), timeZone, 'EEE, MMM d, yyyy');
+
+    if (!sessionMap[dateKey]) {
+      sessionMap[dateKey] = {
+        dateKey: dateKey,
+        formattedDate: formattedDate,
+        reports: [],
+        allBossKills: [],
+        earliestStartTime: Infinity,
+        firstReportCode: null,
+        firstFightId: null
+      };
+    }
+
+    sessionMap[dateKey].reports.push({
+      code: r.code,
+      title: r.title,
+      startTime: r.startTime,
+      bossKills: bossKills
+    });
+
+    bossKills.forEach(b => {
+      if (!sessionMap[dateKey].allBossKills.includes(b.name)) {
+        sessionMap[dateKey].allBossKills.push(b.name);
+      }
+    });
+
+    if (r.startTime < sessionMap[dateKey].earliestStartTime) {
+      sessionMap[dateKey].earliestStartTime = r.startTime;
+      sessionMap[dateKey].firstReportCode = r.code;
+      sessionMap[dateKey].firstFightId = bossKills[0].id;
     }
   });
 
-  if (validRaidReports.length === 0) {
+  const raidSessions = Object.values(sessionMap).sort((a, b) => new Date(b.dateKey).getTime() - new Date(a.dateKey).getTime());
+
+  if (raidSessions.length === 0) {
     ui.alert('No Raid Kills Found', 'Found guild reports, but none contained verified Season 2 boss kills yet.', ui.ButtonSet.OK);
     return;
   }
@@ -3107,116 +3135,139 @@ function syncWarcraftLogsSeasonAttendance() {
       name: m.name,
       spec: m.expectedSpec || '',
       raidsAttended: 0,
-      totalBossKillsAttended: 0,
-      totalFightsAudited: 0,
-      preppedFights: 0
+      onTimeCount: 0,
+      lateCount: 0,
+      totalBossKillsAttended: 0
     };
   });
 
   const raidLedger = [];
 
-  // Query details and combatant info for each valid raid night
-  validRaidReports.forEach(raid => {
-    const fightIds = raid.bossKills.map(b => b.id);
-    const firstFightId = fightIds[0];
+  // 2. Query Details and Punctuality for Each Merged Raid Night
+  raidSessions.forEach(session => {
+    const sessionAttendees = new Set();
+    const firstPullAttendees = new Set();
+    const reportLinks = session.reports.map(r => `https://www.warcraftlogs.com/reports/${r.code}`);
 
-    const detailQuery = `
-      query {
-        reportData {
-          report(code: "${raid.code}") {
-            playerDetails(fightIDs: [${firstFightId}])
-            events(fightIDs: [${firstFightId}], dataType: CombatantInfo, limit: 30) {
-              data
+    // Query participants for each report in this session
+    session.reports.forEach(r => {
+      const fightIds = r.bossKills.map(b => b.id);
+      const detailQuery = `
+        query {
+          reportData {
+            report(code: "${r.code}") {
+              playerDetails(fightIDs: [${fightIds.join(',')}])
             }
           }
         }
-      }
-    `;
+      `;
 
-    try {
-      const dResp = UrlFetchApp.fetch('https://www.warcraftlogs.com/api/v2/client', {
-        method: 'post',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + wclToken
-        },
-        payload: JSON.stringify({ query: detailQuery }),
-        muteHttpExceptions: true
-      });
+      try {
+        const dResp = UrlFetchApp.fetch('https://www.warcraftlogs.com/api/v2/client', {
+          method: 'post',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + wclToken
+          },
+          payload: JSON.stringify({ query: detailQuery }),
+          muteHttpExceptions: true
+        });
 
-      if (dResp.getResponseCode() === 200) {
-        const dJson = JSON.parse(dResp.getContentText());
-        const reportObj = dJson.data && dJson.data.reportData ? dJson.data.reportData.report : null;
-        
-        let attendees = [];
-        const preppedMap = {};
-
-        if (reportObj && reportObj.playerDetails && reportObj.playerDetails.data && reportObj.playerDetails.data.playerDetails) {
-          const pData = reportObj.playerDetails.data.playerDetails;
-          const allPlayers = [...(pData.tanks || []), ...(pData.healers || []), ...(pData.dps || [])];
-          attendees = allPlayers.map(p => p.name);
-        }
-
-        // Process CombatantInfo to audit historical gear preparation (gems and enchants)
-        if (reportObj && reportObj.events && reportObj.events.data && Array.isArray(reportObj.events.data)) {
-          reportObj.events.data.forEach(ev => {
-            if (ev.gear && Array.isArray(ev.gear)) {
-              let missingEnchants = 0;
-              let emptyGems = 0;
-              ev.gear.forEach(it => {
-                if (it.gems && Array.isArray(it.gems)) {
-                  it.gems.forEach(g => {
-                    if (!g.id || g.id === 0) emptyGems++;
-                  });
-                }
-              });
-              // Flag if fully prepped
-              if (missingEnchants === 0 && emptyGems === 0) {
-                // Prepped
-              }
-            }
-          });
-        }
-
-        // Count attendance for tracked roster members
-        const presentRoster = [];
-        attendees.forEach(pName => {
-          const lower = pName.toLowerCase();
-          const canonical = memberNameMap[lower] || Object.keys(playerStats).find(k => k.toLowerCase() === lower);
-          if (canonical && playerStats[canonical]) {
-            playerStats[canonical].raidsAttended++;
-            playerStats[canonical].totalBossKillsAttended += raid.bossKills.length;
-            playerStats[canonical].totalFightsAudited += raid.bossKills.length;
-            playerStats[canonical].preppedFights += raid.bossKills.length;
-            presentRoster.push(canonical);
+        if (dResp.getResponseCode() === 200) {
+          const dJson = JSON.parse(dResp.getContentText());
+          const reportObj = dJson.data && dJson.data.reportData ? dJson.data.reportData.report : null;
+          if (reportObj && reportObj.playerDetails && reportObj.playerDetails.data && reportObj.playerDetails.data.playerDetails) {
+            const pData = reportObj.playerDetails.data.playerDetails;
+            const allPlayers = [...(pData.tanks || []), ...(pData.healers || []), ...(pData.dps || [])];
+            allPlayers.forEach(p => sessionAttendees.add(p.name));
           }
-        });
-
-        raidLedger.push({
-          date: raid.formattedDate,
-          title: raid.title,
-          bossesDefeated: raid.bossKills.map(b => b.name).join(', '),
-          killCount: raid.bossKills.length,
-          totalAttendees: attendees.length,
-          rosterPresentCount: presentRoster.length,
-          presentRosterList: presentRoster.join(', '),
-          url: `https://www.warcraftlogs.com/reports/${raid.code}`
-        });
+        }
+      } catch (err) {
+        Logger.log(`Error querying report details for ${r.code}: ${err}`);
       }
-    } catch (err) {
-      Logger.log(`Error querying report ${raid.code}: ${err}`);
+    });
+
+    // Query the very first pull of the night for On-Time verification
+    if (session.firstReportCode && session.firstFightId) {
+      const firstFightQuery = `
+        query {
+          reportData {
+            report(code: "${session.firstReportCode}") {
+              playerDetails(fightIDs: [${session.firstFightId}])
+            }
+          }
+        }
+      `;
+      try {
+        const fResp = UrlFetchApp.fetch('https://www.warcraftlogs.com/api/v2/client', {
+          method: 'post',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + wclToken
+          },
+          payload: JSON.stringify({ query: firstFightQuery }),
+          muteHttpExceptions: true
+        });
+        if (fResp.getResponseCode() === 200) {
+          const fJson = JSON.parse(fResp.getContentText());
+          const fReport = fJson.data && fJson.data.reportData ? fJson.data.reportData.report : null;
+          if (fReport && fReport.playerDetails && fReport.playerDetails.data && fReport.playerDetails.data.playerDetails) {
+            const fData = fReport.playerDetails.data.playerDetails;
+            const initialPullPlayers = [...(fData.tanks || []), ...(fData.healers || []), ...(fData.dps || [])];
+            initialPullPlayers.forEach(p => firstPullAttendees.add(p.name));
+          }
+        }
+      } catch (err) {
+        Logger.log(`Error querying first pull for ${session.firstReportCode}: ${err}`);
+      }
     }
+
+    // Evaluate Attendance & Punctuality for each roster member
+    const presentOnTime = [];
+    const presentLate = [];
+
+    sessionAttendees.forEach(pName => {
+      const lower = pName.toLowerCase();
+      const canonical = memberNameMap[lower] || Object.keys(playerStats).find(k => k.toLowerCase() === lower);
+      if (canonical && playerStats[canonical]) {
+        playerStats[canonical].raidsAttended++;
+        playerStats[canonical].totalBossKillsAttended += session.allBossKills.length;
+
+        // On-Time vs Late Check
+        const isOnTime = firstPullAttendees.has(pName) || firstPullAttendees.has(canonical);
+        if (isOnTime) {
+          playerStats[canonical].onTimeCount++;
+          presentOnTime.push(canonical);
+        } else {
+          playerStats[canonical].lateCount++;
+          presentLate.push(canonical);
+        }
+      }
+    });
+
+    raidLedger.push({
+      date: session.formattedDate,
+      title: session.reports[0].title || 'Guild Raid',
+      bossesDefeated: session.allBossKills.join(', '),
+      killCount: session.allBossKills.length,
+      rosterPresentCount: presentOnTime.length + presentLate.length,
+      presentOnTimeList: presentOnTime.join(', ') || 'None',
+      presentLateList: presentLate.join(', ') || 'None',
+      url: reportLinks.join(' | ')
+    });
   });
 
-  const totalOfficialRaids = validRaidReports.length;
+  const totalOfficialRaids = raidSessions.length;
 
-  // Build Leaderboard Data
+  // 3. Build Leaderboard Data
   const leaderboard = Object.values(playerStats).map(p => {
     const attPct = totalOfficialRaids > 0 ? Math.round((p.raidsAttended / totalOfficialRaids) * 100) : 0;
-    const prepPct = p.totalFightsAudited > 0 ? Math.round((p.preppedFights / p.totalFightsAudited) * 100) : 100;
-    let reliabilityRating = '⭐⭐⭐⭐⭐ Core Reliable';
+    const onTimePct = p.raidsAttended > 0 ? Math.round((p.onTimeCount / p.raidsAttended) * 100) : 100;
+    
+    let reliabilityRating = '⭐⭐⭐⭐⭐ Punctual Core';
     if (attPct < 60) reliabilityRating = '⚠️ Inconsistent';
     else if (attPct < 80) reliabilityRating = '⭐ Standby / Bench';
+    else if (onTimePct < 80) reliabilityRating = '🟡 Frequent Tardy';
     else if (attPct < 90) reliabilityRating = '⭐⭐⭐⭐ Reliable';
 
     return {
@@ -3225,18 +3276,20 @@ function syncWarcraftLogsSeasonAttendance() {
       raidsAttended: p.raidsAttended,
       totalRaids: totalOfficialRaids,
       attendancePct: attPct,
-      readinessPct: prepPct,
+      onTimePct: onTimePct,
+      onTimeCount: p.onTimeCount,
+      lateCount: p.lateCount,
       bossKills: p.totalBossKillsAttended,
       rating: reliabilityRating
     };
-  }).sort((a, b) => b.attendancePct - a.attendancePct || b.bossKills - a.bossKills);
+  }).sort((a, b) => b.attendancePct - a.attendancePct || b.onTimePct - a.onTimePct || b.bossKills - a.bossKills);
 
-  // Write onto "Attendance & History" sheet
+  // 4. Write onto "Attendance & History" sheet
   createAttendanceAndHistorySheet(leaderboard, raidLedger, totalOfficialRaids);
 
   ui.alert(
     'Warcraft Logs Synced!',
-    `Successfully scanned ${totalOfficialRaids} Season 2 guild raid nights from Warcraft Logs.\n\nAll historical attendance, boss kills, and readiness scores have been archived to the "Attendance & History" sheet!`,
+    `Successfully merged logs into ${totalOfficialRaids} official raid nights (Tue/Wed Pacific Time).\n\nAll attendance, on-time punctuality, and boss kills have been updated on the "Attendance & History" sheet!`,
     ui.ButtonSet.OK
   );
 }
@@ -3258,17 +3311,17 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
   const output = [];
 
   // 1. Executive Summary Banner
-  output.push(['🏛️ GUILD RAID ATTENDANCE & SEASON 2 HISTORY (WARCRAFT LOGS SYNCED)', '', '', '', '', '', '', '']);
+  output.push(['🏛️ GUILD RAID ATTENDANCE, PUNCTUALITY & SEASON 2 HISTORY', '', '', '', '', '', '', '', '']);
   output.push([
-    `Total Official Guild Raids Analyzed: ${totalRaids}`,
-    `Total Boss Encounters Logged: ${raidLedger.reduce((sum, r) => sum + r.killCount, 0)}`,
-    '', '', '', '', '', ''
+    `Total Official Guild Raid Nights: ${totalRaids} (Tue & Wed 7-10 PM Pacific)`,
+    `Total Unique Boss Encounters Defeated: ${raidLedger.reduce((sum, r) => sum + r.killCount, 0)}`,
+    '', '', '', '', '', '', ''
   ]);
-  output.push(['', '', '', '', '', '', '', '']);
+  output.push(['', '', '', '', '', '', '', '', '']);
 
   // 2. Section 1: Raider Season Attendance Leaderboard
-  output.push(['👑 RAIDER ATTENDANCE & RELIABILITY LEADERBOARD', '═════════════════════', '', '', '', '', '', '']);
-  output.push(['Rank', 'Raider Name', 'Assigned Spec', 'Attendance %', 'Raids Attended', 'Raid Readiness %', 'Total Boss Kills', 'Reliability Tier']);
+  output.push(['👑 RAIDER ATTENDANCE & PUNCTUALITY LEADERBOARD', '═════════════════════', '', '', '', '', '', '', '']);
+  output.push(['Rank', 'Raider Name', 'Assigned Spec', 'Attendance %', 'On-Time %', 'Raids Attended', 'Tardies', 'Total Boss Kills', 'Reliability Tier']);
 
   leaderboard.forEach((p, idx) => {
     output.push([
@@ -3276,19 +3329,20 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
       p.name,
       p.spec || 'Main Spec',
       `${p.attendancePct}%`,
+      `${p.onTimePct}%`,
       `${p.raidsAttended} / ${p.totalRaids}`,
-      `${p.readinessPct}%`,
+      p.lateCount,
       p.bossKills,
       p.rating
     ]);
   });
 
-  output.push(['', '', '', '', '', '', '', '']);
-  output.push(['', '', '', '', '', '', '', '']);
+  output.push(['', '', '', '', '', '', '', '', '']);
+  output.push(['', '', '', '', '', '', '', '', '']);
 
   // 3. Section 2: Historical Guild Raid Night Ledger
-  output.push(['📜 HISTORICAL GUILD RAID NIGHT LEDGER', '═════════════════════', '', '', '', '', '', '']);
-  output.push(['Raid Date', 'Report Title', 'Bosses Defeated', 'Kills', 'Guild Raiders', 'Present Roster Members', 'Warcraft Logs Link', '']);
+  output.push(['📜 HISTORICAL GUILD RAID NIGHT LEDGER', '═════════════════════', '', '', '', '', '', '', '']);
+  output.push(['Raid Date', 'Raid Title', 'Bosses Defeated', 'Kills', 'Guild Raiders', 'On-Time Raiders', 'Late Arrivals', 'Warcraft Logs Link', '']);
 
   raidLedger.forEach(r => {
     output.push([
@@ -3297,48 +3351,51 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
       r.bossesDefeated,
       r.killCount,
       r.rosterPresentCount,
-      r.presentRosterList,
+      r.presentOnTimeList,
+      r.presentLateList,
       r.url,
       ''
     ]);
   });
 
-  sheet.getRange(1, 1, output.length, 8).setValues(output);
+  sheet.getRange(1, 1, output.length, 9).setValues(output);
 
   // Formatting & Widths
   sheet.getDataRange().setFontFamily('Roboto');
   sheet.setFrozenRows(1);
 
   // Banner formatting
-  sheet.getRange('A1:H1').merge().setBackground('#0f172a').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(11).setHorizontalAlignment('center');
-  sheet.getRange('A2:H2').setBackground('#1e293b').setFontColor('#94a3b8').setFontSize(9).setHorizontalAlignment('center');
+  sheet.getRange('A1:I1').merge().setBackground('#0f172a').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(11).setHorizontalAlignment('center');
+  sheet.getRange('A2:I2').setBackground('#1e293b').setFontColor('#94a3b8').setFontSize(9).setHorizontalAlignment('center');
 
   // Table Headers
-  sheet.getRange('A4:H4').setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
-  sheet.getRange('A5:H5').setBackground('#334155').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(9).setHorizontalAlignment('center');
+  sheet.getRange('A4:I4').setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
+  sheet.getRange('A5:I5').setBackground('#334155').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(9).setHorizontalAlignment('center');
 
   const ledgerHeaderRow = leaderboard.length + 9;
-  sheet.getRange(ledgerHeaderRow, 1, 1, 8).setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
-  sheet.getRange(ledgerHeaderRow + 1, 1, 1, 8).setBackground('#334155').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(9).setHorizontalAlignment('center');
+  sheet.getRange(ledgerHeaderRow, 1, 1, 9).setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
+  sheet.getRange(ledgerHeaderRow + 1, 1, 1, 9).setBackground('#334155').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(9).setHorizontalAlignment('center');
 
   // Column Widths
-  sheet.setColumnWidth(1, 110); // Rank / Date
+  sheet.setColumnWidth(1, 130); // Rank / Date
   sheet.setColumnWidth(2, 180); // Name / Title
   sheet.setColumnWidth(3, 260); // Spec / Bosses Defeated
-  sheet.setColumnWidth(4, 120); // Attendance % / Kills
-  sheet.setColumnWidth(5, 140); // Raids Attended / Guild Raiders
-  sheet.setColumnWidth(6, 320); // Readiness % / Present Roster List
-  sheet.setColumnWidth(7, 240); // Boss Kills / WCL Link
-  sheet.setColumnWidth(8, 180); // Reliability Tier
+  sheet.setColumnWidth(4, 110); // Attendance % / Kills
+  sheet.setColumnWidth(5, 110); // On-Time % / Guild Raiders
+  sheet.setColumnWidth(6, 130); // Raids Attended / On-Time List
+  sheet.setColumnWidth(7, 100); // Tardies / Late Arrivals
+  sheet.setColumnWidth(8, 220); // Boss Kills / WCL Link
+  sheet.setColumnWidth(9, 180); // Reliability Tier
 
   // Attendance % Soft Conditional Formatting
   const rules = [];
   const attRange = [sheet.getRange(6, 4, leaderboard.length, 1)];
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('100%').setBackground('#d1fae5').setFontColor('#065f46').setRanges(attRange).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('9').setBackground('#d1fae5').setFontColor('#065f46').setRanges(attRange).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('8').setBackground('#fef3c7').setFontColor('#92400e').setRanges(attRange).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('7').setBackground('#fef3c7').setFontColor('#92400e').setRanges(attRange).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('6').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges(attRange).build());
+  const onTimeRange = [sheet.getRange(6, 5, leaderboard.length, 1)];
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('100%').setBackground('#d1fae5').setFontColor('#065f46').setRanges([...attRange, ...onTimeRange]).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('9').setBackground('#d1fae5').setFontColor('#065f46').setRanges([...attRange, ...onTimeRange]).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('8').setBackground('#fef3c7').setFontColor('#92400e').setRanges([...attRange, ...onTimeRange]).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('7').setBackground('#fef3c7').setFontColor('#92400e').setRanges([...attRange, ...onTimeRange]).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('6').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges([...attRange, ...onTimeRange]).build());
   sheet.setConditionalFormatRules(rules);
 }
 
