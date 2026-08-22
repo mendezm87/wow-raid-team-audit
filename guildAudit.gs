@@ -3300,35 +3300,50 @@ function syncWarcraftLogsSeasonAttendance() {
       }
     }
 
-    // Evaluate Attendance & Punctuality for each roster member (with Alt-to-Main resolution)
-    const presentOnTime = [];
-    const presentLate = [];
+    // 1. Resolve unique Main Character Attendees for this raid night (Alt-to-Main deduplicated)
+    const uniqueSessionMains = new Set();
+    const uniqueFirstPullMains = new Set();
     const altToMainMap = config.ALT_TO_MAIN_MAP || {};
 
+    const resolveToMain = (name) => {
+      if (!name) return null;
+      const lower = name.toLowerCase().trim();
+      if (memberNameMap[lower]) return memberNameMap[lower];
+      if (altToMainMap[lower]) {
+        const ownerLower = altToMainMap[lower].toLowerCase().trim();
+        return memberNameMap[ownerLower] || Object.keys(playerStats).find(k => k.toLowerCase() === ownerLower) || altToMainMap[lower];
+      }
+      return Object.keys(playerStats).find(k => k.toLowerCase() === lower) || null;
+    };
+
     sessionAttendees.forEach(pName => {
-      const lower = pName.toLowerCase();
-      let canonical = memberNameMap[lower];
-      if (!canonical && altToMainMap[lower]) {
-        const ownerLower = altToMainMap[lower].toLowerCase();
-        canonical = memberNameMap[ownerLower] || Object.keys(playerStats).find(k => k.toLowerCase() === ownerLower);
+      const mainName = resolveToMain(pName);
+      if (mainName && playerStats[mainName]) {
+        uniqueSessionMains.add(mainName);
       }
-      if (!canonical) {
-        canonical = Object.keys(playerStats).find(k => k.toLowerCase() === lower);
+    });
+
+    firstPullAttendees.forEach(pName => {
+      const mainName = resolveToMain(pName);
+      if (mainName && playerStats[mainName]) {
+        uniqueFirstPullMains.add(mainName);
       }
+    });
 
-      if (canonical && playerStats[canonical]) {
-        playerStats[canonical].raidsAttended++;
-        playerStats[canonical].totalBossKillsAttended += session.allBossKills.length;
+    // 2. Increment Attendance exactly ONCE per canonical main per raid session
+    const presentOnTime = [];
+    const presentLate = [];
 
-        // On-Time vs Late Check
-        const isOnTime = firstPullAttendees.has(pName) || firstPullAttendees.has(canonical) || (altToMainMap[lower] && firstPullAttendees.has(altToMainMap[lower]));
-        if (isOnTime) {
-          playerStats[canonical].onTimeCount++;
-          if (!presentOnTime.includes(canonical)) presentOnTime.push(canonical);
-        } else {
-          playerStats[canonical].lateCount++;
-          if (!presentLate.includes(canonical)) presentLate.push(canonical);
-        }
+    uniqueSessionMains.forEach(canonical => {
+      playerStats[canonical].raidsAttended++;
+      playerStats[canonical].totalBossKillsAttended += session.allBossKills.length;
+
+      if (uniqueFirstPullMains.has(canonical)) {
+        playerStats[canonical].onTimeCount++;
+        presentOnTime.push(canonical);
+      } else {
+        playerStats[canonical].lateCount++;
+        presentLate.push(canonical);
       }
     });
 
