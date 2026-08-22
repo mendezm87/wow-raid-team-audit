@@ -94,12 +94,12 @@ function applyConfigDropdowns(sheet) {
 
   // Section Headers Styling
   sheet.getRange('A1:B1').merge().setHorizontalAlignment('center').setFontWeight('bold').setBackground('#0f172a').setFontColor('#f8fafc');
-  sheet.getRange('A6:C6').setValues([['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If different)']])
+  sheet.getRange('A6:C6').setValues([['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If not in guild)']])
     .setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
 
   // Side-by-Side Alts Table in Columns E to H
   sheet.getRange('E6:H6').setValues([[
-    'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If different)'
+    'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If not in guild)'
   ]]).setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
 
   // Column F for Alts: Main Character Owner dropdown
@@ -115,12 +115,12 @@ function applyConfigDropdowns(sheet) {
   // Set generous column widths
   sheet.setColumnWidth(1, 180); // Main Character Name
   sheet.setColumnWidth(2, 220); // Assigned Spec (Mains)
-  sheet.setColumnWidth(3, 160); // Realm (Mains)
+  sheet.setColumnWidth(3, 170); // Realm (If not in guild)
   sheet.setColumnWidth(4, 30);  // Spacing Divider
   sheet.setColumnWidth(5, 180); // Alt Character Name
   sheet.setColumnWidth(6, 220); // Main Owner Dropdown
   sheet.setColumnWidth(7, 220); // Assigned Spec (Alts)
-  sheet.setColumnWidth(8, 160); // Realm (Alts)
+  sheet.setColumnWidth(8, 170); // Realm (If not in guild)
   sheet.setColumnWidth(9, 30);  // Spacing Divider
   sheet.setColumnWidth(10, 240); // Vault Activity
   sheet.setColumnWidth(11, 90);  // Vault ilvl
@@ -3355,6 +3355,8 @@ function syncWarcraftLogsSeasonAttendance() {
       rosterPresentCount: presentOnTime.length + presentLate.length,
       presentOnTimeList: presentOnTime.join(', ') || 'None',
       presentLateList: presentLate.join(', ') || 'None',
+      reports: session.reports,
+      primaryCode: session.reports[0] ? session.reports[0].code : '',
       url: reportLinks.join(' | ')
     });
   });
@@ -3446,6 +3448,10 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
   output.push(['Raid Date', 'Raid Title', 'Bosses Defeated', 'Kills', 'Guild Raiders', 'On-Time Raiders', 'Late Arrivals', 'Warcraft Logs Link', '']);
 
   raidLedger.forEach(r => {
+    // Generate clean, uniform clickable HYPERLINK formula for single or merged reports
+    const reportCode = r.reports && r.reports.length > 0 ? r.reports[0].code : '';
+    const linkFormula = reportCode ? `=HYPERLINK("https://www.warcraftlogs.com/reports/${reportCode}", "📊 View Log (${reportCode})")` : '-';
+
     output.push([
       r.date,
       r.title,
@@ -3454,7 +3460,7 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
       r.rosterPresentCount,
       r.presentOnTimeList,
       r.presentLateList,
-      r.url,
+      linkFormula,
       ''
     ]);
   });
@@ -3467,7 +3473,7 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
 
   // Banner formatting
   sheet.getRange('A1:I1').merge().setBackground('#0f172a').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(11).setHorizontalAlignment('center');
-  sheet.getRange('A2:I2').setBackground('#1e293b').setFontColor('#94a3b8').setFontSize(9).setHorizontalAlignment('center');
+  sheet.getRange('A2:I2').merge().setBackground('#1e293b').setFontColor('#94a3b8').setFontSize(9).setHorizontalAlignment('center');
 
   // Table Headers
   sheet.getRange('A4:I4').setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
@@ -3476,6 +3482,16 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
   const ledgerHeaderRow = leaderboard.length + 9;
   sheet.getRange(ledgerHeaderRow, 1, 1, 9).setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
   sheet.getRange(ledgerHeaderRow + 1, 1, 1, 9).setBackground('#334155').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(9).setHorizontalAlignment('center');
+
+  // Alternating Row Colors for Ledger
+  for (let rowIdx = 0; rowIdx < raidLedger.length; rowIdx++) {
+    const targetRow = ledgerHeaderRow + 2 + rowIdx;
+    const bgColor = rowIdx % 2 === 0 ? '#ffffff' : '#f8fafc';
+    sheet.getRange(targetRow, 1, 1, 9).setBackground(bgColor).setFontSize(9).setVerticalAlignment('middle');
+    sheet.getRange(targetRow, 1).setHorizontalAlignment('center'); // Date
+    sheet.getRange(targetRow, 4, 1, 2).setHorizontalAlignment('center'); // Kills, Guild Raiders
+    sheet.getRange(targetRow, 8).setHorizontalAlignment('center'); // Link
+  }
 
   // Column Widths
   sheet.setColumnWidth(1, 130); // Rank / Date
