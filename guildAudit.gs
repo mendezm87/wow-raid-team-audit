@@ -2624,10 +2624,11 @@ function processAndIngestQELiveReport(reportUrlOrId) {
   }
 
   // Extract Report ID
-  const match = reportUrlOrId.toString().match(/(?:upgradereport\/|reportID=)?([A-Za-z0-9_-]{8,35})/i);
-  const reportId = match ? match[1] : reportUrlOrId.toString().trim();
+  const str = Array.isArray(reportUrlOrId) ? reportUrlOrId.join(' ') : reportUrlOrId.toString().trim();
+  const m = str.match(/(?:upgradereport\/|reportID=)([A-Za-z0-9_-]{8,35})/i);
+  const reportId = m ? m[1] : (str.match(/\b([a-z0-9_-]{8,35})\b/i) ? str.match(/\b([a-z0-9_-]{8,35})\b/i)[1] : null);
   if (!reportId) {
-    return { success: false, error: 'Could not parse a valid QE Live Report ID.' };
+    return { success: false, error: 'Could not parse a valid QE Live Report ID from input.' };
   }
 
   const apiUrl = `https://questionablyepic.com/api/getUpgradeReport.php?reportID=${reportId}`;
