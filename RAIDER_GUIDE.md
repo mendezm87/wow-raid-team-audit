@@ -59,34 +59,46 @@ To make sure the Loot Council knows which boss drops are your biggest upgrades, 
 
 ### A. ⚔️ DPS & Tanks (Raidbots Droptimizer)
 
+To ensure everyone is compared fairly on the exact same baseline, please use the following **standardized guild sim settings**:
+
+#### ⚙️ Standard Guild Settings Checklist:
 1. Open [Raidbots Droptimizer](https://www.raidbots.com/simbot/droptimizer) (or click your 1-Click link on the *Talents & Builds* sheet).
-2. Select:
-   * **Raid:** *The Venomous Abyss*
-   * **Difficulty:** *Heroic* (or Mythic)
-3. Click **Run Droptimizer**.
-4. When it finishes, copy your report link:
+2. **Raid Difficulty:**
+   * Select **`Heroic (Hero)`**.
+3. **Items to Sim:**
+   * **Group By:** Select **`Boss`**.
+   * **Upgrade up to:** Select **`321 Hero 6/6`**.
+   * **`☑ Upgrade All Equipped Gear to the Same Level`** *(CRITICAL: Check this box so all drops and equipped slots are compared at equal max upgrade track!)*
+4. **Simulation Options:**
+   * **Fight Style:** `Patchwerk` (1 Boss, 5 minutes).
+   * **Consumables:** `SimC Default` (Food, Flask, Potion, Weapon Rune).
+   * **Raid Buffs:** Click **`Optimal Raid Buffs`** (All standard buffs enabled: Bloodlust, Battle Shout, Arcane Intellect, Mark of the Wild, Fortitude, Chaos Brand, Mystic Touch, Skyfury, Hunter's Mark, Bleeding).
+5. Click **Run Droptimizer**.
+6. When finished, copy your report link:
    ```text
    https://www.raidbots.com/simbot/report/aM6qT1dQz2CPxVodxJDy5k
    ```
-5. **Paste the link directly into the `#sims` Discord channel** (or type `/sim report_url:<link>`).
-6. The bot will react with `✅` and confirm that your DPS upgrades are synced to the spreadsheet!
+7. **Paste the link directly into the `#sims` Discord channel** (or type `/sim report_url:<link>`).
+8. The bot will react with `✅` and confirm your DPS upgrades!
 
 ---
 
 ### B. 🩺 Healers (Questionably Epic Live)
 
-Because Raidbots is built for DPS, healers use **Questionably Epic Live (QE Live)** to calculate mathematical healing throughput (HPS):
+Because Raidbots does not model healing throughput, healers use **Questionably Epic Live (QE Live)**:
 
+#### ⚙️ Standard Healer Settings Checklist:
 1. Open [QE Live (questionablyepic.com/live)](https://questionablyepic.com/live).
-2. Import your character (or paste your `/simc` string).
-3. In the top navigation, click **Upgrade Finder** $\rightarrow$ **Raid** (*The Venomous Abyss*).
-4. Click **Run Upgrade Finder**.
-5. Once complete, copy the URL from your browser or click Share:
+2. Import your character using your in-game `/simc` string.
+3. **`☑ Upgrade ALL to Max Level`** *(CRITICAL: Check this box when importing your gear so all calculations reflect max-upgraded gear tracks!)*
+4. In the top navigation, click **Upgrade Finder** $\rightarrow$ **Raid** (*The Venomous Abyss*).
+5. Click **Run Upgrade Finder**.
+6. Once complete, copy the report URL from your browser address bar:
    ```text
    https://questionablyepic.com/live/upgradereport/vuakucejkfyc
    ```
-6. **Paste the link into the `#sims` Discord channel** (or type `/sim report_url:<link>`).
-7. The bot will react with `✅` and confirm:
+7. **Paste the link into the `#sims` Discord channel** (or type `/sim report_url:<link>`).
+8. The bot will react with `✅` and confirm:
    > `🩺 QE Live Healer Report Imported for CharacterName (Spec)`  
    *(Personal loot / bonus roll items are automatically excluded)*
 
