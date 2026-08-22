@@ -117,31 +117,39 @@ The sheet natively supports **both DPS/Tank simulations (Raidbots)** and **Heale
 
 ---
 
-## 7. 🤖 Discord Bot & 24/7 PM2 Management
+## 7. 🏛️ Warcraft Logs Attendance & Season History
 
-If your Discord bot is hosted on a dedicated PC (e.g. living room computer) using **PM2**:
+The spreadsheet features full **Warcraft Logs v2 GraphQL API integration** to automatically sync attendance, boss kills, and retroactive gear readiness for the entire season.
 
-### 🔄 Updating the Bot When Code Changes:
-On your dedicated machine, open the terminal in the project folder and run:
+### 🌟 How to Sync:
+1. In Google Sheets, click **`Guild Audit` $\rightarrow$ `6. Sync Warcraft Logs Attendance & History`**.
+2. The script queries all official Season 2 raid reports for your guild from Warcraft Logs.
+3. In ~4 seconds, it generates/refreshes the **`Attendance & History`** tab with:
+   * **Leaderboard:** Raider Attendance %, Total Raids Attended, Preparation %, and Boss Kills.
+   * **Ledger:** Complete historical timeline of every raid night, bosses defeated, roster present, and direct Warcraft Logs links.
+
+---
+
+## 8. 🤖 Discord Bot & 24/7 PM2 Management
+
+The bot runs on **Discord.js v14** and allows raiders to paste **Raidbots** (DPS) and **QE Live** (Healers) sim links directly into Discord:
+
+### 🛠️ Updating the Bot on Your 24/7 PC (PM2):
+Whenever new updates are pushed:
 ```bash
-git pull
+git pull origin main
 pm2 restart wow-raid-bot
-```
-
-### 📋 Checking Bot Logs:
-```bash
-pm2 logs wow-raid-bot --lines 30
 ```
 
 ---
 
-## 8. ❓ Officer FAQ & Troubleshooting
+## 9. ❓ Officer FAQ & Troubleshooting
 
-#### Q: Will running a Full Audit wipe out our Droptimizer or QE Live sims?
-**No.** Sim results always have **Sim Priority Protection**. Running `3. Run Full Audit & Talents` preserves all `% DPS` and `% HPS` rankings while quietly refreshing each raider's currently equipped gear in columns H & I.
+### Q: Why do M+ Vault slots count runs in the same dungeon now?
+**A:** We integrated the **Raider.IO Hybrid Engine** (`mythic_plus_weekly_runs`). Blizzard's API only exposes 1 run per unique dungeon, but Raider.IO tracks every duplicate and untimed run. Raiders who farm the same key 8 times will now accurately receive credit for all 3 Vault slots (`GV M+ 1`, `GV M+ 2`, `GV M+ 3`)!
 
-#### Q: A raider logged out in PvP / Mythic+ gear. What should we do?
-The audit will display an `⚠️ Off-Spec Logout` warning on the Guild Audit tab. However, the Loot Council sheet uses their **Assigned Main Spec** from the `Config` tab, so they will never be assigned off-spec gear.
+### Q: How do we live log raid night directly to the guild on Warcraft Logs?
+**A:** In the Archon / Warcraft Logs Uploader desktop app, look under *"Choose the guild you want to upload to"*, click the **`[ 🛡️ Personal Logs ▼ ]`** dropdown, and switch it to your Guild name (e.g. `<Prey>`). Make sure **Advanced Combat Logging** is enabled in WoW Options! However, the Loot Council sheet uses their **Assigned Main Spec** from the `Config` tab, so they will never be assigned off-spec gear.
 
 #### Q: How do we change a raider's official raid spec?
 Go to the `Config` sheet, click the dropdown in Column B for that raider, and select their new spec. Then click `3. Run Full Audit & Talents`.
