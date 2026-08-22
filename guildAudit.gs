@@ -185,65 +185,72 @@ function applyConfigDropdowns(sheet) {
   // Apply Region Dropdown to B2
   sheet.getRange('B2').setDataValidation(regionRule);
 
-  // Apply Spec Dropdowns to Mains (Column B, rows 7 to 40)
-  sheet.getRange('B7:B40').setDataValidation(specRule);
+  // 1. Left Block: Guild & Schedule Configuration (Columns A-C, Rows 1-6)
+  sheet.getRange('A1:C1').merge().setValue('⚙️ GUILD & RAID CONFIGURATION').setHorizontalAlignment('center').setFontWeight('bold').setBackground('#0f172a').setFontColor('#f8fafc');
+  sheet.getRange('A2:A6').setFontWeight('bold');
+  sheet.getRange('A2').setValue('Region');
+  sheet.getRange('A3').setValue('Realm Slug');
+  sheet.getRange('A4').setValue('Guild Slug');
+  sheet.getRange('A5').setValue('Raid Hours');
+  sheet.getRange('A6').setValue('Time Zone');
 
-  // Guild Config Header (A1:B1)
-  sheet.getRange('A1:B1').merge().setValue('⚙️ GUILD CONFIGURATION').setHorizontalAlignment('center').setFontWeight('bold').setBackground('#0f172a').setFontColor('#f8fafc');
-  sheet.getRange('A2:A4').setFontWeight('bold');
-
-  // Official Raid Schedule Box (E1:H1 & E2:H5)
-  sheet.getRange('E1:H1').merge().setValue('⏰ OFFICIAL RAID SCHEDULE & DAYS').setHorizontalAlignment('center').setFontWeight('bold').setBackground('#0f172a').setFontColor('#f8fafc');
-  sheet.getRange('E2').setValue('Raid Hours').setFontWeight('bold');
-  sheet.getRange('F2:H2').merge().setValue(sheet.getRange('F2').getValue() || '7:00 PM - 10:00 PM');
+  if (!sheet.getRange('B2').getValue()) sheet.getRange('B2').setValue('us');
+  if (!sheet.getRange('B3').getValue()) sheet.getRange('B3').setValue('kiljaeden');
+  if (!sheet.getRange('B4').getValue()) sheet.getRange('B4').setValue('prey');
+  if (!sheet.getRange('B5').getValue()) sheet.getRange('B5').setValue('7:00 PM - 10:00 PM');
   
-  sheet.getRange('E3').setValue('Time Zone').setFontWeight('bold');
-  sheet.getRange('F3:H3').merge().setDataValidation(tzRule);
-  if (!sheet.getRange('F3').getValue()) sheet.getRange('F3').setValue('America/Los_Angeles (Pacific PT)');
+  sheet.getRange('B6').setDataValidation(tzRule);
+  if (!sheet.getRange('B6').getValue()) sheet.getRange('B6').setValue('America/Los_Angeles (Pacific PT)');
 
-  // Interactive Raid Day Toggle Checkboxes (Row 4 Labels, Row 5 Checkboxes)
-  sheet.getRange('E4:K4').setValues([['Tue', 'Wed', 'Thu', 'Mon', 'Fri', 'Sat', 'Sun']])
+  // 2. Right Block: Interactive Raid Days Checkbox Grid (Columns E-H, Rows 1-5)
+  sheet.getRange('E1:H1').merge().setValue('⏰ RAID DAYS (TOGGLE ACTIVE NIGHTS)').setHorizontalAlignment('center').setFontWeight('bold').setBackground('#0f172a').setFontColor('#f8fafc');
+  
+  // Weekday Days (Row 2 Labels, Row 3 Checkboxes)
+  sheet.getRange('E2:H2').setValues([['Tuesday', 'Wednesday', 'Thursday', 'Monday']])
     .setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center').setFontSize(9);
-  
-  const dayCheckRange = sheet.getRange('E5:K5');
-  dayCheckRange.insertCheckboxes().setHorizontalAlignment('center');
-  if (sheet.getRange('E5').getValue() === '') sheet.getRange('E5').setValue(true); // Tue default
-  if (sheet.getRange('F5').getValue() === '') sheet.getRange('F5').setValue(true); // Wed default
-  if (sheet.getRange('G5').getValue() === '') sheet.getRange('G5').setValue(false);
-  if (sheet.getRange('H5').getValue() === '') sheet.getRange('H5').setValue(false);
-  if (sheet.getRange('I5').getValue() === '') sheet.getRange('I5').setValue(false);
-  if (sheet.getRange('J5').getValue() === '') sheet.getRange('J5').setValue(false);
-  if (sheet.getRange('K5').getValue() === '') sheet.getRange('K5').setValue(false);
+  sheet.getRange('E3:H3').insertCheckboxes().setHorizontalAlignment('center');
+  if (sheet.getRange('E3').getValue() === '') sheet.getRange('E3').setValue(true);  // Tue default ON
+  if (sheet.getRange('F3').getValue() === '') sheet.getRange('F3').setValue(true);  // Wed default ON
+  if (sheet.getRange('G3').getValue() === '') sheet.getRange('G3').setValue(false); // Thu default OFF
+  if (sheet.getRange('H3').getValue() === '') sheet.getRange('H3').setValue(false); // Mon default OFF
 
-  // Table Headers (Row 6)
-  sheet.getRange('A6:C6').setValues([['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If not in guild)']])
+  // Weekend & Off Days (Row 4 Labels, Row 5 Checkboxes)
+  sheet.getRange('E4:H4').setValues([['Friday', 'Saturday', 'Sunday', '—']])
+    .setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center').setFontSize(9);
+  sheet.getRange('E5:G5').insertCheckboxes().setHorizontalAlignment('center');
+  if (sheet.getRange('E5').getValue() === '') sheet.getRange('E5').setValue(false); // Fri default OFF
+  if (sheet.getRange('F5').getValue() === '') sheet.getRange('F5').setValue(false); // Sat default OFF
+  if (sheet.getRange('G5').getValue() === '') sheet.getRange('G5').setValue(false); // Sun default OFF
+  sheet.getRange('H5').clearContent().clearFormat().clearDataValidations();
+
+  // 3. Main Character & Alt Roster Table Headers (Row 8)
+  sheet.getRange('A8:C8').setValues([['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If not in guild)']])
     .setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
 
-  // Side-by-Side Alts Table in Columns E to H
-  sheet.getRange('E6:H6').setValues([[
+  sheet.getRange('E8:H8').setValues([[
     'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If not in guild)'
   ]]).setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
 
-  // Column F for Alts: Main Character Owner dropdown
-  sheet.getRange('F7:F40').setDataValidation(mainOwnerRule);
-  // Column G for Alts: WoW Spec dropdown
-  sheet.getRange('G7:G40').setDataValidation(specRule);
+  // Spec Dropdown for Mains (Column B, rows 9 to 45)
+  sheet.getRange('B9:B45').setDataValidation(specRule);
 
-  // Clear any old/remnant Great Vault reference content beyond Column H
-  sheet.getRange('I1:Z30').clearContent().clearFormat().clearDataValidations();
+  // Dropdowns for Alts (Column F = Owner Dropdown, Column G = Spec Dropdown, rows 9 to 45)
+  sheet.getRange('F9:F45').setDataValidation(mainOwnerRule);
+  sheet.getRange('G9:G45').setDataValidation(specRule);
 
-  // Set generous column widths so all headers are 100% visible and uncompressed
+  // Clear rows 7 and any leftover cells beyond Column H
+  sheet.getRange('A7:H7').clearContent().clearFormat().clearDataValidations();
+  sheet.getRange('I1:Z45').clearContent().clearFormat().clearDataValidations();
+
+  // Set generous column widths so all headers and tables are 100% spacious
   sheet.setColumnWidth(1, 190); // Main Character Name
   sheet.setColumnWidth(2, 230); // Assigned Spec (Mains)
   sheet.setColumnWidth(3, 180); // Realm (If not in guild)
   sheet.setColumnWidth(4, 30);  // Spacing Divider
-  sheet.setColumnWidth(5, 190); // Alt Character Name
-  sheet.setColumnWidth(6, 240); // Main Character (Owner - Dropdown)
-  sheet.setColumnWidth(7, 230); // Assigned Spec (Alts)
-  sheet.setColumnWidth(8, 180); // Realm (If not in guild)
-  sheet.setColumnWidth(9, 70);  // Fri
-  sheet.setColumnWidth(10, 70); // Sat
-  sheet.setColumnWidth(11, 70); // Sun
+  sheet.setColumnWidth(5, 190); // Alt Character Name / Tuesday / Friday
+  sheet.setColumnWidth(6, 240); // Main Character (Owner - Dropdown) / Wednesday / Saturday
+  sheet.setColumnWidth(7, 230); // Assigned Spec (Alts) / Thursday / Sunday
+  sheet.setColumnWidth(8, 180); // Realm (If not in guild) / Monday
 
   // Auto-migrate legacy stacked Alts in row 35+ to side-by-side columns E-H if detected
   for (let r = 30; r < data.length; r++) {
@@ -253,8 +260,8 @@ function applyConfigDropdowns(sheet) {
       const colB = (data[r][1] || '').toString().trim();
       const colC = (data[r][2] || '').toString().trim();
 
-      // Find first empty row in E7:E40
-      for (let targetR = 7; targetR <= 40; targetR++) {
+      // Find first empty row in E9:E45
+      for (let targetR = 9; targetR <= 45; targetR++) {
         if (!sheet.getRange(`E${targetR}`).getValue()) {
           const specVal = normalizeSpecName(ALL_WOW_SPECS.includes(colB) ? colB : (ALL_WOW_SPECS.includes(colC) ? colC : ''));
           const ownerVal = mainCharacterNames.find(m => colB.toLowerCase().includes(m.toLowerCase()) || altName.toLowerCase().startsWith(m.toLowerCase().slice(0, 4))) || (altName.toLowerCase().startsWith('waffle') ? 'Wafflezcalot' : '');
@@ -283,10 +290,12 @@ function createConfigSheet() {
   }
   sheet = ss.insertSheet('Config', 0);
   const setupData = [
-      ['Configuration', 'Value', '', '', 'Official Raid Schedule', 'Value', '', ''],
-      ['Region', 'us', '', '', 'Raid Hours', '7:00 PM - 10:00 PM', '', ''],
-      ['Realm Slug', 'kiljaeden', '', '', 'Time Zone', 'America/Los_Angeles (Pacific PT)', '', ''],
-      ['Guild Slug', 'prey', '', '', '', '', '', ''],
+      ['Configuration', 'Value', '', '', 'Raid Days (Toggle Active Nights)', '', '', ''],
+      ['Region', 'us', '', '', 'Tuesday', 'Wednesday', 'Thursday', 'Monday'],
+      ['Realm Slug', 'kiljaeden', '', '', true, true, false, false],
+      ['Guild Slug', 'prey', '', '', 'Friday', 'Saturday', 'Sunday', '—'],
+      ['Raid Hours', '7:00 PM - 10:00 PM', '', '', false, false, false, ''],
+      ['Time Zone', 'America/Los_Angeles (Pacific PT)', '', '', '', '', '', ''],
       ['', '', '', '', '', '', '', ''],
       ['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If not in guild)', '', 'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If not in guild)'],
       ['Wafflezcalot', 'Retribution', '', '', 'Wafflelegion', 'Wafflezcalot', 'Protection', ''],
@@ -311,24 +320,24 @@ function getConfigurationFromSheet() {
   // Ensure dropdown rules and side-by-side formatting are active
   applyConfigDropdowns(configSheet);
 
-  const region = configSheet.getRange('B2').getValue().toString().trim().toLowerCase();
-  const realmSlug = sanitizeSlug(configSheet.getRange('B3').getValue());
-  const guildSlug = sanitizeSlug(configSheet.getRange('B4').getValue());
+  const region = configSheet.getRange('B2').getValue().toString().trim().toLowerCase() || 'us';
+  const realmSlug = sanitizeSlug(configSheet.getRange('B3').getValue()) || 'kiljaeden';
+  const guildSlug = sanitizeSlug(configSheet.getRange('B4').getValue()) || 'prey';
 
   // Read configurable raid schedule & Day Checkboxes
-  const raidHours = configSheet.getRange('F2').getValue().toString().trim() || '7:00 PM - 10:00 PM';
-  const timeZoneRaw = configSheet.getRange('F3').getValue().toString().trim();
+  const raidHours = configSheet.getRange('B5').getValue().toString().trim() || '7:00 PM - 10:00 PM';
+  const timeZoneRaw = configSheet.getRange('B6').getValue().toString().trim();
   const timeZone = extractIanaTimeZone(timeZoneRaw);
 
   const dayLabels = ['Tuesday', 'Wednesday', 'Thursday', 'Monday', 'Friday', 'Saturday', 'Sunday'];
   const dayToggles = [
+    configSheet.getRange('E3').getValue() === true,
+    configSheet.getRange('F3').getValue() === true,
+    configSheet.getRange('G3').getValue() === true,
+    configSheet.getRange('H3').getValue() === true,
     configSheet.getRange('E5').getValue() === true,
     configSheet.getRange('F5').getValue() === true,
-    configSheet.getRange('G5').getValue() === true,
-    configSheet.getRange('H5').getValue() === true,
-    configSheet.getRange('I5').getValue() === true,
-    configSheet.getRange('J5').getValue() === true,
-    configSheet.getRange('K5').getValue() === true
+    configSheet.getRange('G5').getValue() === true
   ];
 
   const activeRaidDays = [];
@@ -341,8 +350,8 @@ function getConfigurationFromSheet() {
   const members = [];
   const alts = [];
 
-  // 1. Read Main Characters from Columns A-C (rows 7 to 45)
-  for (let r = 6; r < Math.min(data.length, 45); r++) {
+  // 1. Read Main Characters from Columns A-C (rows 9 to 45)
+  for (let r = 8; r < Math.min(data.length, 45); r++) {
     const rawName = (data[r][0] || '').toString().trim();
     const { name, realm: parsedRealm } = parseCharacterAndRealm(rawName, data[r][2] ? data[r][2].toString().trim() : '');
     const row0Lower = name.toLowerCase();
@@ -355,8 +364,8 @@ function getConfigurationFromSheet() {
     }
   }
 
-  // 2. Read Alt Characters from Side-by-Side Columns E-H (rows 7 to 45)
-  for (let r = 6; r < Math.min(data.length, 45); r++) {
+  // 2. Read Alt Characters from Side-by-Side Columns E-H (rows 9 to 45)
+  for (let r = 8; r < Math.min(data.length, 45); r++) {
     const rawAltName = (data[r][4] || '').toString().trim();
     const { name: altName, realm: parsedAltRealm } = parseCharacterAndRealm(rawAltName, data[r][7] ? data[r][7].toString().trim() : '');
     if (altName && !altName.toLowerCase().includes('alt character')) {
