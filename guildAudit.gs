@@ -229,24 +229,21 @@ function applyConfigDropdowns(sheet) {
   // Column G for Alts: WoW Spec dropdown
   sheet.getRange('G7:G40').setDataValidation(specRule);
 
-  // Great Vault Reference Table in Columns J to L
-  sheet.getRange('J1:L1').merge().setHorizontalAlignment('center').setFontWeight('bold').setBackground('#0f172a').setFontColor('#f8fafc');
-  sheet.getRange('J2:L2').setValues([['Midnight S2 Great Vault Reference (12.1)', 'Vault ilvl', 'Track']])
-    .setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
+  // Clear any old/remnant Great Vault reference content beyond Column H
+  sheet.getRange('I1:Z30').clearContent().clearFormat().clearDataValidations();
 
-  // Set generous column widths
-  sheet.setColumnWidth(1, 180); // Main Character Name
-  sheet.setColumnWidth(2, 220); // Assigned Spec (Mains)
-  sheet.setColumnWidth(3, 170); // Realm (If not in guild)
+  // Set generous column widths so all headers are 100% visible and uncompressed
+  sheet.setColumnWidth(1, 190); // Main Character Name
+  sheet.setColumnWidth(2, 230); // Assigned Spec (Mains)
+  sheet.setColumnWidth(3, 180); // Realm (If not in guild)
   sheet.setColumnWidth(4, 30);  // Spacing Divider
-  sheet.setColumnWidth(5, 75);  // Tue / Alt Name
-  sheet.setColumnWidth(6, 75);  // Wed / Main Owner
-  sheet.setColumnWidth(7, 75);  // Thu / Assigned Spec
-  sheet.setColumnWidth(8, 75);  // Mon / Realm
-  sheet.setColumnWidth(9, 65);  // Fri
-  sheet.setColumnWidth(10, 65); // Sat / Vault Activity
-  sheet.setColumnWidth(11, 65); // Sun / Vault ilvl
-  sheet.setColumnWidth(12, 90); // Track
+  sheet.setColumnWidth(5, 190); // Alt Character Name
+  sheet.setColumnWidth(6, 240); // Main Character (Owner - Dropdown)
+  sheet.setColumnWidth(7, 230); // Assigned Spec (Alts)
+  sheet.setColumnWidth(8, 180); // Realm (If not in guild)
+  sheet.setColumnWidth(9, 70);  // Fri
+  sheet.setColumnWidth(10, 70); // Sat
+  sheet.setColumnWidth(11, 70); // Sun
 
   // Auto-migrate legacy stacked Alts in row 35+ to side-by-side columns E-H if detected
   for (let r = 30; r < data.length; r++) {
@@ -286,19 +283,19 @@ function createConfigSheet() {
   }
   sheet = ss.insertSheet('Config', 0);
   const setupData = [
-      ['Configuration', 'Value', '', '', 'Official Raid Schedule', 'Value', '', '', '', 'Midnight S2 Great Vault Reference (12.1)', 'Vault ilvl', 'Track'],
-      ['Region', 'us', '', '', 'Raid Hours', '7:00 PM - 10:00 PM', '', '', '', 'Raid Mythic (Most)', 334, 'Myth'],
-      ['Realm Slug', 'kiljaeden', '', '', 'Time Zone', 'America/Los_Angeles (Pacific PT)', '', '', '', 'Raid Heroic', 318, 'Hero'],
-      ['Guild Slug', 'prey', '', '', '', '', '', '', '', 'Raid Normal', 305, 'Hero'],
-      ['', '', '', '', '', '', '', '', '', 'Raid LFR', 292, 'Champion'],
-      ['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If not in guild)', '', 'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If not in guild)', '', 'Mythic+ 10+', 318, 'Hero'],
-      ['Wafflezcalot', 'Retribution', '', '', 'Wafflelegion', 'Wafflezcalot', 'Protection', '', '', 'Mythic+ 7-9', 315, 'Hero'],
-      ['Fluffytaill', 'Windwalker', '', '', 'Jevofreice', 'Aigirlf', 'Arcane', '', '', 'Mythic+ 6', 311, 'Hero'],
-      ['Rawria', 'Vengeance', '', '', '', '', '', '', '', 'Mythic+ 4-5', 308, 'Hero'],
-      ['Jevo', 'Protection', '', '', '', '', '', '', '', 'Mythic+ 2-3 / Delves T8-11', 305, 'Hero'],
-      ['Castite', 'Restoration', '', '', '', '', '', '', '', 'Mythic 0 / M0', 302, 'Champion']
+      ['Configuration', 'Value', '', '', 'Official Raid Schedule', 'Value', '', ''],
+      ['Region', 'us', '', '', 'Raid Hours', '7:00 PM - 10:00 PM', '', ''],
+      ['Realm Slug', 'kiljaeden', '', '', 'Time Zone', 'America/Los_Angeles (Pacific PT)', '', ''],
+      ['Guild Slug', 'prey', '', '', '', '', '', ''],
+      ['', '', '', '', '', '', '', ''],
+      ['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If not in guild)', '', 'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If not in guild)'],
+      ['Wafflezcalot', 'Retribution', '', '', 'Wafflelegion', 'Wafflezcalot', 'Protection', ''],
+      ['Fluffytaill', 'Windwalker', '', '', 'Jevofreice', 'Aigirlf', 'Arcane', ''],
+      ['Rawria', 'Vengeance', '', '', '', '', '', ''],
+      ['Jevo', 'Protection', '', '', '', '', '', ''],
+      ['Castite', 'Restoration', '', '', '', '', '', '']
   ];
-  sheet.getRange(1, 1, setupData.length, 12).setValues(setupData);
+  sheet.getRange(1, 1, setupData.length, 8).setValues(setupData);
   applyConfigDropdowns(sheet);
   SpreadsheetApp.getUi().alert('"Config" sheet created with Side-by-Side Main and Alt character tracking and Checkbox Day Toggles.');
 }
