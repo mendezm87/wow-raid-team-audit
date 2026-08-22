@@ -3306,7 +3306,7 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
   sheet.getRange(1, 1, output.length, 8).setValues(output);
 
   // Formatting & Widths
-  sheet.setFontFamily('Roboto');
+  sheet.getDataRange().setFontFamily('Roboto');
   sheet.setFrozenRows(1);
 
   // Banner formatting
