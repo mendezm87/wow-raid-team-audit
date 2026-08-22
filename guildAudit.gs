@@ -157,10 +157,31 @@ function getConfigurationFromSheet() {
             realm: row[2] ? row[2].toString().trim() : ''
           });
       } else if (readingAlts && row[0]) {
+          // Support both 4-column [AltName, MainOwner, Spec, Realm] and 3-column [AltName, Spec, Realm]
+          const altName = row[0].toString().trim();
+          const col1 = row[1] ? row[1].toString().trim() : '';
+          const col2 = row[2] ? row[2].toString().trim() : '';
+          const col3 = row[3] ? row[3].toString().trim() : '';
+
+          let mainOwner = '';
+          let expectedSpec = '';
+          let realm = '';
+
+          // If col1 matches a main character or is specified as owner
+          if (col1 && !ALL_WOW_SPECS.includes(col1) && (col2 || col3)) {
+            mainOwner = col1;
+            expectedSpec = col2;
+            realm = col3;
+          } else {
+            expectedSpec = col1;
+            realm = col2;
+          }
+
           alts.push({
-            name: row[0].toString().trim(),
-            expectedSpec: row[1] ? row[1].toString().trim() : '',
-            realm: row[2] ? row[2].toString().trim() : ''
+            name: altName,
+            mainOwner: mainOwner,
+            expectedSpec: expectedSpec,
+            realm: realm
           });
       }
 
@@ -175,12 +196,20 @@ function getConfigurationFromSheet() {
     return null;
   }
 
+  const altToMainMap = {};
+  alts.forEach(a => {
+    if (a.name && a.mainOwner) {
+      altToMainMap[a.name.toLowerCase()] = a.mainOwner;
+    }
+  });
+
   return {
     REGION: region,
     GUILD_REALM_SLUG: realmSlug,
     GUILD_NAME_SLUG: guildSlug,
     MEMBERS_TO_TRACK: members,
-    ALTS_TO_TRACK: alts
+    ALTS_TO_TRACK: alts,
+    ALT_TO_MAIN_MAP: altToMainMap
   };
 }
 
@@ -3222,25 +3251,34 @@ function syncWarcraftLogsSeasonAttendance() {
       }
     }
 
-    // Evaluate Attendance & Punctuality for each roster member
+    // Evaluate Attendance & Punctuality for each roster member (with Alt-to-Main resolution)
     const presentOnTime = [];
     const presentLate = [];
+    const altToMainMap = config.ALT_TO_MAIN_MAP || {};
 
     sessionAttendees.forEach(pName => {
       const lower = pName.toLowerCase();
-      const canonical = memberNameMap[lower] || Object.keys(playerStats).find(k => k.toLowerCase() === lower);
+      let canonical = memberNameMap[lower];
+      if (!canonical && altToMainMap[lower]) {
+        const ownerLower = altToMainMap[lower].toLowerCase();
+        canonical = memberNameMap[ownerLower] || Object.keys(playerStats).find(k => k.toLowerCase() === ownerLower);
+      }
+      if (!canonical) {
+        canonical = Object.keys(playerStats).find(k => k.toLowerCase() === lower);
+      }
+
       if (canonical && playerStats[canonical]) {
         playerStats[canonical].raidsAttended++;
         playerStats[canonical].totalBossKillsAttended += session.allBossKills.length;
 
         // On-Time vs Late Check
-        const isOnTime = firstPullAttendees.has(pName) || firstPullAttendees.has(canonical);
+        const isOnTime = firstPullAttendees.has(pName) || firstPullAttendees.has(canonical) || (altToMainMap[lower] && firstPullAttendees.has(altToMainMap[lower]));
         if (isOnTime) {
           playerStats[canonical].onTimeCount++;
-          presentOnTime.push(canonical);
+          if (!presentOnTime.includes(canonical)) presentOnTime.push(canonical);
         } else {
           playerStats[canonical].lateCount++;
-          presentLate.push(canonical);
+          if (!presentLate.includes(canonical)) presentLate.push(canonical);
         }
       }
     });
@@ -3313,9 +3351,8 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
   // 1. Executive Summary Banner
   output.push(['🏛️ GUILD RAID ATTENDANCE, PUNCTUALITY & SEASON 2 HISTORY', '', '', '', '', '', '', '', '']);
   output.push([
-    `Total Official Guild Raid Nights: ${totalRaids} (Tue & Wed 7-10 PM Pacific)`,
-    `Total Unique Boss Encounters Defeated: ${raidLedger.reduce((sum, r) => sum + r.killCount, 0)}`,
-    '', '', '', '', '', '', ''
+    `Total Official Guild Raid Nights: ${totalRaids} (Tue & Wed 7:00 - 10:00 PM Pacific)   |   Total Boss Encounters Defeated: ${raidLedger.reduce((sum, r) => sum + r.killCount, 0)}`,
+    '', '', '', '', '', '', '', ''
   ]);
   output.push(['', '', '', '', '', '', '', '', '']);
 
