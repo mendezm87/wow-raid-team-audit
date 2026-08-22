@@ -6,14 +6,10 @@ Integrates live data from the **Blizzard Armory API**, **Raidbots Droptimizer Si
 
 ---
 
-## 📖 Officer & User Documentation
+## 📖 Documentation & User Guides
 
-👉 **Read the full [Officer & Raid Leader Guide](OFFICER_GUIDE.md)** for detailed instructions on:
-- Weekly audit routines
-- Interactive spec dropdowns & zero-config auto-population
-- Talents, builds & Hero Talent tree tracking
-- Loot Council & chase item prioritization
-- Importing single or batch Raidbots Droptimizer sims
+* 👉 **[Officer & Raid Leader Guide](OFFICER_GUIDE.md)**: Full guide on weekly audit routines, roster config, Loot Council settings, and Discord bot maintenance.
+* 👉 **[Raider Guide](RAIDER_GUIDE.md)**: Step-by-step guide for guild members on how to check their gear readiness, copy talent loadout codes, and submit Droptimizer/QE Live sims via Discord!
 
 ---
 
