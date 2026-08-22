@@ -55,8 +55,36 @@ const ALL_WOW_SPECS = [
   'Subtlety', 'Survival', 'Unholy', 'Vengeance', 'Windwalker'
 ];
 
+const COMMON_TIME_ZONES = [
+  'America/Los_Angeles (Pacific PT)',
+  'America/Denver (Mountain MT)',
+  'America/Chicago (Central CT)',
+  'America/New_York (Eastern ET)',
+  'America/Anchorage (Alaska AKT)',
+  'Pacific/Honolulu (Hawaii HT)',
+  'Europe/London (GMT / BST)',
+  'Europe/Paris (CET / CEST)',
+  'Australia/Sydney (AEST / AEDT)',
+  'UTC'
+];
+
 /**
- * Applies Google Sheets interactive dropdown validation for WoW specs and Main Character Owners on the Config sheet.
+ * Extracts standard IANA time zone identifier (e.g., 'America/Los_Angeles') from user selection or text.
+ */
+function extractIanaTimeZone(tzStr) {
+  if (!tzStr) return 'America/Los_Angeles';
+  const match = tzStr.toString().match(/^([A-Za-z_]+\/[A-Za-z_]+|UTC)/);
+  if (match) return match[1];
+  const lower = tzStr.toString().toLowerCase();
+  if (lower.includes('pacific') || lower.includes('pt')) return 'America/Los_Angeles';
+  if (lower.includes('mountain') || lower.includes('mt')) return 'America/Denver';
+  if (lower.includes('central') || lower.includes('ct')) return 'America/Chicago';
+  if (lower.includes('eastern') || lower.includes('et')) return 'America/New_York';
+  return 'America/Los_Angeles';
+}
+
+/**
+ * Applies Google Sheets interactive dropdown validation for WoW specs, Main Character Owners, and Time Zones on the Config sheet.
  * Formats Main Characters (Cols A-C) and Alt Characters (Cols E-H) side-by-side for a clean executive layout.
  */
 function applyConfigDropdowns(sheet) {
@@ -89,6 +117,12 @@ function applyConfigDropdowns(sheet) {
     .setAllowInvalid(true)
     .build();
 
+  // 3. Time Zone Dropdown Rule
+  const tzRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(COMMON_TIME_ZONES, true)
+    .setAllowInvalid(true)
+    .build();
+
   // Apply Spec Dropdowns to Mains (Column B, rows 7 to 40)
   sheet.getRange('B7:B40').setDataValidation(specRule);
 
@@ -104,9 +138,11 @@ function applyConfigDropdowns(sheet) {
     ['Time Zone']
   ]).setFontWeight('bold');
 
+  sheet.getRange('F4').setDataValidation(tzRule);
+
   if (!sheet.getRange('F2').getValue()) sheet.getRange('F2').setValue('Tuesday, Wednesday');
   if (!sheet.getRange('F3').getValue()) sheet.getRange('F3').setValue('7:00 PM - 10:00 PM');
-  if (!sheet.getRange('F4').getValue()) sheet.getRange('F4').setValue('America/Los_Angeles');
+  if (!sheet.getRange('F4').getValue()) sheet.getRange('F4').setValue('America/Los_Angeles (Pacific PT)');
 
   // Table Headers (Row 6)
   sheet.getRange('A6:C6').setValues([['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If not in guild)']])
@@ -213,7 +249,8 @@ function getConfigurationFromSheet() {
   // Read configurable raid schedule
   const raidDays = configSheet.getRange('F2').getValue().toString().trim() || 'Tuesday, Wednesday';
   const raidHours = configSheet.getRange('F3').getValue().toString().trim() || '7:00 PM - 10:00 PM';
-  const timeZone = configSheet.getRange('F4').getValue().toString().trim() || 'America/Los_Angeles';
+  const timeZoneRaw = configSheet.getRange('F4').getValue().toString().trim();
+  const timeZone = extractIanaTimeZone(timeZoneRaw);
 
   const data = configSheet.getDataRange().getValues();
   const members = [];
