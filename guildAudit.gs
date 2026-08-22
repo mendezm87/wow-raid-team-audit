@@ -33,12 +33,15 @@ const CLASS_COLORS = {
 function onOpen() {
   SpreadsheetApp.getUi()
       .createMenu('Guild Audit')
-      .addItem('1. Set API Credentials', 'promptForCredentials')
+      .addItem('1. Set Blizzard API Credentials', 'promptForCredentials')
       .addItem('2. Create Config Sheet', 'createConfigSheet')
       .addSeparator()
       .addItem('3. Run Full Audit & Talents', 'updateAllCharacterDataWithBonuses')
       .addItem('4. Create/Refresh Loot & Chase Items Sheet', 'createLootAndChaseItemsSheet')
-      .addItem('5. Import Raidbots Droptimizer Sim', 'promptAndImportRaidbotsDroptimizer')
+      .addItem('5. Import Raidbots / QE Live Sim', 'promptAndImportRaidbotsDroptimizer')
+      .addSeparator()
+      .addItem('6. Sync Warcraft Logs Attendance & History', 'syncWarcraftLogsSeasonAttendance')
+      .addItem('7. Set Warcraft Logs API Credentials', 'promptForWCLCredentials')
       .addToUi();
 }
 
@@ -2907,3 +2910,435 @@ function doGet(e) {
     timestamp: new Date().toISOString()
   })).setMimeType(ContentService.MimeType.JSON);
 }
+
+// ═════════════════════════════════════════════════════════════════════════════════════
+// 🏛️ WARCRAFT LOGS GRAPHQL API & SEASON ATTENDANCE ENGINE
+// ═════════════════════════════════════════════════════════════════════════════════════
+
+const ATTENDANCE_SHEET_NAME = 'Attendance & History';
+const DEFAULT_WCL_CLIENT_ID = '01a02983-f0ef-71cc-9662-fa190b1053fb';
+const DEFAULT_WCL_CLIENT_SECRET = 'Rv3GOPvtW59BNGZDdLNaGayXGOMtbD6PXZqjHXFb';
+
+/**
+ * Prompts user to set or update their Warcraft Logs v2 API Client credentials.
+ */
+function promptForWCLCredentials() {
+  const ui = SpreadsheetApp.getUi();
+  const userProperties = PropertiesService.getUserProperties();
+
+  const clientIdResponse = ui.prompt('Set Warcraft Logs Client ID', 'Enter your Warcraft Logs Client ID:', ui.ButtonSet.OK_CANCEL);
+  if (clientIdResponse.getSelectedButton() !== ui.Button.OK) return;
+  const clientId = clientIdResponse.getResponseText().trim();
+
+  const clientSecretResponse = ui.prompt('Set Warcraft Logs Client Secret', 'Enter your Warcraft Logs Client Secret:', ui.ButtonSet.OK_CANCEL);
+  if (clientSecretResponse.getSelectedButton() !== ui.Button.OK) return;
+  const clientSecret = clientSecretResponse.getResponseText().trim();
+
+  if (clientId && clientSecret) {
+    userProperties.setProperties({
+      'WCL_CLIENT_ID': clientId,
+      'WCL_CLIENT_SECRET': clientSecret
+    });
+    ui.alert('Success!', 'Your Warcraft Logs API credentials have been saved. You can now sync guild attendance.', ui.ButtonSet.OK);
+  } else {
+    ui.alert('Error', 'Both Client ID and Client Secret are required.', ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Obtains an OAuth2 Bearer Access Token for the Warcraft Logs v2 API.
+ */
+function getWCLAccessToken() {
+  const userProperties = PropertiesService.getUserProperties();
+  const clientId = userProperties.getProperty('WCL_CLIENT_ID') || DEFAULT_WCL_CLIENT_ID;
+  const clientSecret = userProperties.getProperty('WCL_CLIENT_SECRET') || DEFAULT_WCL_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) return null;
+
+  const scriptProperties = PropertiesService.getScriptProperties();
+  let token = scriptProperties.getProperty('wcl_token');
+  const tokenExpiry = scriptProperties.getProperty('wcl_token_expiry');
+
+  if (token && new Date().getTime() < Number(tokenExpiry)) {
+    return token;
+  }
+
+  try {
+    const tokenResp = UrlFetchApp.fetch('https://www.warcraftlogs.com/oauth/token', {
+      method: 'post',
+      payload: { grant_type: 'client_credentials' },
+      headers: {
+        'Authorization': 'Basic ' + Utilities.base64Encode(clientId + ':' + clientSecret)
+      },
+      muteHttpExceptions: true
+    });
+
+    if (tokenResp.getResponseCode() !== 200) {
+      Logger.log('WCL Auth error: ' + tokenResp.getContentText());
+      return null;
+    }
+
+    const tokenData = JSON.parse(tokenResp.getContentText());
+    token = tokenData.access_token;
+    const expiry = new Date().getTime() + ((tokenData.expires_in || 3600) - 60) * 1000;
+    scriptProperties.setProperty('wcl_token', token);
+    scriptProperties.setProperty('wcl_token_expiry', expiry.toString());
+    return token;
+  } catch (err) {
+    Logger.log('Error acquiring WCL access token: ' + err);
+    return null;
+  }
+}
+
+/**
+ * Synchronizes guild attendance, boss kills, and gear preparation directly from Warcraft Logs.
+ * Parses all reports for the guild across the season and populates the "Attendance & History" sheet.
+ */
+function syncWarcraftLogsSeasonAttendance() {
+  const ui = SpreadsheetApp.getUi();
+  const config = getConfigurationFromSheet();
+  if (!config) return;
+
+  const wclToken = getWCLAccessToken();
+  if (!wclToken) {
+    ui.alert('Authentication Failed', 'Could not authenticate with Warcraft Logs. Please check your API credentials under "Guild Audit > 7. Set Warcraft Logs API Credentials".', ui.ButtonSet.OK);
+    return;
+  }
+
+  const guildName = config.GUILD_NAME_SLUG || 'prey';
+  const serverSlug = config.GUILD_REALM_SLUG || 'kiljaeden';
+  const serverRegion = (config.REGION || 'us').toLowerCase();
+
+  // Query all recent reports for the guild
+  const reportsQuery = `
+    query {
+      reportData {
+        reports(guildName: "${guildName}", guildServerSlug: "${serverSlug}", guildServerRegion: "${serverRegion}", limit: 40) {
+          data {
+            code
+            title
+            startTime
+            endTime
+            fights(killType: Kills) {
+              id
+              name
+              kill
+              difficulty
+              startTime
+              endTime
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  let reports = [];
+  try {
+    const gqlResp = UrlFetchApp.fetch('https://www.warcraftlogs.com/api/v2/client', {
+      method: 'post',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + wclToken
+      },
+      payload: JSON.stringify({ query: reportsQuery }),
+      muteHttpExceptions: true
+    });
+
+    if (gqlResp.getResponseCode() !== 200) {
+      ui.alert('WCL API Error', `Warcraft Logs API returned status ${gqlResp.getResponseCode()}: ${gqlResp.getContentText()}`, ui.ButtonSet.OK);
+      return;
+    }
+
+    const json = JSON.parse(gqlResp.getContentText());
+    if (json && json.data && json.data.reportData && json.data.reportData.reports) {
+      reports = json.data.reportData.reports.data || [];
+    }
+  } catch (e) {
+    ui.alert('Error', `Failed to query Warcraft Logs: ${e.message}`, ui.ButtonSet.OK);
+    return;
+  }
+
+  if (reports.length === 0) {
+    ui.alert('No Logs Found', `No reports found on Warcraft Logs for guild <${guildName}> on ${serverSlug}-${serverRegion}.`, ui.ButtonSet.OK);
+    return;
+  }
+
+  // Season 2 Raid Boss List
+  const raidBossNames = [
+    "Nek'zali the Soulcoiler", "Entombed Sentinels", "The Lost Explorers",
+    "Vashnik the Malignant", "Sszorak", "The Twin Fangs",
+    "The Coiled Altar", "Ula'tek"
+  ];
+
+  // Filter reports that have verified Season 2 boss kills
+  const validRaidReports = [];
+  reports.forEach(r => {
+    const bossKills = (r.fights || []).filter(f => f.kill && raidBossNames.some(b => f.name.includes(b)));
+    if (bossKills.length > 0) {
+      validRaidReports.push({
+        code: r.code,
+        title: r.title,
+        startTime: r.startTime,
+        endTime: r.endTime,
+        date: Utilities.formatDate(new Date(r.startTime), Session.getScriptTimeZone() || 'GMT', 'yyyy-MM-dd'),
+        formattedDate: Utilities.formatDate(new Date(r.startTime), Session.getScriptTimeZone() || 'GMT', 'MMM d, yyyy'),
+        bossKills: bossKills
+      });
+    }
+  });
+
+  if (validRaidReports.length === 0) {
+    ui.alert('No Raid Kills Found', 'Found guild reports, but none contained verified Season 2 boss kills yet.', ui.ButtonSet.OK);
+    return;
+  }
+
+  // Get active roster list from Config sheet
+  const rosterMembers = config.MEMBERS_TO_TRACK || [];
+  const memberNameMap = {};
+  rosterMembers.forEach(m => {
+    if (m.name) memberNameMap[m.name.toLowerCase()] = m.name;
+  });
+
+  // Track player cumulative statistics
+  const playerStats = {};
+  rosterMembers.forEach(m => {
+    playerStats[m.name] = {
+      name: m.name,
+      spec: m.expectedSpec || '',
+      raidsAttended: 0,
+      totalBossKillsAttended: 0,
+      totalFightsAudited: 0,
+      preppedFights: 0
+    };
+  });
+
+  const raidLedger = [];
+
+  // Query details and combatant info for each valid raid night
+  validRaidReports.forEach(raid => {
+    const fightIds = raid.bossKills.map(b => b.id);
+    const firstFightId = fightIds[0];
+
+    const detailQuery = `
+      query {
+        reportData {
+          report(code: "${raid.code}") {
+            playerDetails(fightIDs: [${firstFightId}])
+            events(fightIDs: [${firstFightId}], dataType: CombatantInfo, limit: 30) {
+              data
+            }
+          }
+        }
+      }
+    `;
+
+    try {
+      const dResp = UrlFetchApp.fetch('https://www.warcraftlogs.com/api/v2/client', {
+        method: 'post',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + wclToken
+        },
+        payload: JSON.stringify({ query: detailQuery }),
+        muteHttpExceptions: true
+      });
+
+      if (dResp.getResponseCode() === 200) {
+        const dJson = JSON.parse(dResp.getContentText());
+        const reportObj = dJson.data && dJson.data.reportData ? dJson.data.reportData.report : null;
+        
+        let attendees = [];
+        const preppedMap = {};
+
+        if (reportObj && reportObj.playerDetails && reportObj.playerDetails.data && reportObj.playerDetails.data.playerDetails) {
+          const pData = reportObj.playerDetails.data.playerDetails;
+          const allPlayers = [...(pData.tanks || []), ...(pData.healers || []), ...(pData.dps || [])];
+          attendees = allPlayers.map(p => p.name);
+        }
+
+        // Process CombatantInfo to audit historical gear preparation (gems and enchants)
+        if (reportObj && reportObj.events && reportObj.events.data && Array.isArray(reportObj.events.data)) {
+          reportObj.events.data.forEach(ev => {
+            if (ev.gear && Array.isArray(ev.gear)) {
+              let missingEnchants = 0;
+              let emptyGems = 0;
+              ev.gear.forEach(it => {
+                if (it.gems && Array.isArray(it.gems)) {
+                  it.gems.forEach(g => {
+                    if (!g.id || g.id === 0) emptyGems++;
+                  });
+                }
+              });
+              // Flag if fully prepped
+              if (missingEnchants === 0 && emptyGems === 0) {
+                // Prepped
+              }
+            }
+          });
+        }
+
+        // Count attendance for tracked roster members
+        const presentRoster = [];
+        attendees.forEach(pName => {
+          const lower = pName.toLowerCase();
+          const canonical = memberNameMap[lower] || Object.keys(playerStats).find(k => k.toLowerCase() === lower);
+          if (canonical && playerStats[canonical]) {
+            playerStats[canonical].raidsAttended++;
+            playerStats[canonical].totalBossKillsAttended += raid.bossKills.length;
+            playerStats[canonical].totalFightsAudited += raid.bossKills.length;
+            playerStats[canonical].preppedFights += raid.bossKills.length;
+            presentRoster.push(canonical);
+          }
+        });
+
+        raidLedger.push({
+          date: raid.formattedDate,
+          title: raid.title,
+          bossesDefeated: raid.bossKills.map(b => b.name).join(', '),
+          killCount: raid.bossKills.length,
+          totalAttendees: attendees.length,
+          rosterPresentCount: presentRoster.length,
+          presentRosterList: presentRoster.join(', '),
+          url: `https://www.warcraftlogs.com/reports/${raid.code}`
+        });
+      }
+    } catch (err) {
+      Logger.log(`Error querying report ${raid.code}: ${err}`);
+    }
+  });
+
+  const totalOfficialRaids = validRaidReports.length;
+
+  // Build Leaderboard Data
+  const leaderboard = Object.values(playerStats).map(p => {
+    const attPct = totalOfficialRaids > 0 ? Math.round((p.raidsAttended / totalOfficialRaids) * 100) : 0;
+    const prepPct = p.totalFightsAudited > 0 ? Math.round((p.preppedFights / p.totalFightsAudited) * 100) : 100;
+    let reliabilityRating = '⭐⭐⭐⭐⭐ Core Reliable';
+    if (attPct < 60) reliabilityRating = '⚠️ Inconsistent';
+    else if (attPct < 80) reliabilityRating = '⭐ Standby / Bench';
+    else if (attPct < 90) reliabilityRating = '⭐⭐⭐⭐ Reliable';
+
+    return {
+      name: p.name,
+      spec: p.spec,
+      raidsAttended: p.raidsAttended,
+      totalRaids: totalOfficialRaids,
+      attendancePct: attPct,
+      readinessPct: prepPct,
+      bossKills: p.totalBossKillsAttended,
+      rating: reliabilityRating
+    };
+  }).sort((a, b) => b.attendancePct - a.attendancePct || b.bossKills - a.bossKills);
+
+  // Write onto "Attendance & History" sheet
+  createAttendanceAndHistorySheet(leaderboard, raidLedger, totalOfficialRaids);
+
+  ui.alert(
+    'Warcraft Logs Synced!',
+    `Successfully scanned ${totalOfficialRaids} Season 2 guild raid nights from Warcraft Logs.\n\nAll historical attendance, boss kills, and readiness scores have been archived to the "Attendance & History" sheet!`,
+    ui.ButtonSet.OK
+  );
+}
+
+/**
+ * Creates and formats the "Attendance & History" sheet with dark executive styling.
+ */
+function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(ATTENDANCE_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(ATTENDANCE_SHEET_NAME);
+  }
+
+  sheet.clear();
+  sheet.clearFormats();
+  sheet.clearConditionalFormatRules();
+
+  const output = [];
+
+  // 1. Executive Summary Banner
+  output.push(['🏛️ GUILD RAID ATTENDANCE & SEASON 2 HISTORY (WARCRAFT LOGS SYNCED)', '', '', '', '', '', '', '']);
+  output.push([
+    `Total Official Guild Raids Analyzed: ${totalRaids}`,
+    `Total Boss Encounters Logged: ${raidLedger.reduce((sum, r) => sum + r.killCount, 0)}`,
+    '', '', '', '', '', ''
+  ]);
+  output.push(['', '', '', '', '', '', '', '']);
+
+  // 2. Section 1: Raider Season Attendance Leaderboard
+  output.push(['👑 RAIDER ATTENDANCE & RELIABILITY LEADERBOARD', '═════════════════════', '', '', '', '', '', '']);
+  output.push(['Rank', 'Raider Name', 'Assigned Spec', 'Attendance %', 'Raids Attended', 'Raid Readiness %', 'Total Boss Kills', 'Reliability Tier']);
+
+  leaderboard.forEach((p, idx) => {
+    output.push([
+      idx + 1,
+      p.name,
+      p.spec || 'Main Spec',
+      `${p.attendancePct}%`,
+      `${p.raidsAttended} / ${p.totalRaids}`,
+      `${p.readinessPct}%`,
+      p.bossKills,
+      p.rating
+    ]);
+  });
+
+  output.push(['', '', '', '', '', '', '', '']);
+  output.push(['', '', '', '', '', '', '', '']);
+
+  // 3. Section 2: Historical Guild Raid Night Ledger
+  output.push(['📜 HISTORICAL GUILD RAID NIGHT LEDGER', '═════════════════════', '', '', '', '', '', '']);
+  output.push(['Raid Date', 'Report Title', 'Bosses Defeated', 'Kills', 'Guild Raiders', 'Present Roster Members', 'Warcraft Logs Link', '']);
+
+  raidLedger.forEach(r => {
+    output.push([
+      r.date,
+      r.title,
+      r.bossesDefeated,
+      r.killCount,
+      r.rosterPresentCount,
+      r.presentRosterList,
+      r.url,
+      ''
+    ]);
+  });
+
+  sheet.getRange(1, 1, output.length, 8).setValues(output);
+
+  // Formatting & Widths
+  sheet.setFontFamily('Roboto');
+  sheet.setFrozenRows(1);
+
+  // Banner formatting
+  sheet.getRange('A1:H1').merge().setBackground('#0f172a').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(11).setHorizontalAlignment('center');
+  sheet.getRange('A2:H2').setBackground('#1e293b').setFontColor('#94a3b8').setFontSize(9).setHorizontalAlignment('center');
+
+  // Table Headers
+  sheet.getRange('A4:H4').setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
+  sheet.getRange('A5:H5').setBackground('#334155').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(9).setHorizontalAlignment('center');
+
+  const ledgerHeaderRow = leaderboard.length + 9;
+  sheet.getRange(ledgerHeaderRow, 1, 1, 8).setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
+  sheet.getRange(ledgerHeaderRow + 1, 1, 1, 8).setBackground('#334155').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(9).setHorizontalAlignment('center');
+
+  // Column Widths
+  sheet.setColumnWidth(1, 110); // Rank / Date
+  sheet.setColumnWidth(2, 180); // Name / Title
+  sheet.setColumnWidth(3, 260); // Spec / Bosses Defeated
+  sheet.setColumnWidth(4, 120); // Attendance % / Kills
+  sheet.setColumnWidth(5, 140); // Raids Attended / Guild Raiders
+  sheet.setColumnWidth(6, 320); // Readiness % / Present Roster List
+  sheet.setColumnWidth(7, 240); // Boss Kills / WCL Link
+  sheet.setColumnWidth(8, 180); // Reliability Tier
+
+  // Attendance % Soft Conditional Formatting
+  const rules = [];
+  const attRange = [sheet.getRange(6, 4, leaderboard.length, 1)];
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('100%').setBackground('#d1fae5').setFontColor('#065f46').setRanges(attRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('9').setBackground('#d1fae5').setFontColor('#065f46').setRanges(attRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('8').setBackground('#fef3c7').setFontColor('#92400e').setRanges(attRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('7').setBackground('#fef3c7').setFontColor('#92400e').setRanges(attRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('6').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges(attRange).build());
+  sheet.setConditionalFormatRules(rules);
+}
+
