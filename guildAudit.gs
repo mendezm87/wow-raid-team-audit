@@ -284,11 +284,11 @@ function createConfigSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName('Config');
   if (sheet) {
-    applyConfigDropdowns(sheet);
-    SpreadsheetApp.getUi().alert('The "Config" sheet already exists. Interactive spec and main character dropdowns have been refreshed!');
-    return;
+    sheet.clear();
+  } else {
+    sheet = ss.insertSheet('Config', 0);
   }
-  sheet = ss.insertSheet('Config', 0);
+
   const setupData = [
       ['Configuration', 'Value', '', '', 'Raid Days (Toggle Active Nights)', '', '', ''],
       ['Region', 'us', '', '', 'Tuesday', 'Wednesday', 'Thursday', 'Monday'],
@@ -301,12 +301,28 @@ function createConfigSheet() {
       ['Wafflezcalot', 'Retribution', '', '', 'Wafflelegion', 'Wafflezcalot', 'Protection', ''],
       ['Fluffytaill', 'Windwalker', '', '', 'Jevofreice', 'Aigirlf', 'Arcane', ''],
       ['Rawria', 'Vengeance', '', '', '', '', '', ''],
-      ['Jevo', 'Protection', '', '', '', '', '', ''],
-      ['Castite', 'Restoration', '', '', '', '', '', '']
+      ['Spellbreakr', 'Arcane', '', '', '', '', '', ''],
+      ['Nimick', 'Blood', '', '', '', '', '', ''],
+      ['Sauceey', 'Beast Mastery', '', '', '', '', '', ''],
+      ['Mnxlol', 'Balance', '', '', '', '', '', ''],
+      ['Raevinnia', 'Destruction', '', '', '', '', '', ''],
+      ['Jirax', 'Shadow', '', '', '', '', '', ''],
+      ['Lyci', 'Holy', '', '', '', '', '', ''],
+      ['Aigirlf', 'Destruction', '', '', '', '', '', ''],
+      ['Ainocee', 'Beast Mastery', '', '', '', '', '', ''],
+      ['Azarioth', 'Arms', '', '', '', '', '', ''],
+      ['Castite', 'Restoration', '', '', '', '', '', ''],
+      ['Slattpal', 'Holy', '', '', '', '', '', ''],
+      ['Tankguywowie', 'Devourer', '', '', '', '', '', ''],
+      ['Narilmo', 'Retribution', '', '', '', '', '', ''],
+      ['Saevenar', 'Unholy', '', '', '', '', '', ''],
+      ['Nalgada', 'Arms', '', '', '', '', '', ''],
+      ['Legendmge', 'Arcane', '', '', '', '', '', ''],
+      ['Doxmia', 'Mistweaver', '', '', '', '', '', '']
   ];
   sheet.getRange(1, 1, setupData.length, 8).setValues(setupData);
   applyConfigDropdowns(sheet);
-  SpreadsheetApp.getUi().alert('"Config" sheet created with Side-by-Side Main and Alt character tracking and Checkbox Day Toggles.');
+  SpreadsheetApp.getUi().alert('"Config" sheet refreshed with all 21 Main Characters, 2 Alts, and Checkbox Day Toggles.');
 }
 
 function getConfigurationFromSheet() {
