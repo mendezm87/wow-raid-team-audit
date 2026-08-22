@@ -182,6 +182,9 @@ function applyConfigDropdowns(sheet) {
     .setAllowInvalid(true)
     .build();
 
+  // Clear any existing validations from header and config rows 1-8 to guarantee NO red error triangles
+  sheet.getRange('A1:H8').clearDataValidations();
+
   // Apply Region Dropdown to B2
   sheet.getRange('B2').setDataValidation(regionRule);
 
@@ -231,10 +234,10 @@ function applyConfigDropdowns(sheet) {
     'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If not in guild)'
   ]]).setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
 
-  // Spec Dropdown for Mains (Column B, rows 9 to 45)
+  // Spec Dropdown for Mains (Column B, rows 9 to 45 ONLY - never row 8)
   sheet.getRange('B9:B45').setDataValidation(specRule);
 
-  // Dropdowns for Alts (Column F = Owner Dropdown, Column G = Spec Dropdown, rows 9 to 45)
+  // Dropdowns for Alts (Column F = Owner Dropdown, Column G = Spec Dropdown, rows 9 to 45 ONLY)
   sheet.getRange('F9:F45').setDataValidation(mainOwnerRule);
   sheet.getRange('G9:G45').setDataValidation(specRule);
 
@@ -292,37 +295,18 @@ function createConfigSheet() {
   const setupData = [
       ['Configuration', 'Value', '', '', 'Raid Days (Toggle Active Nights)', '', '', ''],
       ['Region', 'us', '', '', 'Tuesday', 'Wednesday', 'Thursday', 'Monday'],
-      ['Realm Slug', 'kiljaeden', '', '', true, true, false, false],
-      ['Guild Slug', 'prey', '', '', 'Friday', 'Saturday', 'Sunday', '—'],
+      ['Realm Slug', 'your-realm', '', '', true, true, false, false],
+      ['Guild Slug', 'your-guild', '', '', 'Friday', 'Saturday', 'Sunday', '—'],
       ['Raid Hours', '7:00 PM - 10:00 PM', '', '', false, false, false, ''],
       ['Time Zone', 'America/Los_Angeles (Pacific PT)', '', '', '', '', '', ''],
       ['', '', '', '', '', '', '', ''],
       ['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If not in guild)', '', 'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If not in guild)'],
-      ['Wafflezcalot', 'Retribution', '', '', 'Wafflelegion', 'Wafflezcalot', 'Protection', ''],
-      ['Fluffytaill', 'Windwalker', '', '', 'Jevofreice', 'Aigirlf', 'Arcane', ''],
-      ['Rawria', 'Vengeance', '', '', '', '', '', ''],
-      ['Spellbreakr', 'Arcane', '', '', '', '', '', ''],
-      ['Nimick', 'Blood', '', '', '', '', '', ''],
-      ['Sauceey', 'Beast Mastery', '', '', '', '', '', ''],
-      ['Mnxlol', 'Balance', '', '', '', '', '', ''],
-      ['Raevinnia', 'Destruction', '', '', '', '', '', ''],
-      ['Jirax', 'Shadow', '', '', '', '', '', ''],
-      ['Lyci', 'Holy', '', '', '', '', '', ''],
-      ['Aigirlf', 'Destruction', '', '', '', '', '', ''],
-      ['Ainocee', 'Beast Mastery', '', '', '', '', '', ''],
-      ['Azarioth', 'Arms', '', '', '', '', '', ''],
-      ['Castite', 'Restoration', '', '', '', '', '', ''],
-      ['Slattpal', 'Holy', '', '', '', '', '', ''],
-      ['Tankguywowie', 'Devourer', '', '', '', '', '', ''],
-      ['Narilmo', 'Retribution', '', '', '', '', '', ''],
-      ['Saevenar', 'Unholy', '', '', '', '', '', ''],
-      ['Nalgada', 'Arms', '', '', '', '', '', ''],
-      ['Legendmge', 'Arcane', '', '', '', '', '', ''],
-      ['Doxmia', 'Mistweaver', '', '', '', '', '', '']
+      ['Character1', 'Retribution', '', '', 'Alt1', 'Character1', 'Protection', ''],
+      ['Character2', 'Windwalker', '', '', '', '', '', '']
   ];
   sheet.getRange(1, 1, setupData.length, 8).setValues(setupData);
   applyConfigDropdowns(sheet);
-  SpreadsheetApp.getUi().alert('"Config" sheet refreshed with all 21 Main Characters, 2 Alts, and Checkbox Day Toggles.');
+  SpreadsheetApp.getUi().alert('A clean "Config" sheet template has been created. Fill in your characters, specs, and schedule!');
 }
 
 function getConfigurationFromSheet() {
