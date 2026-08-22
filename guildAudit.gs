@@ -1847,21 +1847,31 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     mainCharacterData = getGuildAuditCharacterList(ss);
   }
 
+  // Helper to normalize item strings for flawless key comparison (handles unicode apostrophes, spaces, punctuation)
+  const normalizeItemKey = (s) => (s || '').toString().toLowerCase().replace(/[\u2018\u2019\u0027\u0060]/g, "'").replace(/[^a-z0-9]/g, '');
+
   // Check if sheet exists and read existing sim data map to prioritize sims over raw ilvl
-  const existingSimData = {};
+  const existingSimDataByName = {};
+  const existingSimDataById = {};
   if (sheet.getLastRow() > 1) {
     const existingValues = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
     existingValues.forEach(row => {
-      const itemName = (row[1] || '').toString().toLowerCase().trim();
+      const rawName = (row[1] || '').toString().trim();
+      const normName = normalizeItemKey(rawName);
       const topContender = (row[6] || '').toString();
       const currentEquipped = (row[7] || '').toString();
       const equippedIlvl = row[8];
       const upgradeDelta = (row[9] || '').toString();
       const simStatus = (row[11] || '').toString();
       const notes = (row[12] || '').toString();
+
       // If this item was previously simmed with Raidbots or QE Live, protect and preserve it!
-      if (notes.includes('Sim Upgrades:') || notes.includes('Raidbots') || notes.includes('QE Live') || upgradeDelta.includes('%') || simStatus.includes('Simmed') || simStatus.includes('QE Live')) {
-        existingSimData[itemName] = {
+      const isSimmed = notes.includes('Sim Upgrades:') || notes.includes('Raidbots') || notes.includes('QE Live') || 
+                       upgradeDelta.includes('%') || simStatus.includes('Simmed') || simStatus.includes('QE Live');
+
+      if (isSimmed && normName) {
+        const entry = {
+          rawName: rawName,
           topContender: topContender,
           currentEquipped: currentEquipped,
           equippedIlvl: equippedIlvl,
@@ -1869,6 +1879,12 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
           simStatus: simStatus || '✅ Simmed',
           notes: notes
         };
+        existingSimDataByName[normName] = entry;
+
+        const idMatch = notes.match(/Blizzard ID:\s*(\d+)/i);
+        if (idMatch) {
+          existingSimDataById[parseInt(idMatch[1], 10)] = entry;
+        }
       }
     });
   }
@@ -1881,18 +1897,30 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
         return;
       }
 
-      const cleanItemName = (row[1] || '').toString().toLowerCase().trim();
+      const rawItemName = (row[1] || '').toString().trim();
+      const normItemName = normalizeItemKey(rawItemName);
       const slot = row[2];
       const dropIlvl = Number(row[4]) || 318;
       const targetRole = (row[5] || '').toLowerCase();
-      const baseNotes = row[12];
+      const baseNotes = row[12] || '';
+      const idMatch = baseNotes.match(/Blizzard ID:\s*(\d+)/i);
+      const blizzardId = idMatch ? parseInt(idMatch[1], 10) : null;
 
-      // 1. PRIORITIZE SIMS: If item already has Raidbots Sim data, preserve the % DPS sim priority!
-      if (existingSimData[cleanItemName]) {
-        row[6] = existingSimData[cleanItemName].topContender;
-        row[9] = existingSimData[cleanItemName].upgradeDelta;
-        row[11] = existingSimData[cleanItemName].simStatus;
-        row[12] = existingSimData[cleanItemName].notes;
+      // 1. PRIORITIZE SIMS: Check by normalized name, Blizzard ID, or fuzzy match
+      let preservedSim = existingSimDataByName[normItemName];
+      if (!preservedSim && blizzardId && existingSimDataById[blizzardId]) {
+        preservedSim = existingSimDataById[blizzardId];
+      }
+      if (!preservedSim) {
+        const matchedKey = Object.keys(existingSimDataByName).find(k => isItemNameMatch(k, normItemName));
+        if (matchedKey) preservedSim = existingSimDataByName[matchedKey];
+      }
+
+      if (preservedSim) {
+        row[6] = preservedSim.topContender;
+        row[9] = preservedSim.upgradeDelta;
+        row[11] = preservedSim.simStatus;
+        row[12] = preservedSim.notes;
 
         // Update live equipped item & ilvl for the top contender
         const topNameMatch = (row[6] || '').match(/^([A-Za-z0-9\u00C0-\u024F]+)/);
