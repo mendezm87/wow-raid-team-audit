@@ -2124,7 +2124,7 @@ function isCharacterEligibleForItem(charClass, charSpec, slot, targetSubclass, i
 
         // Comprehensive Armor, Weapon, Stat & Role Eligibility Engine using Assigned Main Spec
         const mainRaidSpec = char['MainSpec'] || char['Expected Spec'] || char['Spec'];
-        const isEligible = isCharacterEligibleForItem(char['Class'], mainRaidSpec, slot, targetRole, cleanItemName);
+        const isEligible = isCharacterEligibleForItem(char['Class'], mainRaidSpec, slot, targetRole, rawItemName);
 
         if (isEligible) {
           const eq = resolveEquippedItemForChar(char, slot);
