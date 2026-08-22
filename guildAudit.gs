@@ -1859,9 +1859,8 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
       const upgradeDelta = (row[9] || '').toString();
       const simStatus = (row[11] || '').toString();
       const notes = (row[12] || '').toString();
-
-      // If this item was previously simmed with Raidbots
-      if (notes.includes('Raidbots Sim Upgrades:') || upgradeDelta.includes('% DPS') || simStatus.includes('Simmed')) {
+      // If this item was previously simmed with Raidbots or QE Live, protect and preserve it!
+      if (notes.includes('Sim Upgrades:') || notes.includes('Raidbots') || notes.includes('QE Live') || upgradeDelta.includes('%') || simStatus.includes('Simmed') || simStatus.includes('QE Live')) {
         existingSimData[itemName] = {
           topContender: topContender,
           currentEquipped: currentEquipped,
