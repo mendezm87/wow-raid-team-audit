@@ -57,21 +57,20 @@ const ALL_WOW_SPECS = [
 
 /**
  * Applies Google Sheets interactive dropdown validation for WoW specs and Main Character Owners on the Config sheet.
+ * Formats Main Characters (Cols A-C) and Alt Characters (Cols E-H) side-by-side for a clean executive layout.
  */
 function applyConfigDropdowns(sheet) {
   if (!sheet) return;
 
   const data = sheet.getDataRange().getValues();
   const mainCharacterNames = [];
-  let altsStartRow = -1;
 
-  for (let r = 0; r < data.length; r++) {
-    const row0 = (data[r][0] || '').toString().toLowerCase().trim();
-    if (row0.includes('alt character') || row0.includes('alts to track')) {
-      altsStartRow = r + 1; // 1-indexed row of Alts header
-    } else if (r >= 5 && altsStartRow === -1 && data[r][0] && !row0.includes('main character')) {
-      const name = data[r][0].toString().trim();
-      if (name && !mainCharacterNames.includes(name)) {
+  // Read Main Characters from Columns A (rows 7 to 45)
+  for (let r = 6; r < Math.min(data.length, 45); r++) {
+    const name = (data[r][0] || '').toString().trim();
+    const row0Lower = name.toLowerCase();
+    if (name && !row0Lower.includes('main character') && !row0Lower.includes('alt character') && !row0Lower.includes('alts to track') && !row0Lower.includes('configuration')) {
+      if (!mainCharacterNames.includes(name)) {
         mainCharacterNames.push(name);
       }
     }
@@ -84,45 +83,74 @@ function applyConfigDropdowns(sheet) {
     .build();
 
   // 2. Main Character Owner Dropdown Rule (Built from active main characters)
-  const mainOwnersList = mainCharacterNames.length > 0 ? mainCharacterNames : ['Jevo', 'Rawria', 'Castite', 'Aemonnd'];
+  const mainOwnersList = mainCharacterNames.length > 0 ? mainCharacterNames : ['Wafflezcalot', 'Rawria', 'Castite', 'Jevo'];
   const mainOwnerRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(mainOwnersList, true)
     .setAllowInvalid(true)
     .build();
 
-  // Apply Spec Dropdowns to Mains (Column B, rows 7 to altsStartRow - 1)
-  const mainsEndRow = altsStartRow > 7 ? altsStartRow - 1 : 40;
-  sheet.getRange(7, 2, mainsEndRow - 6, 1).setDataValidation(specRule);
-
-  // Apply Owner & Spec Dropdowns to Alts (Column B = Owner Dropdown, Column C = Spec Dropdown)
-  if (altsStartRow > 0) {
-    const altDataStartRow = altsStartRow + 1;
-    // Set Alts Table Header with clear column titles
-    sheet.getRange(altsStartRow, 1, 1, 4).setValues([[
-      'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If different)'
-    ]]).setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
-
-    // Column B for Alts: Main Character Owner dropdown
-    sheet.getRange(altDataStartRow, 2, 40, 1).setDataValidation(mainOwnerRule);
-    // Column C for Alts: WoW Spec dropdown
-    sheet.getRange(altDataStartRow, 3, 40, 1).setDataValidation(specRule);
-  }
+  // Apply Spec Dropdowns to Mains (Column B, rows 7 to 40)
+  sheet.getRange('B7:B40').setDataValidation(specRule);
 
   // Section Headers Styling
   sheet.getRange('A1:B1').merge().setHorizontalAlignment('center').setFontWeight('bold').setBackground('#0f172a').setFontColor('#f8fafc');
-  sheet.getRange('A6:C6').setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
-  if (sheet.getRange('A6').getValue().toString().includes('Main Characters')) {
-    sheet.getRange('A6:C6').setValues([['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If different)']]);
-  }
+  sheet.getRange('A6:C6').setValues([['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If different)']])
+    .setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
+
+  // Side-by-Side Alts Table in Columns E to H
+  sheet.getRange('E6:H6').setValues([[
+    'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If different)'
+  ]]).setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
+
+  // Column F for Alts: Main Character Owner dropdown
+  sheet.getRange('F7:F40').setDataValidation(mainOwnerRule);
+  // Column G for Alts: WoW Spec dropdown
+  sheet.getRange('G7:G40').setDataValidation(specRule);
+
+  // Great Vault Reference Table in Columns J to L
+  sheet.getRange('J1:L1').merge().setHorizontalAlignment('center').setFontWeight('bold').setBackground('#0f172a').setFontColor('#f8fafc');
+  sheet.getRange('J2:L2').setValues([['Midnight S2 Great Vault Reference (12.1)', 'Vault ilvl', 'Track']])
+    .setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
 
   // Set generous column widths
-  sheet.setColumnWidth(1, 190); // Main Character Name / Alt Name
-  sheet.setColumnWidth(2, 240); // Assigned Spec (Mains) / Main Owner (Alts)
-  sheet.setColumnWidth(3, 200); // Realm (Mains) / Assigned Spec (Alts)
-  sheet.setColumnWidth(4, 180); // Realm (Alts) / Vault Reference
-  sheet.setColumnWidth(5, 260); // Vault Reference
-  sheet.setColumnWidth(6, 90);  // Vault ilvl
-  sheet.setColumnWidth(7, 110); // Track
+  sheet.setColumnWidth(1, 180); // Main Character Name
+  sheet.setColumnWidth(2, 220); // Assigned Spec (Mains)
+  sheet.setColumnWidth(3, 160); // Realm (Mains)
+  sheet.setColumnWidth(4, 30);  // Spacing Divider
+  sheet.setColumnWidth(5, 180); // Alt Character Name
+  sheet.setColumnWidth(6, 220); // Main Owner Dropdown
+  sheet.setColumnWidth(7, 220); // Assigned Spec (Alts)
+  sheet.setColumnWidth(8, 160); // Realm (Alts)
+  sheet.setColumnWidth(9, 30);  // Spacing Divider
+  sheet.setColumnWidth(10, 240); // Vault Activity
+  sheet.setColumnWidth(11, 90);  // Vault ilvl
+  sheet.setColumnWidth(12, 90);  // Track
+
+  // Auto-migrate legacy stacked Alts in row 35+ to side-by-side columns E-H if detected
+  for (let r = 30; r < data.length; r++) {
+    const row0 = (data[r][0] || '').toString().trim();
+    if (row0 && !row0.toLowerCase().includes('alt') && !row0.toLowerCase().includes('main')) {
+      const altName = row0;
+      const colB = (data[r][1] || '').toString().trim();
+      const colC = (data[r][2] || '').toString().trim();
+
+      // Find first empty row in E7:E40
+      for (let targetR = 7; targetR <= 40; targetR++) {
+        if (!sheet.getRange(`E${targetR}`).getValue()) {
+          const specVal = ALL_WOW_SPECS.includes(colB) ? colB : (ALL_WOW_SPECS.includes(colC) ? colC : '');
+          const ownerVal = mainCharacterNames.find(m => colB.toLowerCase().includes(m.toLowerCase()) || altName.toLowerCase().startsWith(m.toLowerCase().slice(0, 4))) || (altName.toLowerCase().startsWith('waffle') ? 'Wafflezcalot' : '');
+          sheet.getRange(`E${targetR}`).setValue(altName);
+          if (ownerVal) sheet.getRange(`F${targetR}`).setValue(ownerVal);
+          if (specVal) sheet.getRange(`G${targetR}`).setValue(specVal);
+          // Clear legacy stacked row
+          sheet.getRange(`A${r + 1}:D${r + 1}`).clearContent().clearDataValidations();
+          break;
+        }
+      }
+    } else if (row0.toLowerCase().includes('alt character') || row0.toLowerCase().includes('alts to track')) {
+      sheet.getRange(`A${r + 1}:D${r + 1}`).clearContent().clearFormat().clearDataValidations();
+    }
+  }
 }
 
 function createConfigSheet() {
@@ -130,38 +158,26 @@ function createConfigSheet() {
   let sheet = ss.getSheetByName('Config');
   if (sheet) {
     applyConfigDropdowns(sheet);
-    SpreadsheetApp.getUi().alert('The "Config" sheet already exists. Interactive spec dropdowns have been refreshed!');
+    SpreadsheetApp.getUi().alert('The "Config" sheet already exists. Interactive spec and main character dropdowns have been refreshed!');
     return;
   }
   sheet = ss.insertSheet('Config', 0);
   const setupData = [
-      ['Configuration', 'Value', '', 'Midnight S2 Great Vault Reference (12.1)', 'Vault ilvl', 'Track'],
-      ['Region', 'us', '', 'Raid Mythic (Most)', 334, 'Myth'],
-      ['Realm Slug', 'kiljaeden', '', 'Raid Heroic', 318, 'Hero'],
-      ['Guild Slug', 'prey', '', 'Raid Normal', 305, 'Hero'],
-      ['', '', '', 'Raid LFR', 292, 'Champion'],
-      ['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If different)', 'Mythic+ 10+', 318, 'Hero'],
-      ['Jevo', 'Protection', '', 'Mythic+ 7-9', 315, 'Hero'],
-      ['Lyci', 'Balance', '', 'Mythic+ 6', 311, 'Hero'],
-      ['Aemonnd', 'Unholy', '', 'Mythic+ 4-5', 308, 'Hero'],
-      ['', '', '', 'Mythic+ 2-3 / Delves T8-11', 305, 'Hero'],
-      ['Alt Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If different)', 'Mythic 0 / M0', 302, 'Champion'],
-      ['Altcharone', '', '', '', '', ''],
-      ['Altchartwo', '', '', '', '', '']
+      ['Configuration', 'Value', '', '', '', '', '', '', '', 'Midnight S2 Great Vault Reference (12.1)', 'Vault ilvl', 'Track'],
+      ['Region', 'us', '', '', '', '', '', '', '', 'Raid Mythic (Most)', 334, 'Myth'],
+      ['Realm Slug', 'kiljaeden', '', '', '', '', '', '', '', 'Raid Heroic', 318, 'Hero'],
+      ['Guild Slug', 'prey', '', '', '', '', '', '', '', 'Raid Normal', 305, 'Hero'],
+      ['', '', '', '', '', '', '', '', '', 'Raid LFR', 292, 'Champion'],
+      ['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If different)', '', 'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If different)', '', 'Mythic+ 10+', 318, 'Hero'],
+      ['Wafflezcalot', 'Retribution', '', '', 'Wafflelegion', 'Wafflezcalot', 'Protection', '', '', 'Mythic+ 7-9', 315, 'Hero'],
+      ['Fluffytaill', 'Windwalker', '', '', '', '', '', '', '', 'Mythic+ 6', 311, 'Hero'],
+      ['Rawria', 'Vengeance', '', '', '', '', '', '', '', 'Mythic+ 4-5', 308, 'Hero'],
+      ['Jevo', 'Protection', '', '', '', '', '', '', '', 'Mythic+ 2-3 / Delves T8-11', 305, 'Hero'],
+      ['Castite', 'Restoration', '', '', '', '', '', '', '', 'Mythic 0 / M0', 302, 'Champion']
   ];
-  sheet.getRange(1, 1, setupData.length, 6).setValues(setupData);
-  sheet.getRange("A1:B1").merge().setHorizontalAlignment('center').setFontWeight('bold').setBackground('#202124').setFontColor('#ffffff');
-  sheet.getRange("A2:A4").setFontWeight('bold');
-  sheet.getRange("A6:C6").setFontWeight('bold').setBackground('#e8eaed').setHorizontalAlignment('center');
-  sheet.getRange("A11:C11").setFontWeight('bold').setBackground('#e8eaed').setHorizontalAlignment('center');
-  
-  // Reference Table Header Formatting
-  sheet.getRange("D1:F1").setFontWeight('bold').setBackground('#202124').setFontColor('#ffffff').setHorizontalAlignment('center');
-  sheet.getRange("D2:F11").setHorizontalAlignment('center');
-  sheet.autoResizeColumns(1, 6);
-  
+  sheet.getRange(1, 1, setupData.length, 12).setValues(setupData);
   applyConfigDropdowns(sheet);
-  SpreadsheetApp.getUi().alert('"Config" sheet created with Midnight Season 2 (Patch 12.1) Great Vault reference.');
+  SpreadsheetApp.getUi().alert('"Config" sheet created with Side-by-Side Main and Alt character tracking.');
 }
 
 function getConfigurationFromSheet() {
@@ -172,7 +188,7 @@ function getConfigurationFromSheet() {
     return null;
   }
 
-  // Ensure dropdown rules are always present
+  // Ensure dropdown rules and side-by-side formatting are active
   applyConfigDropdowns(configSheet);
 
   const region = configSheet.getRange('B2').getValue().toString().trim().toLowerCase();
@@ -182,60 +198,46 @@ function getConfigurationFromSheet() {
   const data = configSheet.getDataRange().getValues();
   const members = [];
   const alts = [];
-  let readingMains = false;
-  let readingAlts = false;
 
-  for (const row of data) {
-      const header = row[0].toString().toLowerCase().trim();
-      if (header.includes('main character')) {
-          readingMains = true;
-          readingAlts = false;
-          continue;
-      } else if (header.includes('alt character') || header.includes('alts to track')) {
-          readingMains = false;
-          readingAlts = true;
-          continue;
+  // 1. Read Main Characters from Columns A-C (rows 7 to 45)
+  for (let r = 6; r < Math.min(data.length, 45); r++) {
+    const name = (data[r][0] || '').toString().trim();
+    const row0Lower = name.toLowerCase();
+    if (name && !row0Lower.includes('main character') && !row0Lower.includes('alt character') && !row0Lower.includes('configuration')) {
+      members.push({
+        name: name,
+        expectedSpec: data[r][1] ? data[r][1].toString().trim() : '',
+        realm: data[r][2] ? data[r][2].toString().trim() : ''
+      });
+    }
+  }
+
+  // 2. Read Alt Characters from Side-by-Side Columns E-H (rows 7 to 45)
+  for (let r = 6; r < Math.min(data.length, 45); r++) {
+    const altName = (data[r][4] || '').toString().trim();
+    if (altName && !altName.toLowerCase().includes('alt character')) {
+      alts.push({
+        name: altName,
+        mainOwner: data[r][5] ? data[r][5].toString().trim() : '',
+        expectedSpec: data[r][6] ? data[r][6].toString().trim() : '',
+        realm: data[r][7] ? data[r][7].toString().trim() : ''
+      });
+    }
+  }
+
+  // 3. Fallback: Check legacy stacked rows 35+ if present
+  for (let r = 35; r < data.length; r++) {
+    const altName = (data[r][0] || '').toString().trim();
+    if (altName && !altName.toLowerCase().includes('alt') && !altName.toLowerCase().includes('main')) {
+      if (!alts.some(a => a.name.toLowerCase() === altName.toLowerCase())) {
+        alts.push({
+          name: altName,
+          mainOwner: data[r][1] ? data[r][1].toString().trim() : '',
+          expectedSpec: data[r][2] ? data[r][2].toString().trim() : '',
+          realm: data[r][3] ? data[r][3].toString().trim() : ''
+        });
       }
-
-      if (readingMains && row[0]) {
-          members.push({
-            name: row[0].toString().trim(),
-            expectedSpec: row[1] ? row[1].toString().trim() : '',
-            realm: row[2] ? row[2].toString().trim() : ''
-          });
-      } else if (readingAlts && row[0]) {
-          // Support both 4-column [AltName, MainOwner, Spec, Realm] and 3-column [AltName, Spec, Realm]
-          const altName = row[0].toString().trim();
-          const col1 = row[1] ? row[1].toString().trim() : '';
-          const col2 = row[2] ? row[2].toString().trim() : '';
-          const col3 = row[3] ? row[3].toString().trim() : '';
-
-          let mainOwner = '';
-          let expectedSpec = '';
-          let realm = '';
-
-          // If col1 matches a main character or is specified as owner
-          if (col1 && !ALL_WOW_SPECS.includes(col1) && (col2 || col3)) {
-            mainOwner = col1;
-            expectedSpec = col2;
-            realm = col3;
-          } else {
-            expectedSpec = col1;
-            realm = col2;
-          }
-
-          alts.push({
-            name: altName,
-            mainOwner: mainOwner,
-            expectedSpec: expectedSpec,
-            realm: realm
-          });
-      }
-
-      if ((readingMains || readingAlts) && !row[0]) {
-          readingMains = false;
-          readingAlts = false;
-      }
+    }
   }
 
   if (!region || !realmSlug || !guildSlug || members.length === 0) {
