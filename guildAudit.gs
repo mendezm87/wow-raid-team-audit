@@ -92,8 +92,23 @@ function applyConfigDropdowns(sheet) {
   // Apply Spec Dropdowns to Mains (Column B, rows 7 to 40)
   sheet.getRange('B7:B40').setDataValidation(specRule);
 
-  // Section Headers Styling
-  sheet.getRange('A1:B1').merge().setHorizontalAlignment('center').setFontWeight('bold').setBackground('#0f172a').setFontColor('#f8fafc');
+  // Guild Config Header (A1:B1)
+  sheet.getRange('A1:B1').merge().setValue('⚙️ GUILD CONFIGURATION').setHorizontalAlignment('center').setFontWeight('bold').setBackground('#0f172a').setFontColor('#f8fafc');
+  sheet.getRange('A2:A4').setFontWeight('bold');
+
+  // Official Raid Schedule Box (E1:F1 & E2:F4)
+  sheet.getRange('E1:F1').merge().setValue('⏰ OFFICIAL RAID SCHEDULE').setHorizontalAlignment('center').setFontWeight('bold').setBackground('#0f172a').setFontColor('#f8fafc');
+  sheet.getRange('E2:E4').setValues([
+    ['Raid Days'],
+    ['Raid Hours'],
+    ['Time Zone']
+  ]).setFontWeight('bold');
+
+  if (!sheet.getRange('F2').getValue()) sheet.getRange('F2').setValue('Tuesday, Wednesday');
+  if (!sheet.getRange('F3').getValue()) sheet.getRange('F3').setValue('7:00 PM - 10:00 PM');
+  if (!sheet.getRange('F4').getValue()) sheet.getRange('F4').setValue('America/Los_Angeles');
+
+  // Table Headers (Row 6)
   sheet.getRange('A6:C6').setValues([['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If not in guild)']])
     .setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
 
@@ -117,8 +132,8 @@ function applyConfigDropdowns(sheet) {
   sheet.setColumnWidth(2, 220); // Assigned Spec (Mains)
   sheet.setColumnWidth(3, 170); // Realm (If not in guild)
   sheet.setColumnWidth(4, 30);  // Spacing Divider
-  sheet.setColumnWidth(5, 180); // Alt Character Name
-  sheet.setColumnWidth(6, 220); // Main Owner Dropdown
+  sheet.setColumnWidth(5, 180); // Alt Character Name / Schedule Label
+  sheet.setColumnWidth(6, 220); // Main Owner Dropdown / Schedule Value
   sheet.setColumnWidth(7, 220); // Assigned Spec (Alts)
   sheet.setColumnWidth(8, 170); // Realm (If not in guild)
   sheet.setColumnWidth(9, 30);  // Spacing Divider
@@ -163,21 +178,21 @@ function createConfigSheet() {
   }
   sheet = ss.insertSheet('Config', 0);
   const setupData = [
-      ['Configuration', 'Value', '', '', '', '', '', '', '', 'Midnight S2 Great Vault Reference (12.1)', 'Vault ilvl', 'Track'],
-      ['Region', 'us', '', '', '', '', '', '', '', 'Raid Mythic (Most)', 334, 'Myth'],
-      ['Realm Slug', 'kiljaeden', '', '', '', '', '', '', '', 'Raid Heroic', 318, 'Hero'],
-      ['Guild Slug', 'prey', '', '', '', '', '', '', '', 'Raid Normal', 305, 'Hero'],
+      ['Configuration', 'Value', '', '', 'Official Raid Schedule', 'Value', '', '', '', 'Midnight S2 Great Vault Reference (12.1)', 'Vault ilvl', 'Track'],
+      ['Region', 'us', '', '', 'Raid Days', 'Tuesday, Wednesday', '', '', '', 'Raid Mythic (Most)', 334, 'Myth'],
+      ['Realm Slug', 'kiljaeden', '', '', 'Raid Hours', '7:00 PM - 10:00 PM', '', '', '', 'Raid Heroic', 318, 'Hero'],
+      ['Guild Slug', 'prey', '', '', 'Time Zone', 'America/Los_Angeles', '', '', '', 'Raid Normal', 305, 'Hero'],
       ['', '', '', '', '', '', '', '', '', 'Raid LFR', 292, 'Champion'],
-      ['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If different)', '', 'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If different)', '', 'Mythic+ 10+', 318, 'Hero'],
+      ['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If not in guild)', '', 'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If not in guild)', '', 'Mythic+ 10+', 318, 'Hero'],
       ['Wafflezcalot', 'Retribution', '', '', 'Wafflelegion', 'Wafflezcalot', 'Protection', '', '', 'Mythic+ 7-9', 315, 'Hero'],
-      ['Fluffytaill', 'Windwalker', '', '', '', '', '', '', '', 'Mythic+ 6', 311, 'Hero'],
+      ['Fluffytaill', 'Windwalker', '', '', 'Jevofreice', 'Aigirlf', 'Arcane', '', '', 'Mythic+ 6', 311, 'Hero'],
       ['Rawria', 'Vengeance', '', '', '', '', '', '', '', 'Mythic+ 4-5', 308, 'Hero'],
       ['Jevo', 'Protection', '', '', '', '', '', '', '', 'Mythic+ 2-3 / Delves T8-11', 305, 'Hero'],
       ['Castite', 'Restoration', '', '', '', '', '', '', '', 'Mythic 0 / M0', 302, 'Champion']
   ];
   sheet.getRange(1, 1, setupData.length, 12).setValues(setupData);
   applyConfigDropdowns(sheet);
-  SpreadsheetApp.getUi().alert('"Config" sheet created with Side-by-Side Main and Alt character tracking.');
+  SpreadsheetApp.getUi().alert('"Config" sheet created with Side-by-Side Main and Alt character tracking and configurable Raid Schedule.');
 }
 
 function getConfigurationFromSheet() {
@@ -194,6 +209,11 @@ function getConfigurationFromSheet() {
   const region = configSheet.getRange('B2').getValue().toString().trim().toLowerCase();
   const realmSlug = configSheet.getRange('B3').getValue().toString().trim().toLowerCase();
   const guildSlug = configSheet.getRange('B4').getValue().toString().trim().toLowerCase();
+
+  // Read configurable raid schedule
+  const raidDays = configSheet.getRange('F2').getValue().toString().trim() || 'Tuesday, Wednesday';
+  const raidHours = configSheet.getRange('F3').getValue().toString().trim() || '7:00 PM - 10:00 PM';
+  const timeZone = configSheet.getRange('F4').getValue().toString().trim() || 'America/Los_Angeles';
 
   const data = configSheet.getDataRange().getValues();
   const members = [];
@@ -256,6 +276,9 @@ function getConfigurationFromSheet() {
     REGION: region,
     GUILD_REALM_SLUG: realmSlug,
     GUILD_NAME_SLUG: guildSlug,
+    RAID_DAYS: raidDays,
+    RAID_HOURS: raidHours,
+    TIME_ZONE: timeZone,
     MEMBERS_TO_TRACK: members,
     ALTS_TO_TRACK: alts,
     ALT_TO_MAIN_MAP: altToMainMap
