@@ -5,23 +5,25 @@ Welcome raiders! Our guild uses an automated Google Spreadsheet and Discord bot 
 ---
 
 ## 📑 Quick Navigation
-1. [The 3 Tabs in Your Spreadsheet](#1--the-3-tabs-in-your-spreadsheet)
+1. [The 4 Tabs in Your Spreadsheet](#1--the-4-tabs-in-your-spreadsheet)
 2. [Tab 1: Guild Audit (Gems, Enchants, Tier & Vault)](#2--tab-1-guild-audit-gems-enchants-tier--vault)
-3. [Tab 2: Talents & Builds (1-Click Meta Guides)](#3--tab-2-talents--builds-1-click-meta-guides)
-4. [Tab 3: Submitting Your Sims for Loot Council](#4--tab-3-submitting-your-sims-for-loot-council)
+3. [Tab 2: Attendance & History (Season Leaderboard & Logs)](#3--tab-2-attendance--history-season-leaderboard--logs)
+4. [Tab 3: Talents & Builds (1-Click Meta Guides)](#4--tab-3-talents--builds-1-click-meta-guides)
+5. [Tab 4: Submitting Your Sims for Loot Council](#5--tab-4-submitting-your-sims-for-loot-council)
    * [⚔️ DPS & Tanks (Raidbots Droptimizer)](#a-dps--tanks-raidbots-droptimizer)
    * [🩺 Healers (Questionably Epic Live)](#b-healers-questionably-epic-live)
-5. [How Loot Priority is Decided](#5--how-loot-priority-is-decided)
+6. [How Loot Priority is Decided](#6--how-loot-priority-is-decided)
 
 ---
 
-## 1. 📊 The 3 Tabs in Your Spreadsheet
+## 1. 📊 The 4 Tabs in Your Spreadsheet
 
-When you open the guild spreadsheet, you will see 3 main tabs:
+When you open the guild spreadsheet, you will see 4 main tabs:
 
 | Tab Name | Purpose | What You Should Check |
 | :--- | :--- | :--- |
 | **`Guild Audit`** | Live Gear & Readiness | Are you enchanted? Are your gems slotted? Are your Vault slots unlocked? |
+| **`Attendance & History`** | Season Attendance & Logs | Check your Season Attendance %, On-Time %, Boss Kills, and past raid night logs. |
 | **`Talents & Builds`** | Talent Codes & Guides | Hero talent trees, 1-click in-game talent loadout strings, and meta guides. |
 | **`Loot & Chase Items`** | Loot Council Rankings | See the top upgrades per boss and check where you rank for drops! |
 
@@ -39,7 +41,20 @@ This tab automatically synchronizes with Blizzard's live Armory to check your ch
 
 ---
 
-## 3. 🌲 Tab 2: Talents & Builds (1-Click Meta Guides)
+## 3. 📜 Tab 2: Attendance & History (Season Leaderboard & Logs)
+
+Tracks official guild raid attendance and boss progression across the entire season using live **Warcraft Logs** data.
+
+### 🌟 Key Highlights:
+* 📈 **Attendance %**: Percentage of official guild raid nights you were present for.
+* ⏰ **On-Time %**: Percentage of raid nights you were ready and present for the **first pull of the night** (within the first 15 minutes of scheduled start time).
+* ⚔️ **Season Boss Kills**: Total number of unique raid boss encounters defeated across all difficulties.
+* 🔄 **Playing an Alt?**: If an officer has your alt linked to your main character on the `Config` tab, **all attendance, on-time percentage, and boss kill credits automatically combine onto your main character!**
+* 📜 **Historical Raid Night Ledger**: Section 2 at the bottom contains a permanent timeline of every raid night with direct clickable links to Warcraft Logs reports.
+
+---
+
+## 4. 🌲 Tab 3: Talents & Builds (1-Click Meta Guides)
 
 Looking for optimal talent builds for heroic progression or mythic boss encounters?
 
@@ -51,7 +66,7 @@ Looking for optimal talent builds for heroic progression or mythic boss encounte
 
 ---
 
-## 4. 🚀 Tab 3: Submitting Your Sims for Loot Council
+## 5. 🚀 Tab 4: Submitting Your Sims for Loot Council
 
 To make sure the Loot Council knows which boss drops are your biggest upgrades, **submit your sim or healer report once a week** (or after getting new gear).
 
@@ -104,7 +119,7 @@ Because Raidbots does not model healing throughput, healers use **Questionably E
 
 ---
 
-## 5. 👑 How Loot Priority is Decided
+## 6. 👑 How Loot Priority is Decided
 
 On the **`Loot & Chase Items`** sheet, you can see all 8 raid bosses and every piece of gear that drops.
 

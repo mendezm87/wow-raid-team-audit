@@ -27,21 +27,27 @@ Every week before raid night (or after weekly reset):
 
 ## 2. ⚙️ Config Sheet Setup
 
-The `Config` sheet establishes the roster and official raid specs for your team.
+The `Config` sheet establishes the roster, official raid specs, alt-to-main assignments, and official raid schedule.
 
-### 📋 Setup Layout
-| Column A (`Main Character Name`) | Column B (`Assigned Raid Spec`) | Column C (`Realm (If different)`) |
-| :--- | :--- | :--- |
-| `Jevo` | `▼ Protection` *(Dropdown)* | *(blank = Guild Realm)* |
-| `Lyci` | `▼ Balance` *(Dropdown)* | *(blank)* |
-| `Castilo` | `▼ Restoration` *(Dropdown)* | *(blank)* |
-| `Aemonnd` | `▼ Unholy` *(Dropdown)* | `illidan` *(cross-realm)* |
+### 📋 Side-by-Side Executive Layout
+* **Top Left (Rows 1–6):** `⚙️ GUILD & RAID CONFIGURATION`
+  * `Region`: Interactive dropdown (`us`, `eu`, `kr`, `tw`)
+  * `Realm Slug` & `Guild Slug`: Automatic slug sanitization (strips punctuation and formats for API)
+  * `Raid Hours`: e.g. `7:00 PM - 10:00 PM`
+  * `Time Zone`: Interactive dropdown with standard IANA time zones (`America/Los_Angeles (Pacific PT)`, etc.)
+* **Top Right (Rows 1–5):** `⏰ RAID DAYS (TOGGLE ACTIVE NIGHTS)`
+  * Interactive **Checkbox Toggles** for all 7 days (`Tue`, `Wed`, `Thu`, `Mon`, `Fri`, `Sat`, `Sun`). Check the active raid nights—no code edits required!
+* **Main Characters (Columns A–C, Row 8+):**
+  * `Main Character Name` | `Assigned Raid Spec ▼` | `Realm (If not in guild)`
+* **Alt Characters (Columns E–H, Row 8+):**
+  * `Alt Character Name` | `Main Character (Owner ▼)` | `Assigned Spec ▼` | `Realm (If not in guild)`
 
 ### 💡 Key Features:
-* **Interactive Spec Dropdowns**: Column B contains a pre-built dropdown of all 36 WoW specializations.
-* **Assigned Main Spec Priority**: Loot eligibility is strictly evaluated against the **Assigned Main Spec** in Column B. If a raider logs out in an off-spec (e.g. questing in Retribution while assigned Holy Paladin), the audit will flag the logout but **never assign off-spec loot to them**.
-* **Zero-Config Auto-Learning**: If you leave Column B blank, the script automatically detects each raider's active spec on the first audit run and saves it to the dropdown.
-* **Cross-Realm Raiders**: For connected realms or pug trials, simply enter their realm in Column C (or format their name as `Name-Realm`).
+* **Interactive Dropdowns**: Mains and Alts have interactive dropdowns for all 36 WoW specializations. Column F for Alts dynamically populates with active Main Character names!
+* **Alt-to-Main Credit Consolidation**: When a raider plays an alt on raid night, the Warcraft Logs attendance engine credits their attendance, on-time percentage, and boss kills directly to their main character (strictly capped at 100% attendance per night).
+* **Assigned Main Spec Priority**: Loot eligibility is strictly evaluated against the **Assigned Main Spec**. If a raider logs out in an off-spec (e.g. questing in Retribution while assigned Holy Paladin), the audit will flag the logout but **never assign off-spec loot to them**.
+* **Zero-Config Auto-Learning**: If you leave spec blank, the script automatically detects each raider's active spec on the first audit run and saves it to the dropdown.
+* **Cross-Realm Raiders & Trial Auto-Splitting**: For connected realms or pug trials, simply enter their realm in Column C/H (or paste their name as `Name-Realm`—the script automatically splits and places the realm in the right column!).
 
 ---
 
