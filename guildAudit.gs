@@ -68,16 +68,30 @@ const COMMON_TIME_ZONES = [
   'UTC'
 ];
 
-const COMMON_RAID_TIMES = [
-  '12:00 AM', '12:30 AM', '1:00 AM', '1:30 AM', '2:00 AM', '2:30 AM',
-  '3:00 AM', '3:30 AM', '4:00 AM', '4:30 AM', '5:00 AM', '5:30 AM',
-  '6:00 AM', '6:30 AM', '7:00 AM', '7:30 AM', '8:00 AM', '8:30 AM',
-  '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
-  '12:00 PM', '12:30 PM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM',
-  '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM', '5:30 PM',
-  '6:00 PM', '6:30 PM', '7:00 PM', '7:30 PM', '8:00 PM', '8:30 PM',
-  '9:00 PM', '9:30 PM', '10:00 PM', '10:30 PM', '11:00 PM', '11:30 PM'
+const COMMON_HOURS = [
+  '12:00 AM', '1:00 AM', '2:00 AM', '3:00 AM', '4:00 AM', '5:00 AM',
+  '6:00 AM', '7:00 AM', '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM',
+  '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM',
+  '6:00 PM', '7:00 PM', '8:00 PM', '9:00 PM', '10:00 PM', '11:00 PM'
 ];
+
+const COMMON_MINUTES = [
+  ':00', ':15', ':30', ':45'
+];
+
+/**
+ * Combines hour and minute dropdown selections into a standard formatted time string (e.g. "7:30 PM").
+ */
+function formatRaidTime(hourVal, minuteVal) {
+  const hStr = (hourVal || '7:00 PM').toString().trim();
+  const mStr = (minuteVal || ':00').toString().trim();
+  const match = hStr.match(/^(\d{1,2})(?::\d{2})?\s*(AM|PM)?/i);
+  if (!match) return hStr;
+  const hour = match[1];
+  const ampm = match[2] || (hStr.toLowerCase().includes('pm') ? 'PM' : (mStr.toLowerCase().includes('pm') ? 'PM' : 'AM'));
+  const cleanMin = mStr.replace(/[^0-9]/g, '').padStart(2, '0') || '00';
+  return `${hour}:${cleanMin} ${ampm.toUpperCase()}`;
+}
 
 /**
  * Extracts standard IANA time zone identifier (e.g., 'America/Los_Angeles') from user selection or text.
@@ -193,9 +207,14 @@ function applyConfigDropdowns(sheet) {
     .setAllowInvalid(true)
     .build();
 
-  // 5. Raid Start / End Time Dropdown Rule
-  const timeRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(COMMON_RAID_TIMES, true)
+  // 5. Hour & Minute Dropdown Rules
+  const hourRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(COMMON_HOURS, true)
+    .setAllowInvalid(true)
+    .build();
+
+  const minuteRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(COMMON_MINUTES, true)
     .setAllowInvalid(true)
     .build();
 
@@ -219,14 +238,20 @@ function applyConfigDropdowns(sheet) {
   if (!sheet.getRange('B3').getValue()) sheet.getRange('B3').setValue('kiljaeden');
   if (!sheet.getRange('B4').getValue()) sheet.getRange('B4').setValue('prey');
   
-  // Start Time & End Time Dropdowns
-  sheet.getRange('B5').setDataValidation(timeRule);
-  sheet.getRange('B6').setDataValidation(timeRule);
+  // Start Time: Column B (Hour) + Column C (Minute)
+  sheet.getRange('B5').setDataValidation(hourRule);
+  sheet.getRange('C5').setDataValidation(minuteRule).setHorizontalAlignment('center');
   if (!sheet.getRange('B5').getValue()) sheet.getRange('B5').setValue('7:00 PM');
+  if (!sheet.getRange('C5').getValue()) sheet.getRange('C5').setValue(':00');
+
+  // End Time: Column B (Hour) + Column C (Minute)
+  sheet.getRange('B6').setDataValidation(hourRule);
+  sheet.getRange('C6').setDataValidation(minuteRule).setHorizontalAlignment('center');
   if (!sheet.getRange('B6').getValue()) sheet.getRange('B6').setValue('10:00 PM');
+  if (!sheet.getRange('C6').getValue()) sheet.getRange('C6').setValue(':00');
   
-  // Time Zone Dropdown
-  sheet.getRange('B7').setDataValidation(tzRule);
+  // Time Zone Dropdown (Merged across B7:C7)
+  sheet.getRange('B7:C7').merge().setDataValidation(tzRule);
   if (!sheet.getRange('B7').getValue()) sheet.getRange('B7').setValue('America/Los_Angeles (Pacific PT)');
 
   // 2. Right Block: Interactive Raid Days Checkbox Grid (Columns E-H, Rows 1-5)
@@ -270,8 +295,8 @@ function applyConfigDropdowns(sheet) {
 
   // Set generous column widths so all headers and tables are 100% spacious
   sheet.setColumnWidth(1, 190); // Main Character Name
-  sheet.setColumnWidth(2, 230); // Assigned Spec (Mains)
-  sheet.setColumnWidth(3, 180); // Realm (If not in guild)
+  sheet.setColumnWidth(2, 230); // Assigned Spec (Mains) / Hour
+  sheet.setColumnWidth(3, 180); // Realm (If not in guild) / Minute
   sheet.setColumnWidth(4, 30);  // Spacing Divider
   sheet.setColumnWidth(5, 190); // Alt Character Name / Tuesday / Friday
   sheet.setColumnWidth(6, 240); // Main Character (Owner - Dropdown) / Wednesday / Saturday
@@ -316,12 +341,12 @@ function createConfigSheet() {
   }
 
   const setupData = [
-      ['Configuration', 'Value', '', '', 'Raid Days (Toggle Active Nights)', '', '', ''],
+      ['Configuration', 'Hour', 'Minute', '', 'Raid Days (Toggle Active Nights)', '', '', ''],
       ['Region', 'us', '', '', 'Tuesday', 'Wednesday', 'Thursday', 'Monday'],
       ['Realm Slug', 'your-realm', '', '', true, true, false, false],
       ['Guild Slug', 'your-guild', '', '', 'Friday', 'Saturday', 'Sunday', '—'],
-      ['Raid Start Time', '7:00 PM', '', '', false, false, false, ''],
-      ['Raid End Time', '10:00 PM', '', '', '', '', '', ''],
+      ['Raid Start Time', '7:00 PM', ':00', '', false, false, false, ''],
+      ['Raid End Time', '10:00 PM', ':00', '', '', '', '', ''],
       ['Time Zone', 'America/Los_Angeles (Pacific PT)', '', '', '', '', '', ''],
       ['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If not in guild)', '', 'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If not in guild)'],
       ['Character1', 'Retribution', '', '', 'Alt1', 'Character1', 'Protection', ''],
@@ -347,9 +372,9 @@ function getConfigurationFromSheet() {
   const realmSlug = sanitizeSlug(configSheet.getRange('B3').getValue()) || 'kiljaeden';
   const guildSlug = sanitizeSlug(configSheet.getRange('B4').getValue()) || 'prey';
 
-  // Read configurable raid schedule & Day Checkboxes
-  const startTime = configSheet.getRange('B5').getValue().toString().trim() || '7:00 PM';
-  const endTime = configSheet.getRange('B6').getValue().toString().trim() || '10:00 PM';
+  // Read configurable raid schedule (Hour in Col B, Minute in Col C) & Day Checkboxes
+  const startTime = formatRaidTime(configSheet.getRange('B5').getValue(), configSheet.getRange('C5').getValue());
+  const endTime = formatRaidTime(configSheet.getRange('B6').getValue(), configSheet.getRange('C6').getValue());
   const raidHours = `${startTime} - ${endTime}`;
   const timeZoneRaw = configSheet.getRange('B7').getValue().toString().trim();
   const timeZone = extractIanaTimeZone(timeZoneRaw);
