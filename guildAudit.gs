@@ -68,6 +68,14 @@ const COMMON_TIME_ZONES = [
   'UTC'
 ];
 
+const COMMON_RAID_TIMES = [
+  '12:00 PM', '12:30 PM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM',
+  '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM', '5:30 PM',
+  '6:00 PM', '6:30 PM', '7:00 PM', '7:30 PM', '8:00 PM', '8:30 PM',
+  '9:00 PM', '9:30 PM', '10:00 PM', '10:30 PM', '11:00 PM', '11:30 PM',
+  '12:00 AM', '12:30 AM'
+];
+
 /**
  * Extracts standard IANA time zone identifier (e.g., 'America/Los_Angeles') from user selection or text.
  */
@@ -136,7 +144,7 @@ function parseCharacterAndRealm(nameRaw, realmRaw) {
 }
 
 /**
- * Applies Google Sheets interactive dropdown validation for WoW specs, Main Character Owners, Time Zones, and Checkboxes on Config.
+ * Applies Google Sheets interactive dropdown validation for WoW specs, Main Character Owners, Times, Time Zones, and Checkboxes on Config.
  * Formats Main Characters (Cols A-C) and Alt Characters (Cols E-H) side-by-side for a clean executive layout.
  */
 function applyConfigDropdowns(sheet) {
@@ -145,8 +153,8 @@ function applyConfigDropdowns(sheet) {
   const data = sheet.getDataRange().getValues();
   const mainCharacterNames = [];
 
-  // Read Main Characters from Columns A (rows 7 to 45)
-  for (let r = 6; r < Math.min(data.length, 45); r++) {
+  // Read Main Characters from Columns A (rows 9 to 45)
+  for (let r = 8; r < Math.min(data.length, 45); r++) {
     const rawVal = (data[r][0] || '').toString().trim();
     const { name } = parseCharacterAndRealm(rawVal, '');
     const row0Lower = name.toLowerCase();
@@ -164,7 +172,7 @@ function applyConfigDropdowns(sheet) {
     .build();
 
   // 2. Main Character Owner Dropdown Rule (Built from active main characters)
-  const mainOwnersList = mainCharacterNames.length > 0 ? mainCharacterNames : ['Wafflezcalot', 'Rawria', 'Castite', 'Jevo'];
+  const mainOwnersList = mainCharacterNames.length > 0 ? mainCharacterNames : ['Character1', 'Character2'];
   const mainOwnerRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(mainOwnersList, true)
     .setAllowInvalid(true)
@@ -182,28 +190,41 @@ function applyConfigDropdowns(sheet) {
     .setAllowInvalid(true)
     .build();
 
+  // 5. Raid Start / End Time Dropdown Rule
+  const timeRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(COMMON_RAID_TIMES, true)
+    .setAllowInvalid(true)
+    .build();
+
   // Clear any existing validations from header and config rows 1-8 to guarantee NO red error triangles
   sheet.getRange('A1:H8').clearDataValidations();
 
   // Apply Region Dropdown to B2
   sheet.getRange('B2').setDataValidation(regionRule);
 
-  // 1. Left Block: Guild & Schedule Configuration (Columns A-C, Rows 1-6)
+  // 1. Left Block: Guild & Schedule Configuration (Columns A-C, Rows 1-7)
   sheet.getRange('A1:C1').merge().setValue('⚙️ GUILD & RAID CONFIGURATION').setHorizontalAlignment('center').setFontWeight('bold').setBackground('#0f172a').setFontColor('#f8fafc');
-  sheet.getRange('A2:A6').setFontWeight('bold');
+  sheet.getRange('A2:A7').setFontWeight('bold');
   sheet.getRange('A2').setValue('Region');
   sheet.getRange('A3').setValue('Realm Slug');
   sheet.getRange('A4').setValue('Guild Slug');
-  sheet.getRange('A5').setValue('Raid Hours');
-  sheet.getRange('A6').setValue('Time Zone');
+  sheet.getRange('A5').setValue('Raid Start Time');
+  sheet.getRange('A6').setValue('Raid End Time');
+  sheet.getRange('A7').setValue('Time Zone');
 
   if (!sheet.getRange('B2').getValue()) sheet.getRange('B2').setValue('us');
   if (!sheet.getRange('B3').getValue()) sheet.getRange('B3').setValue('kiljaeden');
   if (!sheet.getRange('B4').getValue()) sheet.getRange('B4').setValue('prey');
-  if (!sheet.getRange('B5').getValue()) sheet.getRange('B5').setValue('7:00 PM - 10:00 PM');
   
-  sheet.getRange('B6').setDataValidation(tzRule);
-  if (!sheet.getRange('B6').getValue()) sheet.getRange('B6').setValue('America/Los_Angeles (Pacific PT)');
+  // Start Time & End Time Dropdowns
+  sheet.getRange('B5').setDataValidation(timeRule);
+  sheet.getRange('B6').setDataValidation(timeRule);
+  if (!sheet.getRange('B5').getValue()) sheet.getRange('B5').setValue('7:00 PM');
+  if (!sheet.getRange('B6').getValue()) sheet.getRange('B6').setValue('10:00 PM');
+  
+  // Time Zone Dropdown
+  sheet.getRange('B7').setDataValidation(tzRule);
+  if (!sheet.getRange('B7').getValue()) sheet.getRange('B7').setValue('America/Los_Angeles (Pacific PT)');
 
   // 2. Right Block: Interactive Raid Days Checkbox Grid (Columns E-H, Rows 1-5)
   sheet.getRange('E1:H1').merge().setValue('⏰ RAID DAYS (TOGGLE ACTIVE NIGHTS)').setHorizontalAlignment('center').setFontWeight('bold').setBackground('#0f172a').setFontColor('#f8fafc');
@@ -241,8 +262,7 @@ function applyConfigDropdowns(sheet) {
   sheet.getRange('F9:F45').setDataValidation(mainOwnerRule);
   sheet.getRange('G9:G45').setDataValidation(specRule);
 
-  // Clear rows 7 and any leftover cells beyond Column H
-  sheet.getRange('A7:H7').clearContent().clearFormat().clearDataValidations();
+  // Clear any leftover cells beyond Column H
   sheet.getRange('I1:Z45').clearContent().clearFormat().clearDataValidations();
 
   // Set generous column widths so all headers and tables are 100% spacious
@@ -297,9 +317,9 @@ function createConfigSheet() {
       ['Region', 'us', '', '', 'Tuesday', 'Wednesday', 'Thursday', 'Monday'],
       ['Realm Slug', 'your-realm', '', '', true, true, false, false],
       ['Guild Slug', 'your-guild', '', '', 'Friday', 'Saturday', 'Sunday', '—'],
-      ['Raid Hours', '7:00 PM - 10:00 PM', '', '', false, false, false, ''],
+      ['Raid Start Time', '7:00 PM', '', '', false, false, false, ''],
+      ['Raid End Time', '10:00 PM', '', '', '', '', '', ''],
       ['Time Zone', 'America/Los_Angeles (Pacific PT)', '', '', '', '', '', ''],
-      ['', '', '', '', '', '', '', ''],
       ['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If not in guild)', '', 'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If not in guild)'],
       ['Character1', 'Retribution', '', '', 'Alt1', 'Character1', 'Protection', ''],
       ['Character2', 'Windwalker', '', '', '', '', '', '']
@@ -325,8 +345,10 @@ function getConfigurationFromSheet() {
   const guildSlug = sanitizeSlug(configSheet.getRange('B4').getValue()) || 'prey';
 
   // Read configurable raid schedule & Day Checkboxes
-  const raidHours = configSheet.getRange('B5').getValue().toString().trim() || '7:00 PM - 10:00 PM';
-  const timeZoneRaw = configSheet.getRange('B6').getValue().toString().trim();
+  const startTime = configSheet.getRange('B5').getValue().toString().trim() || '7:00 PM';
+  const endTime = configSheet.getRange('B6').getValue().toString().trim() || '10:00 PM';
+  const raidHours = `${startTime} - ${endTime}`;
+  const timeZoneRaw = configSheet.getRange('B7').getValue().toString().trim();
   const timeZone = extractIanaTimeZone(timeZoneRaw);
 
   const dayLabels = ['Tuesday', 'Wednesday', 'Thursday', 'Monday', 'Friday', 'Saturday', 'Sunday'];
