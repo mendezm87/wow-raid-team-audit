@@ -2114,6 +2114,7 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     ['Boss 8: Ula\'tek', 'Aqirbane Reliquary', 'Neck', 'Heroic', 318, 'All Roles', '', '', '', '', 'Venomcursed BiS', '⚡ Live Armory ilvl', 'Special void altar proc neck/trinket (ID: 268265)'],
     ['Boss 8: Ula\'tek', 'Venomkeeper\'s Horrific Cowl', 'Head', 'Heroic', 318, 'Cloth / Leather Head', '', '', '', '', 'Venomcursed Helm', '⚡ Live Armory ilvl', 'Venomcursed cantrip helm with periodic shadow damage'],
     ['Boss 8: Ula\'tek', 'Chausses of Unbound Rancor', 'Legs', 'Heroic', 318, 'Plate Legs', '', '', '', '', 'Heroic Legs', '⚡ Live Armory ilvl', 'Plate legs with crit/mastery (ID: 271878)'],
+    ['Boss 8: Ula\'tek', 'Jan\'thrazet, the Soul Fang', 'One-Hand (1H)', 'Heroic', 321, 'Dagger (Intellect)', '', '', '', '', 'Heroic Dagger', '⚡ Live Armory ilvl', 'Blizzard ID: 271092 | Dagger with cast speed drain & haste proc'],
 
     // ════════════════════════════════════════════════════════════
     // 📦 TRASH DROPS & OTHER RAID SOURCES
@@ -2745,24 +2746,27 @@ function processAndIngestRaidbotsSims(input) {
   simDataList.forEach(simData => {
     if (!simData) return;
 
-    // 1. Build Item ID to Name & Slot dictionary from simbot.meta.itemLibrary
+    // 1. Build Item ID to Name & Slot dictionary from simbot.meta.itemLibrary & instanceLibrary
     const itemMap = {};
     const slotMap = {};
     const sourceMap = {};
     const encounters = {};
 
-    if (simData.simbot && simData.simbot.meta && simData.simbot.meta.instanceLibrary) {
-      simData.simbot.meta.instanceLibrary.forEach(inst => {
-        if (inst.encounters) {
-          inst.encounters.forEach(enc => {
-            encounters[enc.id] = enc.name;
-          });
-        }
-      });
-    }
+    const rawInstLib = simData.simbot && simData.simbot.meta && simData.simbot.meta.instanceLibrary;
+    const instList = Array.isArray(rawInstLib) ? rawInstLib : (rawInstLib ? Object.values(rawInstLib) : []);
+    instList.forEach(inst => {
+      if (inst && inst.encounters) {
+        const encs = Array.isArray(inst.encounters) ? inst.encounters : Object.values(inst.encounters);
+        encs.forEach(enc => {
+          if (enc && enc.id) encounters[enc.id] = enc.name;
+        });
+      }
+    });
 
-    if (simData.simbot && simData.simbot.meta && simData.simbot.meta.itemLibrary) {
-      simData.simbot.meta.itemLibrary.forEach(it => {
+    const rawItemLib = simData.simbot && simData.simbot.meta && simData.simbot.meta.itemLibrary;
+    const itemsList = Array.isArray(rawItemLib) ? rawItemLib : (rawItemLib ? Object.values(rawItemLib) : []);
+    itemsList.forEach(it => {
+      if (it && it.id) {
         itemMap[it.id] = it.name;
         slotMap[it.id] = it.slot;
         if (it.encounter && it.encounter.name) {
@@ -2774,8 +2778,8 @@ function processAndIngestRaidbotsSims(input) {
         } else if (it.encounterId && encounters[it.encounterId]) {
           sourceMap[it.id] = encounters[it.encounterId];
         }
-      });
-    }
+      }
+    });
 
     let playerName = 'Unknown';
     if (simData.simbot && simData.simbot.player) {
