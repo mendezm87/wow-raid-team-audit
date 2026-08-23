@@ -2917,14 +2917,25 @@ function processAndIngestRaidbotsSims(input) {
   let totalMatches = 0;
   values.forEach(row => {
     const sheetItemName = (row[1] || '').toString().trim();
-    if (itemUpgradeMap[sheetItemName] && itemUpgradeMap[sheetItemName].length > 0) {
-      const contenders = itemUpgradeMap[sheetItemName].sort((a, b) => b.pct - a.pct);
-      const top = contenders[0];
+    if (!sheetItemName) return;
+
+    // Look up upgrades using exact key OR fuzzy isItemNameMatch
+    let contenders = itemUpgradeMap[sheetItemName];
+    if (!contenders || contenders.length === 0) {
+      const matchedKey = Object.keys(itemUpgradeMap).find(k => isItemNameMatch(k, sheetItemName));
+      if (matchedKey && itemUpgradeMap[matchedKey]) {
+        contenders = itemUpgradeMap[matchedKey];
+      }
+    }
+
+    if (contenders && contenders.length > 0) {
+      const sorted = contenders.sort((a, b) => b.pct - a.pct);
+      const top = sorted[0];
       row[6] = `${top.name} (+${top.pct}%)`;
       row[9] = `+${top.pct}% DPS`;
       row[11] = simStatusBadge;
 
-      const topList = contenders.slice(0, 5).map((c, i) => `${i + 1}. ${c.name} (+${c.pct}%)`).join(' | ');
+      const topList = sorted.slice(0, 5).map((c, i) => `${i + 1}. ${c.name} (+${c.pct}%)`).join(' | ');
       row[12] = `Raidbots Sim Upgrades: ${topList}`;
 
       // Populate live equipped item and ilvl for the top contender!
@@ -2944,6 +2955,10 @@ function processAndIngestRaidbotsSims(input) {
           const ilvl1 = extractIlvl(r1);
           const ilvl2 = extractIlvl(r2);
           currentSlotText = (ilvl1 <= ilvl2 && ilvl1 > 0) ? r1 : (ilvl2 > 0 ? r2 : r1);
+        } else if (slot.includes('Two-Hand') || slot.includes('One-Hand') || slot.includes('Main Hand') || slot.includes('Ranged')) {
+          currentSlotText = topChar['Main Hand'] || '-';
+        } else if (slot.includes('Off Hand') || slot.includes('Shield')) {
+          currentSlotText = topChar['Off Hand'] || '-';
         } else {
           currentSlotText = topChar[slot] || '-';
         }
@@ -2956,7 +2971,7 @@ function processAndIngestRaidbotsSims(input) {
   });
 
   // Save back all updated and newly registered items
-  sheet.getRange(2, 1, values.length, sheet.getLastColumn()).setValues(values);
+  sheet.getRange(2, 1, values.length, values[0].length).setValues(values);
 
   return {
     success: true,
@@ -3103,14 +3118,25 @@ function processAndIngestQELiveReport(reportUrlOrId) {
   // Re-write merged rankings onto the sheet
   values.forEach(row => {
     const sheetItemName = (row[1] || '').toString().trim();
-    if (itemUpgradeMap[sheetItemName] && itemUpgradeMap[sheetItemName].length > 0) {
-      const contenders = itemUpgradeMap[sheetItemName].sort((a, b) => b.pct - a.pct);
-      const top = contenders[0];
+    if (!sheetItemName) return;
+
+    // Look up upgrades using exact key OR fuzzy isItemNameMatch
+    let contenders = itemUpgradeMap[sheetItemName];
+    if (!contenders || contenders.length === 0) {
+      const matchedKey = Object.keys(itemUpgradeMap).find(k => isItemNameMatch(k, sheetItemName));
+      if (matchedKey && itemUpgradeMap[matchedKey]) {
+        contenders = itemUpgradeMap[matchedKey];
+      }
+    }
+
+    if (contenders && contenders.length > 0) {
+      const sorted = contenders.sort((a, b) => b.pct - a.pct);
+      const top = sorted[0];
       row[6] = `${top.name} (+${top.pct}%)`;
       row[9] = `+${top.pct}%`;
       row[11] = simStatusBadge;
 
-      const topList = contenders.slice(0, 5).map((c, i) => `${i + 1}. ${c.name} (+${c.pct}%)`).join(' | ');
+      const topList = sorted.slice(0, 5).map((c, i) => `${i + 1}. ${c.name} (+${c.pct}%)`).join(' | ');
       row[12] = `Sim / QE Live Upgrades: ${topList}`;
 
       const topChar = charMap[top.name.toLowerCase()];
@@ -3139,10 +3165,12 @@ function processAndIngestQELiveReport(reportUrlOrId) {
         row[7] = currentSlotText;
         row[8] = extractIlvl(currentSlotText) || '-';
       }
+
+      totalMatches++;
     }
   });
 
-  sheet.getRange(2, 1, values.length, sheet.getLastColumn()).setValues(values);
+  sheet.getRange(2, 1, values.length, values[0].length).setValues(values);
 
   return {
     success: true,
