@@ -2510,10 +2510,41 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
       }
 
       if (preservedSim) {
-        row[6] = preservedSim.topContender;
+        // Extract player name and % gain from preserved topContender string
+        const match = preservedSim.topContender.match(/^([A-Za-z0-9\u00C0-\u024F]+)(?:\s*\(\+?([0-9.]+)(?:%| ilvl)?.*?\))?/);
+        if (match && match[2]) {
+          const charName = match[1];
+          const val = match[2];
+          const isPct = preservedSim.upgradeDelta.includes('%') || preservedSim.topContender.includes('%');
+          row[6] = formatContenderDisplay(charName, val, isPct, rosterContextMap);
+        } else {
+          row[6] = preservedSim.topContender;
+        }
+
         row[9] = preservedSim.upgradeDelta;
         row[11] = preservedSim.simStatus;
-        row[12] = preservedSim.notes;
+
+        // Also update notes with current role & attendance context for all top contenders
+        if (preservedSim.notes.includes('Sim Upgrades:')) {
+          const prefix = preservedSim.notes.includes('Raidbots') ? 'Raidbots Sim Upgrades: ' : 'Sim / QE Live Upgrades: ';
+          const listStr = preservedSim.notes.replace(/^.*Sim Upgrades:\s*/, '');
+          const parts = listStr.split('|');
+          const updatedParts = parts.map((p, idx) => {
+            const pMatch = p.trim().match(/(?:\d+\.\s*)?([A-Za-z0-9\u00C0-\u024F]+)\s*\(\+?([0-9.]+)%.*?\)/);
+            if (pMatch) {
+              const pName = pMatch[1];
+              const pPct = pMatch[2];
+              const pCtx = (rosterContextMap && rosterContextMap[pName.toLowerCase()]) || { role: '⚔️ Raider', attPct: null };
+              const pRole = pCtx.role ? ` | ${pCtx.role}` : '';
+              const pAtt = pCtx.attPct ? ` | ${pCtx.attPct}` : '';
+              return `${idx + 1}. ${pName} (+${pPct}%${pRole}${pAtt})`;
+            }
+            return p.trim();
+          });
+          row[12] = prefix + updatedParts.join(' | ');
+        } else {
+          row[12] = preservedSim.notes;
+        }
 
         // Update live equipped item & ilvl for the top contender
         const topNameMatch = (row[6] || '').match(/^([A-Za-z0-9\u00C0-\u024F]+)/);
