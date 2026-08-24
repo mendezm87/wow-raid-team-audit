@@ -149,7 +149,15 @@ The spreadsheet features full **Warcraft Logs v2 GraphQL API integration** to au
 2. The script queries all official Season 2 raid reports for your guild from Warcraft Logs.
 3. In ~4 seconds, it generates/refreshes the **`Attendance & History`** tab with:
    * **Leaderboard:** Raider Attendance %, Total Raids Attended, Preparation %, and Boss Kills.
-   * **Ledger:** Complete historical timeline of every raid night, bosses defeated, roster present, and direct Warcraft Logs links.
+   * **Ledger:** Complete historical timeline of every raid night, bosses defeated, roster present, bench list, and direct Warcraft Logs links.
+
+### 🪑 7.1 Mythic Bench & Standby Credit Manager:
+Because Warcraft Logs only records raiders inside the 20-player instance, bench raiders standing by in Discord are awarded full credit with a 1-click modal:
+1. In Google Sheets, click **`Guild Audit` $\rightarrow$ `8. 🪑 Mark Bench & Standby Raiders`**.
+2. Select the raid date from the dropdown.
+3. Check the boxes for the raiders who were on standby in Discord (supports any number of bench players).
+4. Click **`💾 Save & Award Bench Credit`**.
+5. The system immediately awards them **100% Attendance & On-Time credit**, updates the Ledger column (`🪑 Bench / Standby`), and recalculates all Priority Scores on `Loot & Chase Items`!
 
 ---
 
