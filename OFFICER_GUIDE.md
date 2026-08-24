@@ -102,11 +102,20 @@ An intelligent **Loot Council Assistant** configured with all 8 bosses of **The 
   * Shields are assigned strictly to Shield specs (Prot Warrior, Prot/Holy Paladin, Ele/Resto Shaman).
   * Holdables are assigned strictly to Intellect casters & healers.
 
-### 👑 Real-Time Contender Context (Role & Attendance Badges):
-Contenders display their mathematical upgrade alongside their **Roster Tenure** and **Season Attendance**:
-* **Veteran:** `Castite (+4.77% DPS • 👑 Veteran • 100% Att)`
-* **Raider:** `Spellbreakr (+4.12% DPS • ⚔️ Raider • 95% Att)`
-* **Trial:** `NewRecruit (+5.20% DPS • 🛡️ Trial • 100% Att)`
+### 🧮 Objective Composite Priority Score Engine:
+To eliminate guesswork, contenders are sorted automatically by a mathematically objective **Priority Score**:
+
+$$\text{Priority Score} = \text{Raw Upgrade Gain} \times \left(\frac{\text{Attendance \%}}{100}\right) \times \text{Role Multiplier}$$
+
+* **Role Multipliers**:
+  * 👑 **`👑 Veteran` ($1.10\times$)**: $+10\%$ priority bonus for proven multi-season loyalty.
+  * ⚔️ **`⚔️ Raider` ($1.00\times$)**: Core standard baseline.
+  * 🛡️ **`🛡️ Trial` ($0.80\times$)**: $-20\%$ modifier until trial graduation.
+* **Attendance Factor**: Scaled from active season raid attendance (`Attendance % / 100`).
+
+### 👑 Contender Display Badges:
+* **Top Contender (Column G):** `Summzr [Score: 4.62] (+4.20% DPS • 👑 Veteran • 100% Att)`
+* **Loot Council Notes (Column M):** `Rankings: 1. Summzr [Score: 4.62] (+4.20% | 👑 Veteran | 100%) | 2. NewTrial [Score: 4.00] (+5.00% | 🛡️ Trial | 100%)`
 
 ### 🎨 Top Contender Color-Coding (Column G):
 * 🟢 **Mint Green (`#d1fae5`)**: Item is evaluated via an active sim (**Raidbots `% DPS`** or **QE Live `% HPS`**).
