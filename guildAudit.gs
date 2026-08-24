@@ -2065,18 +2065,61 @@ function getRosterContextMap(ss) {
 }
 
 /**
- * Formats a contender string with their Roster Role (Veteran/Raider/Trial) and Attendance % context.
+ * Calculates a composite Loot Council Priority Score balancing mathematical upgrade, season attendance, and roster role.
+ * Formula: Score = RawGain * AttendanceFactor * RoleMultiplier
+ * - Role: Veteran (1.10x), Raider (1.00x), Trial (0.80x)
+ * - Attendance: min(1.0, max(0.40, attPct / 100))
  */
-function formatContenderDisplay(name, valueStr, isSim, contextMap) {
+function calculatePriorityScore(rawGain, charName, isSim, contextMap) {
+  const numGain = parseFloat(rawGain) || 0;
+  const normalizedGain = isSim ? numGain : (numGain / 10); // Scale +ilvl deltas comparable to % gain
+
+  const lower = (charName || '').toLowerCase().trim();
+  const ctx = (contextMap && contextMap[lower]) || { role: '⚔️ Raider', attPct: null };
+  const role = ctx.role || '⚔️ Raider';
+
+  let roleMult = 1.00;
+  if (role.includes('Veteran') || role.includes('👑')) roleMult = 1.10;
+  else if (role.includes('Trial') || role.includes('🛡️')) roleMult = 0.80;
+
+  let attFactor = 1.00;
+  if (ctx.attPct) {
+    const parsedAtt = parseFloat(ctx.attPct.replace('%', ''));
+    if (!isNaN(parsedAtt)) {
+      attFactor = Math.min(1.0, Math.max(0.40, parsedAtt / 100));
+    }
+  }
+
+  const score = normalizedGain * attFactor * roleMult;
+  return {
+    score: Number(score.toFixed(2)),
+    rawGain: numGain,
+    role: role,
+    roleMult: roleMult,
+    attPct: ctx.attPct || '100%',
+    attFactor: attFactor
+  };
+}
+
+/**
+ * Formats a contender string with their Priority Score, Roster Role, and Attendance % context.
+ */
+function formatContenderDisplay(name, valueStr, isSim, contextMap, scoreObj) {
   const lower = (name || '').toLowerCase().trim();
   const ctx = (contextMap && contextMap[lower]) || { role: '⚔️ Raider', attPct: null };
   const roleBadge = ctx.role || '⚔️ Raider';
   const attBadge = ctx.attPct ? ` • ${ctx.attPct} Att` : '';
 
+  if (!scoreObj) {
+    scoreObj = calculatePriorityScore(valueStr, name, isSim, contextMap);
+  }
+
+  const scoreBadge = `[Score: ${scoreObj.score}]`;
+
   if (isSim) {
-    return `${name} (+${valueStr}% DPS • ${roleBadge}${attBadge})`;
+    return `${name} ${scoreBadge} (+${valueStr}% DPS • ${roleBadge}${attBadge})`;
   } else {
-    return `${name} (+${valueStr} • ${roleBadge}${attBadge})`;
+    return `${name} ${scoreBadge} (+${valueStr} • ${roleBadge}${attBadge})`;
   }
 }
 
@@ -2510,41 +2553,53 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
       }
 
       if (preservedSim) {
-        // Extract player name and % gain from preserved topContender string
-        const match = preservedSim.topContender.match(/^([A-Za-z0-9\u00C0-\u024F]+)(?:\s*\(\+?([0-9.]+)(?:%| ilvl)?.*?\))?/);
-        if (match && match[2]) {
-          const charName = match[1];
-          const val = match[2];
-          const isPct = preservedSim.upgradeDelta.includes('%') || preservedSim.topContender.includes('%');
-          row[6] = formatContenderDisplay(charName, val, isPct, rosterContextMap);
-        } else {
-          row[6] = preservedSim.topContender;
-        }
-
-        row[9] = preservedSim.upgradeDelta;
-        row[11] = preservedSim.simStatus;
-
-        // Also update notes with current role & attendance context for all top contenders
-        if (preservedSim.notes.includes('Sim Upgrades:')) {
-          const prefix = preservedSim.notes.includes('Raidbots') ? 'Raidbots Sim Upgrades: ' : 'Sim / QE Live Upgrades: ';
+        // Parse all contenders from preserved notes to recalculate and re-rank by composite Priority Score
+        const simContenders = [];
+        if (preservedSim.notes && preservedSim.notes.includes('Sim Upgrades:')) {
           const listStr = preservedSim.notes.replace(/^.*Sim Upgrades:\s*/, '');
           const parts = listStr.split('|');
-          const updatedParts = parts.map((p, idx) => {
-            const pMatch = p.trim().match(/(?:\d+\.\s*)?([A-Za-z0-9\u00C0-\u024F]+)\s*\(\+?([0-9.]+)%.*?\)/);
+          parts.forEach(p => {
+            const pMatch = p.trim().match(/(?:\d+\.\s*)?([A-Za-z0-9\u00C0-\u024F]+)(?:\s*\[Score:\s*[0-9.]+\])?\s*\(\+?([0-9.]+)%/);
             if (pMatch) {
               const pName = pMatch[1];
-              const pPct = pMatch[2];
-              const pCtx = (rosterContextMap && rosterContextMap[pName.toLowerCase()]) || { role: '⚔️ Raider', attPct: null };
-              const pRole = pCtx.role ? ` | ${pCtx.role}` : '';
-              const pAtt = pCtx.attPct ? ` | ${pCtx.attPct}` : '';
-              return `${idx + 1}. ${pName} (+${pPct}%${pRole}${pAtt})`;
+              const pPct = parseFloat(pMatch[2]);
+              const prio = calculatePriorityScore(pPct, pName, true, rosterContextMap);
+              simContenders.push({ name: pName, pct: pPct, priority: prio });
             }
-            return p.trim();
           });
-          row[12] = prefix + updatedParts.join(' | ');
+        }
+
+        if (simContenders.length > 0) {
+          // Re-sort by highest composite Priority Score
+          simContenders.sort((a, b) => b.priority.score - a.priority.score || b.pct - a.pct);
+          const top = simContenders[0];
+          row[6] = formatContenderDisplay(top.name, top.pct, true, rosterContextMap, top.priority);
+          row[9] = `+${top.pct}% DPS`;
+
+          const prefix = preservedSim.notes.includes('Raidbots') ? 'Raidbots Sim Upgrades: ' : 'Sim / QE Live Upgrades: ';
+          const topList = simContenders.slice(0, 5).map((c, i) => {
+            const pRole = c.priority.role ? ` | ${c.priority.role}` : '';
+            const pAtt = c.priority.attPct ? ` | ${c.priority.attPct}` : '';
+            return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.pct}%${pRole}${pAtt})`;
+          });
+          row[12] = prefix + topList.join(' | ');
         } else {
+          // Fallback if notes were plain text
+          const match = preservedSim.topContender.match(/^([A-Za-z0-9\u00C0-\u024F]+)(?:\s*\[Score:\s*[0-9.]+\])?(?:\s*\(\+?([0-9.]+)(?:%| ilvl)?.*?\))?/);
+          if (match && match[2]) {
+            const charName = match[1];
+            const val = parseFloat(match[2]);
+            const isPct = preservedSim.upgradeDelta.includes('%') || preservedSim.topContender.includes('%');
+            const prio = calculatePriorityScore(val, charName, isPct, rosterContextMap);
+            row[6] = formatContenderDisplay(charName, val, isPct, rosterContextMap, prio);
+          } else {
+            row[6] = preservedSim.topContender;
+          }
+          row[9] = preservedSim.upgradeDelta;
           row[12] = preservedSim.notes;
         }
+
+        row[11] = preservedSim.simStatus;
 
         // Update live equipped item & ilvl for the top contender
         const topNameMatch = (row[6] || '').match(/^([A-Za-z0-9\u00C0-\u024F]+)/);
@@ -2559,7 +2614,7 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
         return;
       }
 
-      // 2. FALLBACK: For unsimmed items, calculate Live Equipped ilvl Delta
+      // 2. FALLBACK: For unsimmed items, calculate Live Equipped ilvl Delta with Priority Score
       const contenders = [];
 
       mainCharacterData.forEach(char => {
@@ -2573,9 +2628,11 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
           const eq = resolveEquippedItemForChar(char, slot);
           if (eq.ilvl > 0) {
             const delta = dropIlvl - eq.ilvl;
+            const prio = calculatePriorityScore(delta, char['Name'], false, rosterContextMap);
             contenders.push({
               name: char['Name'],
               delta: delta,
+              priority: prio,
               equippedText: eq.text,
               equippedIlvl: eq.ilvl
             });
@@ -2583,23 +2640,22 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
         }
       });
 
-      // Sort by largest upgrade delta
-      contenders.sort((a, b) => b.delta - a.delta);
+      // Sort by highest composite Priority Score
+      contenders.sort((a, b) => b.priority.score - a.priority.score || b.delta - a.delta);
 
       if (contenders.length > 0) {
         const top = contenders[0];
-        row[6] = formatContenderDisplay(top.name, top.delta, false, rosterContextMap);
+        row[6] = formatContenderDisplay(top.name, top.delta, false, rosterContextMap, top.priority);
         row[7] = top.equippedText;
         row[8] = top.equippedIlvl;
         row[9] = `+${top.delta}`;
         row[11] = '⚡ Live Armory ilvl';
 
-        // Top 3 list in Notes with Role and Attendance context
+        // Top 3 list in Notes with Priority Score, Role, and Attendance context
         const top3List = contenders.slice(0, 3).map((c, i) => {
-          const cCtx = (rosterContextMap && rosterContextMap[c.name.toLowerCase()]) || { role: '⚔️ Raider', attPct: null };
-          const cRole = cCtx.role ? ` | ${cCtx.role}` : '';
-          const cAtt = cCtx.attPct ? ` | ${cCtx.attPct}` : '';
-          return `${i + 1}. ${c.name} (+${c.delta}${cRole}${cAtt})`;
+          const cRole = c.priority.role ? ` | ${c.priority.role}` : '';
+          const cAtt = c.priority.attPct ? ` | ${c.priority.attPct}` : '';
+          return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.delta}${cRole}${cAtt})`;
         }).join(' | ');
         row[12] = `${baseNotes} (Top Upgrades: ${top3List})`;
       }
@@ -3050,17 +3106,19 @@ function processAndIngestRaidbotsSims(input) {
     }
 
     if (contenders && contenders.length > 0) {
-      const sorted = contenders.sort((a, b) => b.pct - a.pct);
+      contenders.forEach(c => {
+        c.priority = calculatePriorityScore(c.pct, c.name, true, rosterContextMap);
+      });
+      const sorted = contenders.sort((a, b) => b.priority.score - a.priority.score || b.pct - a.pct);
       const top = sorted[0];
-      row[6] = formatContenderDisplay(top.name, top.pct, true, rosterContextMap);
+      row[6] = formatContenderDisplay(top.name, top.pct, true, rosterContextMap, top.priority);
       row[9] = `+${top.pct}% DPS`;
       row[11] = simStatusBadge;
 
       const topList = sorted.slice(0, 5).map((c, i) => {
-        const cCtx = (rosterContextMap && rosterContextMap[c.name.toLowerCase()]) || { role: '⚔️ Raider', attPct: null };
-        const cRole = cCtx.role ? ` | ${cCtx.role}` : '';
-        const cAtt = cCtx.attPct ? ` | ${cCtx.attPct}` : '';
-        return `${i + 1}. ${c.name} (+${c.pct}%${cRole}${cAtt})`;
+        const cRole = c.priority.role ? ` | ${c.priority.role}` : '';
+        const cAtt = c.priority.attPct ? ` | ${c.priority.attPct}` : '';
+        return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.pct}%${cRole}${cAtt})`;
       }).join(' | ');
       row[12] = `Raidbots Sim Upgrades: ${topList}`;
 
@@ -3259,17 +3317,19 @@ function processAndIngestQELiveReport(reportUrlOrId) {
     }
 
     if (contenders && contenders.length > 0) {
-      const sorted = contenders.sort((a, b) => b.pct - a.pct);
+      contenders.forEach(c => {
+        c.priority = calculatePriorityScore(c.pct, c.name, true, rosterContextMap);
+      });
+      const sorted = contenders.sort((a, b) => b.priority.score - a.priority.score || b.pct - a.pct);
       const top = sorted[0];
-      row[6] = formatContenderDisplay(top.name, top.pct, false, rosterContextMap);
-      row[9] = `+${top.pct}%`;
+      row[6] = formatContenderDisplay(top.name, top.pct, true, rosterContextMap, top.priority);
+      row[9] = `+${top.pct}% HPS`;
       row[11] = simStatusBadge;
 
       const topList = sorted.slice(0, 5).map((c, i) => {
-        const cCtx = (rosterContextMap && rosterContextMap[c.name.toLowerCase()]) || { role: '⚔️ Raider', attPct: null };
-        const cRole = cCtx.role ? ` | ${cCtx.role}` : '';
-        const cAtt = cCtx.attPct ? ` | ${cCtx.attPct}` : '';
-        return `${i + 1}. ${c.name} (+${c.pct}%${cRole}${cAtt})`;
+        const cRole = c.priority.role ? ` | ${c.priority.role}` : '';
+        const cAtt = c.priority.attPct ? ` | ${c.priority.attPct}` : '';
+        return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.pct}%${cRole}${cAtt})`;
       }).join(' | ');
       row[12] = `Sim / QE Live Upgrades: ${topList}`;
 
