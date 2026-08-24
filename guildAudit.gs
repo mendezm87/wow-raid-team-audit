@@ -3695,9 +3695,22 @@ function syncWarcraftLogsSeasonAttendance() {
       }
     });
 
-    // Evaluate if this session meets the Official Guild Raid criteria (Scheduled Day + Guild Quorum)
+    // Determine highest difficulty fought during this raid session (5 = Mythic, 4 = Heroic, 3 = Normal)
+    let isMythicSession = false;
+    session.reports.forEach(r => {
+      if ((r.bossKills || []).some(b => b.difficulty === 5)) {
+        isMythicSession = true;
+      }
+    });
+
+    // Blizzard Guild Group Quorums:
+    // - Mythic (20-player locked): Minimum 15 guild members (Cancels if missing >5 raiders)
+    // - Heroic / Normal (Flex): Minimum 10 guild members (Minimum flex raid baseline)
+    const requiredGuildQuorum = isMythicSession ? 15 : 10;
+
+    // Evaluate if this session meets the Official Guild Raid criteria (Scheduled Day + Difficulty-Aware Guild Quorum)
     const isScheduledDay = activeDaysList.length === 0 || activeDaysList.some(d => session.dayOfWeek.toLowerCase().includes(d));
-    const hasGuildQuorum = uniqueSessionMains.size >= minGuildQuorum;
+    const hasGuildQuorum = uniqueSessionMains.size >= requiredGuildQuorum;
     const isOfficial = hasGuildQuorum && isScheduledDay;
 
     const presentOnTime = [];
