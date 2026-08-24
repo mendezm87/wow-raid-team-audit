@@ -157,9 +157,15 @@ function parseCharacterAndRealm(nameRaw, realmRaw) {
   return { name, realm };
 }
 
+const ROSTER_ROLES = [
+  '👑 Veteran',
+  '⚔️ Raider',
+  '🛡️ Trial'
+];
+
 /**
- * Applies Google Sheets interactive dropdown validation for WoW specs, Main Character Owners, Times, Time Zones, and Checkboxes on Config.
- * Formats Main Characters (Cols A-C) and Alt Characters (Cols E-H) side-by-side for a clean executive layout.
+ * Applies Google Sheets interactive dropdown validation for WoW specs, Roster Roles, Main Character Owners, Times, Time Zones, and Checkboxes on Config.
+ * Formats Main Characters (Cols A-D) and Alt Characters (Cols F-I) side-by-side for a clean executive layout.
  */
 function applyConfigDropdowns(sheet) {
   if (!sheet) return;
@@ -185,26 +191,32 @@ function applyConfigDropdowns(sheet) {
     .setAllowInvalid(true)
     .build();
 
-  // 2. Main Character Owner Dropdown Rule (Built from active main characters)
+  // 2. Roster Role Dropdown Rule (Veteran / Raider / Trial)
+  const roleRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(ROSTER_ROLES, true)
+    .setAllowInvalid(true)
+    .build();
+
+  // 3. Main Character Owner Dropdown Rule (Built from active main characters)
   const mainOwnersList = mainCharacterNames.length > 0 ? mainCharacterNames : ['Character1', 'Character2'];
   const mainOwnerRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(mainOwnersList, true)
     .setAllowInvalid(true)
     .build();
 
-  // 3. Time Zone Dropdown Rule
+  // 4. Time Zone Dropdown Rule
   const tzRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(COMMON_TIME_ZONES, true)
     .setAllowInvalid(true)
     .build();
 
-  // 4. Region Dropdown Rule
+  // 5. Region Dropdown Rule
   const regionRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(['us', 'eu', 'kr', 'tw'], true)
     .setAllowInvalid(true)
     .build();
 
-  // 5. Hour, Minute, and AM/PM Dropdown Rules
+  // 6. Hour, Minute, and AM/PM Dropdown Rules
   const hourRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(COMMON_HOURS, true)
     .setAllowInvalid(true)
@@ -284,19 +296,18 @@ function applyConfigDropdowns(sheet) {
   // 3. Main Character & Alt Roster Table Headers (Row 8)
   sheet.getRange('A8').setValue('Main Character Name').setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
   sheet.getRange('B8').setValue('Assigned Raid Spec (Dropdown)').setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
-  sheet.getRange('C8:D8').merge().setValue('Realm (If not in guild)').setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
+  sheet.getRange('C8').setValue('Roster Role (Dropdown)').setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
+  sheet.getRange('D8').setValue('Realm (If not in guild)').setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
 
   sheet.getRange('F8:I8').setValues([[
     'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If not in guild)'
   ]]).setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
 
-  // Spec Dropdown for Mains (Column B, rows 9 to 45 ONLY - never row 8)
+  // Spec Dropdown for Mains (Column B, rows 9 to 45 ONLY)
   sheet.getRange('B9:B45').setDataValidation(specRule);
 
-  // Merge C:D for Mains Realm column across rows 9 to 45 so text has generous room
-  for (let r = 9; r <= 45; r++) {
-    sheet.getRange(`C${r}:D${r}`).merge();
-  }
+  // Roster Role Dropdown for Mains (Column C, rows 9 to 45 ONLY)
+  sheet.getRange('C9:C45').setDataValidation(roleRule).setHorizontalAlignment('center');
 
   // Dropdowns for Alts (Column G = Owner Dropdown, Column H = Spec Dropdown, rows 9 to 45 ONLY)
   sheet.getRange('G9:G45').setDataValidation(mainOwnerRule);
@@ -306,21 +317,21 @@ function applyConfigDropdowns(sheet) {
   sheet.getRange('J1:Z45').clearContent().clearFormat().clearDataValidations();
 
   // Set generous column widths so all headers and tables are 100% spacious
-  sheet.setColumnWidth(1, 190); // Main Character Name
-  sheet.setColumnWidth(2, 220); // Assigned Spec (Mains) / Hour
-  sheet.setColumnWidth(3, 110); // Realm (Col C) / Minute
-  sheet.setColumnWidth(4, 80);  // Realm (Col D) / AM-PM
+  sheet.setColumnWidth(1, 180); // Main Character Name
+  sheet.setColumnWidth(2, 210); // Assigned Spec (Mains) / Hour
+  sheet.setColumnWidth(3, 130); // Roster Role (Col C) / Minute
+  sheet.setColumnWidth(4, 160); // Realm (Col D) / AM-PM
   sheet.setColumnWidth(5, 30);  // Spacing Divider
-  sheet.setColumnWidth(6, 190); // Alt Character Name / Tuesday / Friday
-  sheet.setColumnWidth(7, 240); // Main Character (Owner - Dropdown) / Wednesday / Saturday
-  sheet.setColumnWidth(8, 220); // Assigned Spec (Alts) / Thursday / Sunday
-  sheet.setColumnWidth(9, 180); // Realm (Alts) / Monday
+  sheet.setColumnWidth(6, 180); // Alt Character Name / Tuesday / Friday
+  sheet.setColumnWidth(7, 230); // Main Character (Owner - Dropdown) / Wednesday / Saturday
+  sheet.setColumnWidth(8, 210); // Assigned Spec (Alts) / Thursday / Sunday
+  sheet.setColumnWidth(9, 170); // Realm (Alts) / Monday
 
   // Auto-migrate legacy stacked Alts in row 35+ to side-by-side columns F-I if detected
   for (let r = 30; r < data.length; r++) {
     const row0 = (data[r][0] || '').toString().trim();
     if (row0 && !row0.toLowerCase().includes('alt') && !row0.toLowerCase().includes('main')) {
-      const { name: altName, realm: parsedRealm } = parseCharacterAndRealm(row0, data[r][2] || data[r][3] || '');
+      const { name: altName, realm: parsedRealm } = parseCharacterAndRealm(row0, data[r][3] || data[r][2] || '');
       const colB = (data[r][1] || '').toString().trim();
       const colC = (data[r][2] || '').toString().trim();
 
@@ -361,9 +372,9 @@ function createConfigSheet() {
       ['Raid Start Time', 7, ':00', 'PM', '', false, false, false, ''],
       ['Raid End Time', 10, ':00', 'PM', '', '', '', '', ''],
       ['Time Zone', 'America/Los_Angeles (Pacific PT)', '', '', '', '', '', '', ''],
-      ['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Realm (If not in guild)', '', '', 'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If not in guild)'],
-      ['Character1', 'Retribution', '', '', '', 'Alt1', 'Character1', 'Protection', ''],
-      ['Character2', 'Windwalker', '', '', '', '', '', '', '']
+      ['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Roster Role (Dropdown)', 'Realm (If not in guild)', '', 'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If not in guild)'],
+      ['Character1', 'Retribution', '👑 Veteran', '', '', 'Alt1', 'Character1', 'Protection', ''],
+      ['Character2', 'Windwalker', '⚔️ Raider', '', '', '', '', '', '']
   ];
   sheet.getRange(1, 1, setupData.length, 9).setValues(setupData);
   applyConfigDropdowns(sheet);
@@ -416,13 +427,15 @@ function getConfigurationFromSheet() {
   // 1. Read Main Characters from Columns A-D (rows 9 to 45)
   for (let r = 8; r < Math.min(data.length, 45); r++) {
     const rawName = (data[r][0] || '').toString().trim();
-    const { name, realm: parsedRealm } = parseCharacterAndRealm(rawName, data[r][2] ? data[r][2].toString().trim() : '');
+    const { name, realm: parsedRealm } = parseCharacterAndRealm(rawName, data[r][3] ? data[r][3].toString().trim() : '');
     const row0Lower = name.toLowerCase();
     if (name && !row0Lower.includes('main character') && !row0Lower.includes('alt character') && !row0Lower.includes('configuration')) {
+      const roleVal = (data[r][2] || '⚔️ Raider').toString().trim() || '⚔️ Raider';
       members.push({
         name: name,
         expectedSpec: normalizeSpecName(data[r][1] ? data[r][1].toString().trim() : ''),
-        realm: parsedRealm || (data[r][2] ? data[r][2].toString().trim() : '')
+        role: roleVal,
+        realm: parsedRealm || (data[r][3] ? data[r][3].toString().trim() : '')
       });
     }
   }
@@ -2002,6 +2015,253 @@ function fetchLiveBlizzardRaidLootTable(config, token) {
 }
 
 /**
+ * Reads Roster Roles (from Config) and Season Attendance % / On-Time % (from Attendance & History)
+ * to provide real-time context on the Loot & Chase Items sheet.
+ */
+function getRosterContextMap(ss) {
+  const contextMap = {};
+  if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // 1. Read Roster Roles from Config
+  const configSheet = ss.getSheetByName('Config');
+  if (configSheet && configSheet.getLastRow() >= 9) {
+    const numRows = Math.min(configSheet.getLastRow() - 8, 37);
+    const configData = configSheet.getRange(9, 1, numRows, 4).getValues();
+    configData.forEach(row => {
+      const rawName = (row[0] || '').toString().trim();
+      const { name } = parseCharacterAndRealm(rawName, '');
+      const role = (row[2] || '⚔️ Raider').toString().trim() || '⚔️ Raider';
+      if (name && !name.toLowerCase().includes('main character')) {
+        contextMap[name.toLowerCase()] = {
+          name: name,
+          role: role,
+          attPct: null,
+          onTimePct: null
+        };
+      }
+    });
+  }
+
+  // 2. Read Attendance % from Attendance & History tab if it exists
+  const attSheet = ss.getSheetByName('Attendance & History');
+  if (attSheet && attSheet.getLastRow() >= 4) {
+    const attValues = attSheet.getDataRange().getValues();
+    attValues.forEach(row => {
+      const name = (row[1] || '').toString().trim();
+      const attStr = (row[3] || '').toString().trim(); // Attendance %
+      const onTimeStr = (row[4] || '').toString().trim(); // On-Time %
+      if (name && attStr.includes('%')) {
+        const lower = name.toLowerCase();
+        if (!contextMap[lower]) {
+          contextMap[lower] = { name: name, role: '⚔️ Raider', attPct: null, onTimePct: null };
+        }
+        contextMap[lower].attPct = attStr;
+        contextMap[lower].onTimePct = onTimeStr;
+      }
+    });
+  }
+
+  return contextMap;
+}
+
+/**
+ * Formats a contender string with their Roster Role (Veteran/Raider/Trial) and Attendance % context.
+ */
+function formatContenderDisplay(name, valueStr, isSim, contextMap) {
+  const lower = (name || '').toLowerCase().trim();
+  const ctx = (contextMap && contextMap[lower]) || { role: '⚔️ Raider', attPct: null };
+  const roleBadge = ctx.role || '⚔️ Raider';
+  const attBadge = ctx.attPct ? ` • ${ctx.attPct} Att` : '';
+
+  if (isSim) {
+    return `${name} (+${valueStr}% DPS • ${roleBadge}${attBadge})`;
+  } else {
+    return `${name} (+${valueStr} • ${roleBadge}${attBadge})`;
+  }
+}
+
+/**
+ * Evaluates whether a character is eligible to equip and use an item in their main spec.
+ * Strictly enforces WoW Armor Proficiencies, Class Weapon Proficiencies, 1H vs 2H spec rules, and Primary Stat matching.
+ */
+function isCharacterEligibleForItem(charClass, charSpec, slot, targetSubclass, itemName) {
+  charClass = (charClass || '').toLowerCase().trim();
+  charSpec = (charSpec || '').toLowerCase().trim();
+  targetSubclass = (targetSubclass || '').toLowerCase().trim();
+  itemName = (itemName || '').toLowerCase().trim();
+  slot = (slot || '').trim();
+
+  // 1. ARMOR SLOTS (Head, Shoulders, Chest, Hands, Legs, Feet, Wrist, Waist)
+  const ARMOR_MAP = {
+    'warrior': 'plate', 'paladin': 'plate', 'death knight': 'plate',
+    'hunter': 'mail', 'shaman': 'mail', 'evoker': 'mail',
+    'rogue': 'leather', 'druid': 'leather', 'monk': 'leather', 'demon hunter': 'leather',
+    'priest': 'cloth', 'mage': 'cloth', 'warlock': 'cloth'
+  };
+
+  const armorSlots = ['Head', 'Shoulders', 'Chest', 'Hands', 'Legs', 'Feet', 'Wrist', 'Waist'];
+  if (armorSlots.includes(slot)) {
+    const charArmor = ARMOR_MAP[charClass] || '';
+    if (targetSubclass.includes('plate') && charArmor !== 'plate') return false;
+    if (targetSubclass.includes('mail') && charArmor !== 'mail') return false;
+    if (targetSubclass.includes('leather') && charArmor !== 'leather') return false;
+    if (targetSubclass.includes('cloth') && charArmor !== 'cloth') return false;
+    if (targetSubclass.includes('cosmetic') || targetSubclass.includes('junk')) return false;
+  }
+
+  // 2. WEAPONS & OFF-HANDS (Main Hand, Off Hand, 1H, 2H, Ranged, Shield)
+  const isWeaponOrOffhand = slot === 'Main Hand' || slot === 'Off Hand' || slot.includes('Two-Hand') || slot.includes('One-Hand') || slot.includes('Ranged') || slot.includes('Shield');
+  if (isWeaponOrOffhand) {
+    // Exact baseline Class Weapon Proficiencies in World of Warcraft
+    const CLASS_WEAPON_PROFICIENCIES = {
+      'mage': ['dagger', 'sword', 'wand', 'staff', 'off hand', 'holdable'],
+      'warlock': ['dagger', 'sword', 'wand', 'staff', 'off hand', 'holdable'],
+      'priest': ['dagger', 'mace', 'wand', 'staff', 'off hand', 'holdable'],
+      'rogue': ['dagger', 'sword', 'axe', 'mace', 'fist'],
+      'demon hunter': ['warglaive', 'sword', 'axe', 'fist', 'dagger'],
+      'warrior': ['sword', 'axe', 'mace', 'polearm', 'shield', 'fist', 'dagger'],
+      'paladin': ['sword', 'axe', 'mace', 'polearm', 'shield'],
+      'death knight': ['sword', 'axe', 'mace', 'polearm'],
+      'hunter': ['bow', 'gun', 'crossbow', 'polearm', 'staff', 'axe', 'sword'],
+      'druid': ['dagger', 'mace', 'staff', 'polearm', 'fist', 'off hand', 'holdable'],
+      'monk': ['sword', 'axe', 'mace', 'fist', 'staff', 'polearm', 'off hand', 'holdable'],
+      'shaman': ['dagger', 'mace', 'axe', 'fist', 'shield', 'staff', 'off hand', 'holdable'],
+      'evoker': ['dagger', 'sword', 'axe', 'mace', 'fist', 'staff', 'off hand', 'holdable']
+    };
+
+    const prof = CLASS_WEAPON_PROFICIENCIES[charClass];
+    if (prof && !prof.some(w => targetSubclass.includes(w) || itemName.includes(w))) {
+      return false;
+    }
+
+    const is2HWeapon = targetSubclass.includes('2h') || targetSubclass.includes('two-hand') || targetSubclass.includes('polearm') || targetSubclass.includes('staff') || targetSubclass.includes('stave') || targetSubclass.includes('bow') || targetSubclass.includes('crossbow') || targetSubclass.includes('gun') || (itemName.includes('2h') || itemName.includes('greatsword') || itemName.includes('greataxe') || itemName.includes('greatmace') || itemName.includes('bardiche') || itemName.includes('warlord\'s fury'));
+
+    const is1HWeapon = (targetSubclass.includes('1h') || targetSubclass.includes('one-hand') || targetSubclass.includes('dagger') || targetSubclass.includes('fist') || targetSubclass.includes('warglaive') || targetSubclass.includes('wand') || targetSubclass.includes('shield') || targetSubclass.includes('off hand') || targetSubclass.includes('off-hand') || targetSubclass.includes('holdable') || itemName.includes('cleaver') || itemName.includes('claw') || itemName.includes('censer')) && !is2HWeapon;
+
+    // Strict 2H Only Melee/Tank specs (Must use 2H, CANNOT use 1H):
+    // - Arms Warrior, Retribution Paladin, Blood/Unholy DK, Survival Hunter, Feral/Guardian Druid
+    const isStrictly2HSpec = (charClass === 'warrior' && charSpec.includes('arms')) ||
+                             (charClass === 'paladin' && charSpec.includes('retribution')) ||
+                             (charClass === 'death knight' && (charSpec.includes('blood') || charSpec.includes('unholy'))) ||
+                             (charClass === 'hunter' && charSpec.includes('survival')) ||
+                             (charClass === 'druid' && (charSpec.includes('feral') || charSpec.includes('guardian')));
+
+    if (isStrictly2HSpec && is1HWeapon) {
+      return false;
+    }
+
+    // Strict 1H Only Specs (Must use 1H + Shield/Offhand/DW, CANNOT use 2H Weapons):
+    // - Protection Warrior, Protection Paladin, Enhancement Shaman, All Rogues, All Demon Hunters
+    const isStrictly1HSpec = (charClass === 'warrior' && charSpec.includes('protection')) ||
+                             (charClass === 'paladin' && charSpec.includes('protection')) ||
+                             (charClass === 'shaman' && charSpec.includes('enhancement')) ||
+                             charClass === 'rogue' ||
+                             charClass === 'demon hunter';
+
+    if (isStrictly1HSpec && is2HWeapon) {
+      return false;
+    }
+
+    // Bows, Guns, Crossbows -> Beast Mastery & Marksmanship Hunters ONLY (Survival is strictly 2H Melee)
+    if (targetSubclass.includes('gun') || targetSubclass.includes('bow') || targetSubclass.includes('crossbow')) {
+      return charClass === 'hunter' && !charSpec.includes('survival');
+    }
+    // Warglaives -> Demon Hunters ONLY
+    if (targetSubclass.includes('warglaive')) {
+      return charClass === 'demon hunter';
+    }
+    // Wands -> Mages, Warlocks, Priests ONLY
+    if (targetSubclass.includes('wand')) {
+      return ['mage', 'warlock', 'priest'].includes(charClass);
+    }
+    // Shields -> Prot/Holy Paladin, Prot Warrior, Ele/Resto Shaman ONLY
+    if (targetSubclass.includes('shield')) {
+      return (charClass === 'paladin' && ['protection', 'holy'].some(s => charSpec.includes(s))) ||
+             (charClass === 'warrior' && charSpec.includes('protection')) ||
+             (charClass === 'shaman' && ['elemental', 'restoration'].some(s => charSpec.includes(s)));
+    }
+    // Caster Off-Hands / Holdable -> Intellect Casters & Healers ONLY
+    if (targetSubclass.includes('off-hand') || targetSubclass.includes('off hand') || targetSubclass.includes('holdable')) {
+      return ['mage', 'warlock', 'priest', 'evoker'].includes(charClass) ||
+             (charClass === 'druid' && ['balance', 'restoration'].some(s => charSpec.includes(s))) ||
+             (charClass === 'shaman' && ['elemental', 'restoration'].some(s => charSpec.includes(s))) ||
+             (charClass === 'monk' && charSpec.includes('mistweaver'));
+    }
+    // 2H Axes, 2H Swords, 2H Maces -> Str/Agi 2H Melee (Warrior, DK, Ret Paladin, Survival Hunter, Feral/Guardian Druid)
+    if (targetSubclass.includes('2h axe') || targetSubclass.includes('2h sword') || targetSubclass.includes('2h mace') || (targetSubclass.includes('axe') && !targetSubclass.includes('1h') && (itemName.includes('2h') || itemName.includes('cleaver') || itemName.includes('fury') || itemName.includes('axe')))) {
+      if (['mage', 'warlock', 'priest', 'rogue', 'demon hunter', 'evoker'].includes(charClass)) return false;
+      if (charClass === 'hunter' && !charSpec.includes('survival')) return false;
+      if (charClass === 'druid' && !['feral', 'guardian'].some(s => charSpec.includes(s))) return false;
+      if (charClass === 'paladin' && charSpec.includes('holy')) return false;
+      if (charClass === 'shaman') return false;
+      if (charClass === 'monk') return false;
+    }
+    // 1H Axes / Cleavers -> Melee physical classes. NO Pure Casters, NO Ranged Hunters!
+    if (targetSubclass.includes('axe') || targetSubclass.includes('cleaver')) {
+      if (['mage', 'warlock', 'priest', 'druid'].includes(charClass)) return false;
+      if (charClass === 'hunter') return false;
+      if (charClass === 'paladin' && charSpec.includes('holy')) return false;
+      if (charClass === 'shaman' && !charSpec.includes('enhancement')) return false;
+    }
+    // Daggers -> Rogue, Mage, Priest, Warlock, Druid, Evoker, Shaman, Devourer DH. NO Plate classes, NO Hunters!
+    if (targetSubclass.includes('dagger')) {
+      if (['warrior', 'paladin', 'death knight', 'hunter'].includes(charClass)) return false;
+      if (charClass === 'demon hunter' && !charSpec.includes('devourer')) return false;
+    }
+    // Fist Weapons -> Rogue, Monk, DH, Enh Shaman, Druid, Evoker, Warrior. NO Cloth/Paladin/DK/Hunter!
+    if (targetSubclass.includes('fist')) {
+      if (['mage', 'warlock', 'priest', 'paladin', 'death knight', 'hunter'].includes(charClass)) return false;
+    }
+    // Polearms -> Str/Agi 2H Melee (Warrior, Ret Paladin, Blood/Unholy DK, Survival Hunter, Feral/Guardian Druid, Brew/WW Monk)
+    if (targetSubclass.includes('polearm')) {
+      if (['mage', 'warlock', 'priest', 'rogue', 'demon hunter', 'evoker', 'shaman'].includes(charClass)) return false;
+      if (charClass === 'hunter' && !charSpec.includes('survival')) return false;
+      if (charClass === 'paladin' && charSpec.includes('holy')) return false;
+    }
+    // Staves -> Casters/Healers + Feral/Guardian Druid, Monk, Survival Hunter. NO DK, Paladin, Rogue, Warrior, BM/MM Hunter!
+    if (targetSubclass.includes('staff') || targetSubclass.includes('stave')) {
+      if (['paladin', 'death knight', 'rogue', 'warrior', 'demon hunter'].includes(charClass)) return false;
+      if (charClass === 'hunter' && !charSpec.includes('survival')) return false;
+    }
+    // 1H Maces -> Paladin, Warrior, DK, Rogue, Monk, Priest, Shaman, Druid, Evoker. NO Mage/Warlock/Hunter/DH!
+    if (targetSubclass.includes('mace') && !targetSubclass.includes('2h')) {
+      if (['mage', 'warlock', 'hunter', 'demon hunter'].includes(charClass)) return false;
+    }
+    // 1H Swords -> Warrior, Paladin, DK, Rogue, Monk, DH, Mage, Warlock. NO Priest/Shaman/Druid/Hunter!
+    if (targetSubclass.includes('sword') && !targetSubclass.includes('2h')) {
+      if (['priest', 'shaman', 'druid', 'hunter'].includes(charClass)) return false;
+    }
+  }
+
+  // 3. PRIMARY STAT & ROLE CONSTRAINTS (Weapons, Trinkets, Accessories)
+  if (targetSubclass.includes('strength') || targetSubclass.includes('(str') || targetSubclass.includes('str /')) {
+    const isStr = ['warrior', 'death knight'].includes(charClass) || (charClass === 'paladin' && !charSpec.includes('holy'));
+    if (!isStr && !targetSubclass.includes('agi') && !targetSubclass.includes('all')) return false;
+  }
+  if (targetSubclass.includes('agility') || targetSubclass.includes('(agi') || targetSubclass.includes('/ agi')) {
+    const isAgi = ['rogue', 'demon hunter', 'hunter'].includes(charClass) ||
+                  (charClass === 'druid' && (charSpec.includes('feral') || charSpec.includes('guardian'))) ||
+                  (charClass === 'monk' && !charSpec.includes('mistweaver')) ||
+                  (charClass === 'shaman' && charSpec.includes('enhancement'));
+    if (!isAgi && !targetSubclass.includes('str') && !targetSubclass.includes('all')) return false;
+  }
+  if (targetSubclass.includes('intellect') || targetSubclass.includes('(int') || targetSubclass.includes('/ int') || targetSubclass.includes('caster') || targetSubclass.includes('healer')) {
+    const isInt = ['mage', 'warlock', 'priest', 'evoker'].includes(charClass) ||
+                  (charClass === 'paladin' && charSpec.includes('holy')) ||
+                  (charClass === 'druid' && (charSpec.includes('balance') || charSpec.includes('restoration'))) ||
+                  (charClass === 'shaman' && !charSpec.includes('enhancement')) ||
+                  (charClass === 'monk' && charSpec.includes('mistweaver'));
+    if (!isInt && !targetSubclass.includes('all') && !targetSubclass.includes('str') && !targetSubclass.includes('agi')) return false;
+  }
+  if (targetSubclass.includes('tank') && !targetSubclass.includes('all')) {
+    const isTank = ['protection', 'blood', 'guardian', 'brewmaster', 'vengeance'].some(t => charSpec.includes(t));
+    if (!isTank) return false;
+  }
+
+  return true;
+}
+
+/**
  * Creates and formats the Loot & Chase Items reference sheet.
  * Features the current Season 2 raid: The Venomous Abyss (8 Bosses) with distinct boss separator banners.
  * Automatically queries Blizzard Journal API for complete drop tables and calculates upgrade deltas.
@@ -2012,6 +2272,9 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
   if (!sheet) {
     sheet = ss.insertSheet(LOOT_SHEET_NAME);
   }
+
+  // Load roster context (Role & Attendance) for live badge overlays
+  const rosterContextMap = getRosterContextMap(ss);
 
   const lootHeaders = [
     'Boss / Source', 'Chase Item / Drop', 'Slot', 'Difficulty', 'Drop ilvl',
@@ -2265,187 +2528,6 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
         return;
       }
 
-/**
- * Evaluates whether a character is eligible to equip and use an item in their main spec.
- * Strictly enforces WoW Armor Proficiencies, Class Weapon Proficiencies, 1H vs 2H spec rules, and Primary Stat matching.
- */
-function isCharacterEligibleForItem(charClass, charSpec, slot, targetSubclass, itemName) {
-  charClass = (charClass || '').toLowerCase().trim();
-  charSpec = (charSpec || '').toLowerCase().trim();
-  targetSubclass = (targetSubclass || '').toLowerCase().trim();
-  itemName = (itemName || '').toLowerCase().trim();
-  slot = (slot || '').trim();
-
-  // 1. ARMOR SLOTS (Head, Shoulders, Chest, Hands, Legs, Feet, Wrist, Waist)
-  const ARMOR_MAP = {
-    'warrior': 'plate', 'paladin': 'plate', 'death knight': 'plate',
-    'hunter': 'mail', 'shaman': 'mail', 'evoker': 'mail',
-    'rogue': 'leather', 'druid': 'leather', 'monk': 'leather', 'demon hunter': 'leather',
-    'priest': 'cloth', 'mage': 'cloth', 'warlock': 'cloth'
-  };
-
-  const armorSlots = ['Head', 'Shoulders', 'Chest', 'Hands', 'Legs', 'Feet', 'Wrist', 'Waist'];
-  if (armorSlots.includes(slot)) {
-    const charArmor = ARMOR_MAP[charClass] || '';
-    if (targetSubclass.includes('plate') && charArmor !== 'plate') return false;
-    if (targetSubclass.includes('mail') && charArmor !== 'mail') return false;
-    if (targetSubclass.includes('leather') && charArmor !== 'leather') return false;
-    if (targetSubclass.includes('cloth') && charArmor !== 'cloth') return false;
-    if (targetSubclass.includes('cosmetic') || targetSubclass.includes('junk')) return false;
-  }
-
-  // 2. WEAPONS & OFF-HANDS (Main Hand, Off Hand, 1H, 2H, Ranged, Shield)
-  const isWeaponOrOffhand = slot === 'Main Hand' || slot === 'Off Hand' || slot.includes('Two-Hand') || slot.includes('One-Hand') || slot.includes('Ranged') || slot.includes('Shield');
-  if (isWeaponOrOffhand) {
-    // Exact baseline Class Weapon Proficiencies in World of Warcraft
-    const CLASS_WEAPON_PROFICIENCIES = {
-      'mage': ['dagger', 'sword', 'wand', 'staff', 'off hand', 'holdable'],
-      'warlock': ['dagger', 'sword', 'wand', 'staff', 'off hand', 'holdable'],
-      'priest': ['dagger', 'mace', 'wand', 'staff', 'off hand', 'holdable'],
-      'rogue': ['dagger', 'sword', 'axe', 'mace', 'fist'],
-      'demon hunter': ['warglaive', 'sword', 'axe', 'fist', 'dagger'],
-      'warrior': ['sword', 'axe', 'mace', 'polearm', 'shield', 'fist', 'dagger'],
-      'paladin': ['sword', 'axe', 'mace', 'polearm', 'shield'],
-      'death knight': ['sword', 'axe', 'mace', 'polearm'],
-      'hunter': ['bow', 'gun', 'crossbow', 'polearm', 'staff', 'axe', 'sword'],
-      'druid': ['dagger', 'mace', 'staff', 'polearm', 'fist', 'off hand', 'holdable'],
-      'monk': ['sword', 'axe', 'mace', 'fist', 'staff', 'polearm', 'off hand', 'holdable'],
-      'shaman': ['dagger', 'mace', 'axe', 'fist', 'shield', 'staff', 'off hand', 'holdable'],
-      'evoker': ['dagger', 'sword', 'axe', 'mace', 'fist', 'staff', 'off hand', 'holdable']
-    };
-
-    const prof = CLASS_WEAPON_PROFICIENCIES[charClass];
-    if (prof && !prof.some(w => targetSubclass.includes(w) || itemName.includes(w))) {
-      return false;
-    }
-
-    const is2HWeapon = targetSubclass.includes('2h') || targetSubclass.includes('two-hand') || targetSubclass.includes('polearm') || targetSubclass.includes('staff') || targetSubclass.includes('stave') || targetSubclass.includes('bow') || targetSubclass.includes('crossbow') || targetSubclass.includes('gun') || (itemName.includes('2h') || itemName.includes('greatsword') || itemName.includes('greataxe') || itemName.includes('greatmace') || itemName.includes('bardiche') || itemName.includes('warlord\'s fury'));
-
-    const is1HWeapon = (targetSubclass.includes('1h') || targetSubclass.includes('one-hand') || targetSubclass.includes('dagger') || targetSubclass.includes('fist') || targetSubclass.includes('warglaive') || targetSubclass.includes('wand') || targetSubclass.includes('shield') || targetSubclass.includes('off hand') || targetSubclass.includes('off-hand') || targetSubclass.includes('holdable') || itemName.includes('cleaver') || itemName.includes('claw') || itemName.includes('censer')) && !is2HWeapon;
-
-    // Strict 2H Only Melee/Tank specs (Must use 2H, CANNOT use 1H):
-    // - Arms Warrior, Retribution Paladin, Blood/Unholy DK, Survival Hunter, Feral/Guardian Druid
-    const isStrictly2HSpec = (charClass === 'warrior' && charSpec.includes('arms')) ||
-                             (charClass === 'paladin' && charSpec.includes('retribution')) ||
-                             (charClass === 'death knight' && (charSpec.includes('blood') || charSpec.includes('unholy'))) ||
-                             (charClass === 'hunter' && charSpec.includes('survival')) ||
-                             (charClass === 'druid' && (charSpec.includes('feral') || charSpec.includes('guardian')));
-
-    if (isStrictly2HSpec && is1HWeapon) {
-      return false;
-    }
-
-    // Strict 1H Only Specs (Must use 1H + Shield/Offhand/DW, CANNOT use 2H Weapons):
-    // - Protection Warrior, Protection Paladin, Enhancement Shaman, All Rogues, All Demon Hunters
-    const isStrictly1HSpec = (charClass === 'warrior' && charSpec.includes('protection')) ||
-                             (charClass === 'paladin' && charSpec.includes('protection')) ||
-                             (charClass === 'shaman' && charSpec.includes('enhancement')) ||
-                             charClass === 'rogue' ||
-                             charClass === 'demon hunter';
-
-    if (isStrictly1HSpec && is2HWeapon) {
-      return false;
-    }
-
-    // Bows, Guns, Crossbows -> Beast Mastery & Marksmanship Hunters ONLY (Survival is strictly 2H Melee)
-    if (targetSubclass.includes('gun') || targetSubclass.includes('bow') || targetSubclass.includes('crossbow')) {
-      return charClass === 'hunter' && !charSpec.includes('survival');
-    }
-    // Warglaives -> Demon Hunters ONLY
-    if (targetSubclass.includes('warglaive')) {
-      return charClass === 'demon hunter';
-    }
-    // Wands -> Mages, Warlocks, Priests ONLY
-    if (targetSubclass.includes('wand')) {
-      return ['mage', 'warlock', 'priest'].includes(charClass);
-    }
-    // Shields -> Prot/Holy Paladin, Prot Warrior, Ele/Resto Shaman ONLY
-    if (targetSubclass.includes('shield')) {
-      return (charClass === 'paladin' && ['protection', 'holy'].some(s => charSpec.includes(s))) ||
-             (charClass === 'warrior' && charSpec.includes('protection')) ||
-             (charClass === 'shaman' && ['elemental', 'restoration'].some(s => charSpec.includes(s)));
-    }
-    // Caster Off-Hands / Holdable -> Intellect Casters & Healers ONLY
-    if (targetSubclass.includes('off-hand') || targetSubclass.includes('off hand') || targetSubclass.includes('holdable')) {
-      return ['mage', 'warlock', 'priest', 'evoker'].includes(charClass) ||
-             (charClass === 'druid' && ['balance', 'restoration'].some(s => charSpec.includes(s))) ||
-             (charClass === 'shaman' && ['elemental', 'restoration'].some(s => charSpec.includes(s))) ||
-             (charClass === 'monk' && charSpec.includes('mistweaver'));
-    }
-    // 2H Axes, 2H Swords, 2H Maces -> Str/Agi 2H Melee (Warrior, DK, Ret Paladin, Survival Hunter, Feral/Guardian Druid)
-    if (targetSubclass.includes('2h axe') || targetSubclass.includes('2h sword') || targetSubclass.includes('2h mace') || (targetSubclass.includes('axe') && !targetSubclass.includes('1h') && (itemName.includes('2h') || itemName.includes('cleaver') || itemName.includes('fury') || itemName.includes('axe')))) {
-      if (['mage', 'warlock', 'priest', 'rogue', 'demon hunter', 'evoker'].includes(charClass)) return false;
-      if (charClass === 'hunter' && !charSpec.includes('survival')) return false;
-      if (charClass === 'druid' && !['feral', 'guardian'].some(s => charSpec.includes(s))) return false;
-      if (charClass === 'paladin' && charSpec.includes('holy')) return false;
-      if (charClass === 'shaman') return false;
-      if (charClass === 'monk') return false;
-    }
-    // 1H Axes / Cleavers -> Melee physical classes. NO Pure Casters, NO Ranged Hunters!
-    if (targetSubclass.includes('axe') || targetSubclass.includes('cleaver')) {
-      if (['mage', 'warlock', 'priest', 'druid'].includes(charClass)) return false;
-      if (charClass === 'hunter') return false;
-      if (charClass === 'paladin' && charSpec.includes('holy')) return false;
-      if (charClass === 'shaman' && !charSpec.includes('enhancement')) return false;
-    }
-    // Daggers -> Rogue, Mage, Priest, Warlock, Druid, Evoker, Shaman, Devourer DH. NO Plate classes, NO Hunters!
-    if (targetSubclass.includes('dagger')) {
-      if (['warrior', 'paladin', 'death knight', 'hunter'].includes(charClass)) return false;
-      if (charClass === 'demon hunter' && !charSpec.includes('devourer')) return false;
-    }
-    // Fist Weapons -> Rogue, Monk, DH, Enh Shaman, Druid, Evoker, Warrior. NO Cloth/Paladin/DK/Hunter!
-    if (targetSubclass.includes('fist')) {
-      if (['mage', 'warlock', 'priest', 'paladin', 'death knight', 'hunter'].includes(charClass)) return false;
-    }
-    // Polearms -> Str/Agi 2H Melee (Warrior, Ret Paladin, Blood/Unholy DK, Survival Hunter, Feral/Guardian Druid, Brew/WW Monk)
-    if (targetSubclass.includes('polearm')) {
-      if (['mage', 'warlock', 'priest', 'rogue', 'demon hunter', 'evoker', 'shaman'].includes(charClass)) return false;
-      if (charClass === 'hunter' && !charSpec.includes('survival')) return false;
-      if (charClass === 'paladin' && charSpec.includes('holy')) return false;
-    }
-    // Staves -> Casters/Healers + Feral/Guardian Druid, Monk, Survival Hunter. NO DK, Paladin, Rogue, Warrior, BM/MM Hunter!
-    if (targetSubclass.includes('staff') || targetSubclass.includes('stave')) {
-      if (['paladin', 'death knight', 'rogue', 'warrior', 'demon hunter'].includes(charClass)) return false;
-      if (charClass === 'hunter' && !charSpec.includes('survival')) return false;
-    }
-    // 1H Maces -> Paladin, Warrior, DK, Rogue, Monk, Priest, Shaman, Druid, Evoker. NO Mage/Warlock/Hunter/DH!
-    if (targetSubclass.includes('mace') && !targetSubclass.includes('2h')) {
-      if (['mage', 'warlock', 'hunter', 'demon hunter'].includes(charClass)) return false;
-    }
-    // 1H Swords -> Warrior, Paladin, DK, Rogue, Monk, DH, Mage, Warlock. NO Priest/Shaman/Druid/Hunter!
-    if (targetSubclass.includes('sword') && !targetSubclass.includes('2h')) {
-      if (['priest', 'shaman', 'druid', 'hunter'].includes(charClass)) return false;
-    }
-  }
-
-  // 3. PRIMARY STAT & ROLE CONSTRAINTS (Weapons, Trinkets, Accessories)
-  if (targetSubclass.includes('strength') || targetSubclass.includes('(str') || targetSubclass.includes('str /')) {
-    const isStr = ['warrior', 'death knight'].includes(charClass) || (charClass === 'paladin' && !charSpec.includes('holy'));
-    if (!isStr && !targetSubclass.includes('agi') && !targetSubclass.includes('all')) return false;
-  }
-  if (targetSubclass.includes('agility') || targetSubclass.includes('(agi') || targetSubclass.includes('/ agi')) {
-    const isAgi = ['rogue', 'demon hunter', 'hunter'].includes(charClass) ||
-                  (charClass === 'druid' && (charSpec.includes('feral') || charSpec.includes('guardian'))) ||
-                  (charClass === 'monk' && !charSpec.includes('mistweaver')) ||
-                  (charClass === 'shaman' && charSpec.includes('enhancement'));
-    if (!isAgi && !targetSubclass.includes('str') && !targetSubclass.includes('all')) return false;
-  }
-  if (targetSubclass.includes('intellect') || targetSubclass.includes('(int') || targetSubclass.includes('/ int') || targetSubclass.includes('caster') || targetSubclass.includes('healer')) {
-    const isInt = ['mage', 'warlock', 'priest', 'evoker'].includes(charClass) ||
-                  (charClass === 'paladin' && charSpec.includes('holy')) ||
-                  (charClass === 'druid' && (charSpec.includes('balance') || charSpec.includes('restoration'))) ||
-                  (charClass === 'shaman' && !charSpec.includes('enhancement')) ||
-                  (charClass === 'monk' && charSpec.includes('mistweaver'));
-    if (!isInt && !targetSubclass.includes('all') && !targetSubclass.includes('str') && !targetSubclass.includes('agi')) return false;
-  }
-  if (targetSubclass.includes('tank') && !targetSubclass.includes('all')) {
-    const isTank = ['protection', 'blood', 'guardian', 'brewmaster', 'vengeance'].some(t => charSpec.includes(t));
-    if (!isTank) return false;
-  }
-
-  return true;
-}
-
       // 2. FALLBACK: For unsimmed items, calculate Live Equipped ilvl Delta
       const contenders = [];
 
@@ -2475,14 +2557,19 @@ function isCharacterEligibleForItem(charClass, charSpec, slot, targetSubclass, i
 
       if (contenders.length > 0) {
         const top = contenders[0];
-        row[6] = `${top.name} (+${top.delta})`;
+        row[6] = formatContenderDisplay(top.name, top.delta, false, rosterContextMap);
         row[7] = top.equippedText;
         row[8] = top.equippedIlvl;
         row[9] = `+${top.delta}`;
         row[11] = '⚡ Live Armory ilvl';
 
-        // Top 3 list in Notes
-        const top3List = contenders.slice(0, 3).map((c, i) => `${i + 1}. ${c.name} (+${c.delta})`).join(' | ');
+        // Top 3 list in Notes with Role and Attendance context
+        const top3List = contenders.slice(0, 3).map((c, i) => {
+          const cCtx = (rosterContextMap && rosterContextMap[c.name.toLowerCase()]) || { role: '⚔️ Raider', attPct: null };
+          const cRole = cCtx.role ? ` | ${cCtx.role}` : '';
+          const cAtt = cCtx.attPct ? ` | ${cCtx.attPct}` : '';
+          return `${i + 1}. ${c.name} (+${c.delta}${cRole}${cAtt})`;
+        }).join(' | ');
         row[12] = `${baseNotes} (Top Upgrades: ${top3List})`;
       }
     });
@@ -2907,6 +2994,9 @@ function processAndIngestRaidbotsSims(input) {
   const charMap = {};
   charList.forEach(c => { if (c['Name']) charMap[c['Name'].toLowerCase()] = c; });
 
+  // Load roster context (Role & Attendance) for live badge overlays
+  const rosterContextMap = getRosterContextMap(sheet.getParent());
+
   const extractIlvl = (slotText) => {
     if (!slotText || slotText === '-') return 0;
     const match = slotText.match(/(?:\[.*?\]\s*)?(\d{2,3})/);
@@ -2931,11 +3021,16 @@ function processAndIngestRaidbotsSims(input) {
     if (contenders && contenders.length > 0) {
       const sorted = contenders.sort((a, b) => b.pct - a.pct);
       const top = sorted[0];
-      row[6] = `${top.name} (+${top.pct}%)`;
+      row[6] = formatContenderDisplay(top.name, top.pct, true, rosterContextMap);
       row[9] = `+${top.pct}% DPS`;
       row[11] = simStatusBadge;
 
-      const topList = sorted.slice(0, 5).map((c, i) => `${i + 1}. ${c.name} (+${c.pct}%)`).join(' | ');
+      const topList = sorted.slice(0, 5).map((c, i) => {
+        const cCtx = (rosterContextMap && rosterContextMap[c.name.toLowerCase()]) || { role: '⚔️ Raider', attPct: null };
+        const cRole = cCtx.role ? ` | ${cCtx.role}` : '';
+        const cAtt = cCtx.attPct ? ` | ${cCtx.attPct}` : '';
+        return `${i + 1}. ${c.name} (+${c.pct}%${cRole}${cAtt})`;
+      }).join(' | ');
       row[12] = `Raidbots Sim Upgrades: ${topList}`;
 
       // Populate live equipped item and ilvl for the top contender!
@@ -3115,6 +3210,9 @@ function processAndIngestQELiveReport(reportUrlOrId) {
     return match ? parseInt(match[1], 10) : 0;
   };
 
+  // Load roster context (Role & Attendance) for live badge overlays
+  const rosterContextMap = getRosterContextMap(sheet.getParent());
+
   // Re-write merged rankings onto the sheet
   values.forEach(row => {
     const sheetItemName = (row[1] || '').toString().trim();
@@ -3132,11 +3230,16 @@ function processAndIngestQELiveReport(reportUrlOrId) {
     if (contenders && contenders.length > 0) {
       const sorted = contenders.sort((a, b) => b.pct - a.pct);
       const top = sorted[0];
-      row[6] = `${top.name} (+${top.pct}%)`;
+      row[6] = formatContenderDisplay(top.name, top.pct, false, rosterContextMap);
       row[9] = `+${top.pct}%`;
       row[11] = simStatusBadge;
 
-      const topList = sorted.slice(0, 5).map((c, i) => `${i + 1}. ${c.name} (+${c.pct}%)`).join(' | ');
+      const topList = sorted.slice(0, 5).map((c, i) => {
+        const cCtx = (rosterContextMap && rosterContextMap[c.name.toLowerCase()]) || { role: '⚔️ Raider', attPct: null };
+        const cRole = cCtx.role ? ` | ${cCtx.role}` : '';
+        const cAtt = cCtx.attPct ? ` | ${cCtx.attPct}` : '';
+        return `${i + 1}. ${c.name} (+${c.pct}%${cRole}${cAtt})`;
+      }).join(' | ');
       row[12] = `Sim / QE Live Upgrades: ${topList}`;
 
       const topChar = charMap[top.name.toLowerCase()];
