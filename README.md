@@ -101,6 +101,12 @@ Raiders can post either **Raidbots** (DPS/Tanks) or **QE Live** (Healers) links 
 
 3. **Loot Council Assistant (*The Venomous Abyss*)**:
    - All 8 boss chase items, trinkets, weapons, and tier tokens.
-   - **Live Contender Scanner** (computes live ilvl $\Delta$ across all slots including dual trinkets/rings).
-   - **Raidbots Droptimizer Sim Importer** with multi-link batching, cumulative non-destructive merging, and Sim Priority protection.
-   - **Sim Freshness & Stale Sim Badges** (`✅ Simmed`, `⚠️ Stale`, `⚡ Live Armory ilvl`).
+   - **Composite Priority Score Engine** ($\text{Score} = \text{Raw Upgrade} \times \text{Reliability Index} \times \text{Role Multiplier}$).
+   - **Roster Roles**: `👑 Veteran` ($1.10\times$), `⚔️ Raider` ($1.00\times$), and `🛡️ Trial` ($0.80\times$).
+   - **Raidbots Droptimizer & QE Live Healer Importers** with Discord bot integration and non-destructive merging.
+   - **Sim Freshness & Stale Badges** (`✅ Simmed`, `⚠️ Stale`, `⚡ Live Armory ilvl`).
+
+4. **Warcraft Logs Attendance & Season History**:
+   - Automated attendance %, on-time punctuality, and boss kills synced via WCL v2 GraphQL API.
+   - **Difficulty-Aware Guild Quorums** ($\ge 10$ for Heroic, $\ge 15$ for Mythic) to automatically filter out off-hours PUGs from mandatory attendance.
+   - **🪑 Mythic Bench & Standby Credit Manager**: Interactive modal dialog (`Guild Audit > 8. 🪑 Mark Bench & Standby Raiders`) to award standby raiders full 100% attendance and on-time credit with 1 click!

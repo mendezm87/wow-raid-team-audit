@@ -123,14 +123,24 @@ Because Raidbots does not model healing throughput, healers use **Questionably E
 
 On the **`Loot & Chase Items`** sheet, you can see all 8 raid bosses and every piece of gear that drops.
 
-### 🎨 How Contenders are Displayed:
-* 🟢 **Mint Green (`Top Contender`)**: You (or another raider) have an active sim/report (**`+% DPS`** or **`+% HPS`**) showing this item as a major upgrade.
-* 🟡 **Soft Yellow (`Top Contender`)**: The item is evaluated by **item level increase (`+ilvl`)** from the live Armory.
+### 🧮 Objective Priority Score Engine:
+To keep loot distribution 100% fair, transparent, and free of officer bias, the spreadsheet automatically calculates an objective **Priority Score** for every contender:
 
-### ⚖️ Fair Loot Council Allocation:
-* **Simmed Upgrades Take Priority:** Submitting your Droptimizer or QE Live link ensures the loot council has your exact mathematical upgrade percentages.
-* **Tier Breakpoints (2-pc / 4-pc):** Raiders sitting at 1/4 or 3/4 tier sets are prioritized so they unlock their powerful set bonuses.
-* **Class & Spec Accuracy:** The system automatically ensures items only assign to specs that can actually equip and benefit from them.
+$$\text{Priority Score} = \text{Raw Upgrade Gain} \times \text{Reliability Index} \times \text{Role Multiplier}$$
+
+1. **Role Multipliers**:
+   * 👑 **`👑 Veteran` ($1.10\times$)**: $+10\%$ priority bonus for proven multi-season loyalty.
+   * ⚔️ **`⚔️ Raider` ($1.00\times$)**: Core standard baseline.
+   * 🛡️ **`🛡️ Trial` ($0.80\times$)**: $-20\%$ modifier until trial graduation.
+2. **Reliability Index**:
+   * Combines **$85\%$ Season Attendance** $+ \mathbf{15\%}$ **On-Time Punctuality** (being ready for the first pull).
+3. **🪑 Mythic Bench / Standby Credit**:
+   * If you are sitting on the bench / standby in Discord on a Mythic raid night, officers award you **full 100% Attendance & On-Time credit** so you are never penalized in loot priority for taking one for the team!
+
+### 🎨 How Contenders are Displayed:
+* 🟢 **Mint Green (`Top Contender`)**: Evaluated via an active sim (**`+% DPS`** or **`+% HPS`**).
+* 🟡 **Soft Yellow (`Top Contender`)**: Evaluated via **item level increase (`+ilvl`)** from the live Armory.
+* **Badge Format:** `CharacterName [Score: 4.53] (+4.12% DPS • 👑 Veteran • 100% Att)`
 
 ---
 
