@@ -3513,11 +3513,13 @@ function syncWarcraftLogsSeasonAttendance() {
 
     const dateKey = Utilities.formatDate(new Date(r.startTime), timeZone, 'yyyy-MM-dd');
     const formattedDate = Utilities.formatDate(new Date(r.startTime), timeZone, 'EEE, MMM d, yyyy');
+    const dayOfWeek = Utilities.formatDate(new Date(r.startTime), timeZone, 'EEEE');
 
     if (!sessionMap[dateKey]) {
       sessionMap[dateKey] = {
         dateKey: dateKey,
         formattedDate: formattedDate,
+        dayOfWeek: dayOfWeek,
         reports: [],
         allBossKills: [],
         earliestStartTime: Infinity,
@@ -3573,6 +3575,15 @@ function syncWarcraftLogsSeasonAttendance() {
     };
   });
 
+  // Active Raid Days & Minimum Guild Quorum configuration (Filters out off-hours PUGs & alt runs)
+  const activeDaysList = (config.RAID_DAYS || 'Tuesday, Wednesday')
+    .split(',')
+    .map(d => d.trim().toLowerCase())
+    .filter(Boolean);
+
+  // Guild Quorum: Require at least 5 main guild raiders OR 35% of the active roster for an official mandatory raid night
+  const minGuildQuorum = Math.max(5, Math.min(8, Math.ceil(rosterMembers.length * 0.35)));
+  let officialRaidCount = 0;
   const raidLedger = [];
 
   // 2. Query Details and Punctuality for Each Merged Raid Night
@@ -3684,38 +3695,54 @@ function syncWarcraftLogsSeasonAttendance() {
       }
     });
 
-    // 2. Increment Attendance exactly ONCE per canonical main per raid session
+    // Evaluate if this session meets the Official Guild Raid criteria (Scheduled Day + Guild Quorum)
+    const isScheduledDay = activeDaysList.length === 0 || activeDaysList.some(d => session.dayOfWeek.toLowerCase().includes(d));
+    const hasGuildQuorum = uniqueSessionMains.size >= minGuildQuorum;
+    const isOfficial = hasGuildQuorum && isScheduledDay;
+
     const presentOnTime = [];
     const presentLate = [];
 
-    uniqueSessionMains.forEach(canonical => {
-      playerStats[canonical].raidsAttended++;
-      playerStats[canonical].totalBossKillsAttended += session.allBossKills.length;
+    if (isOfficial) {
+      officialRaidCount++;
+      // Increment Attendance exactly ONCE per canonical main for official raid nights
+      uniqueSessionMains.forEach(canonical => {
+        playerStats[canonical].raidsAttended++;
+        playerStats[canonical].totalBossKillsAttended += session.allBossKills.length;
 
-      if (uniqueFirstPullMains.has(canonical)) {
-        playerStats[canonical].onTimeCount++;
+        if (uniqueFirstPullMains.has(canonical)) {
+          playerStats[canonical].onTimeCount++;
+          presentOnTime.push(canonical);
+        } else {
+          playerStats[canonical].lateCount++;
+          presentLate.push(canonical);
+        }
+      });
+    } else {
+      // Optional / Alt / PUG Run: Credit boss kills to attendees, but DO NOT penalize absent raiders or increment official raid nights
+      uniqueSessionMains.forEach(canonical => {
+        playerStats[canonical].totalBossKillsAttended += session.allBossKills.length;
         presentOnTime.push(canonical);
-      } else {
-        playerStats[canonical].lateCount++;
-        presentLate.push(canonical);
-      }
-    });
+      });
+    }
 
+    const titlePrefix = isOfficial ? '' : '📦 [Optional / PUG] ';
     raidLedger.push({
       date: session.formattedDate,
-      title: session.reports[0].title || 'Guild Raid',
+      title: titlePrefix + (session.reports[0].title || 'Guild Raid'),
       bossesDefeated: session.allBossKills.join(', '),
       killCount: session.allBossKills.length,
-      rosterPresentCount: presentOnTime.length + presentLate.length,
+      rosterPresentCount: isOfficial ? (presentOnTime.length + presentLate.length) : uniqueSessionMains.size,
       presentOnTimeList: presentOnTime.join(', ') || 'None',
-      presentLateList: presentLate.join(', ') || 'None',
+      presentLateList: isOfficial ? (presentLate.join(', ') || 'None') : 'N/A (Optional Run)',
       reports: session.reports,
       primaryCode: session.reports[0] ? session.reports[0].code : '',
-      url: reportLinks.join(' | ')
+      url: reportLinks.join(' | '),
+      isOfficial: isOfficial
     });
   });
 
-  const totalOfficialRaids = raidSessions.length;
+  const totalOfficialRaids = officialRaidCount;
 
   // 3. Build Leaderboard Data
   const leaderboard = Object.values(playerStats).map(p => {
