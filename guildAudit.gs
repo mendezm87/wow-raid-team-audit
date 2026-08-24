@@ -42,6 +42,7 @@ function onOpen() {
       .addSeparator()
       .addItem('6. Sync Warcraft Logs Attendance & History', 'syncWarcraftLogsSeasonAttendance')
       .addItem('7. Set Warcraft Logs API Credentials', 'promptForWCLCredentials')
+      .addItem('8. 🪑 Mark Bench & Standby Raiders', 'showBenchRaidersDialog')
       .addToUi();
 }
 
@@ -2065,39 +2066,47 @@ function getRosterContextMap(ss) {
 }
 
 /**
- * Calculates a composite Loot Council Priority Score balancing mathematical upgrade, season attendance, and roster role.
- * Formula: Score = RawGain * AttendanceFactor * RoleMultiplier
+ * Calculates a composite Loot Council Priority Score balancing mathematical upgrade, season attendance, punctuality, and roster role.
+ * Formula: Score = RawGain * ReliabilityFactor * RoleMultiplier
  * - Role: Veteran (1.10x), Raider (1.00x), Trial (0.80x)
- * - Attendance: min(1.0, max(0.40, attPct / 100))
+ * - Reliability: (0.85 * Attendance% + 0.15 * OnTime%) with min floor at 0.40
  */
 function calculatePriorityScore(rawGain, charName, isSim, contextMap) {
   const numGain = parseFloat(rawGain) || 0;
   const normalizedGain = isSim ? numGain : (numGain / 10); // Scale +ilvl deltas comparable to % gain
 
   const lower = (charName || '').toLowerCase().trim();
-  const ctx = (contextMap && contextMap[lower]) || { role: '⚔️ Raider', attPct: null };
+  const ctx = (contextMap && contextMap[lower]) || { role: '⚔️ Raider', attPct: null, onTimePct: null };
   const role = ctx.role || '⚔️ Raider';
 
   let roleMult = 1.00;
   if (role.includes('Veteran') || role.includes('👑')) roleMult = 1.10;
   else if (role.includes('Trial') || role.includes('🛡️')) roleMult = 0.80;
 
-  let attFactor = 1.00;
+  let attVal = 1.00;
   if (ctx.attPct) {
     const parsedAtt = parseFloat(ctx.attPct.replace('%', ''));
-    if (!isNaN(parsedAtt)) {
-      attFactor = Math.min(1.0, Math.max(0.40, parsedAtt / 100));
-    }
+    if (!isNaN(parsedAtt)) attVal = parsedAtt / 100;
   }
 
-  const score = normalizedGain * attFactor * roleMult;
+  let onTimeVal = 1.00;
+  if (ctx.onTimePct && ctx.onTimePct !== 'N/A') {
+    const parsedOnTime = parseFloat(ctx.onTimePct.replace('%', ''));
+    if (!isNaN(parsedOnTime)) onTimeVal = parsedOnTime / 100;
+  }
+
+  // Composite Reliability Index: 85% Attendance + 15% On-Time Punctuality
+  const reliabilityFactor = Math.min(1.0, Math.max(0.40, (0.85 * attVal) + (0.15 * onTimeVal)));
+
+  const score = normalizedGain * reliabilityFactor * roleMult;
   return {
     score: Number(score.toFixed(2)),
     rawGain: numGain,
     role: role,
     roleMult: roleMult,
     attPct: ctx.attPct || '100%',
-    attFactor: attFactor
+    onTimePct: ctx.onTimePct || '100%',
+    reliabilityFactor: Number(reliabilityFactor.toFixed(2))
   };
 }
 
@@ -3801,8 +3810,14 @@ function syncWarcraftLogsSeasonAttendance() {
     const requiredGuildQuorum = isMythicSession ? 15 : 10;
 
     // Evaluate if this session meets the Official Guild Raid criteria (Scheduled Day + Difficulty-Aware Guild Quorum)
+    // Load saved Bench records from ScriptProperties
+    const scriptProperties = PropertiesService.getScriptProperties();
+    const benchRecords = JSON.parse(scriptProperties.getProperty('bench_records') || '{}');
+    const sessionBench = benchRecords[session.dateKey] || benchRecords[session.formattedDate] || [];
+    const presentBench = [];
+
     const isScheduledDay = activeDaysList.length === 0 || activeDaysList.some(d => session.dayOfWeek.toLowerCase().includes(d));
-    const hasGuildQuorum = uniqueSessionMains.size >= requiredGuildQuorum;
+    const hasGuildQuorum = (uniqueSessionMains.size + sessionBench.length) >= requiredGuildQuorum;
     const isOfficial = hasGuildQuorum && isScheduledDay;
 
     const presentOnTime = [];
@@ -3823,6 +3838,17 @@ function syncWarcraftLogsSeasonAttendance() {
           presentLate.push(canonical);
         }
       });
+
+      // Award full 100% Attendance & On-Time credit to Bench / Standby raiders!
+      sessionBench.forEach(bName => {
+        const canonical = resolveToMain(bName);
+        if (canonical && playerStats[canonical] && !uniqueSessionMains.has(canonical)) {
+          playerStats[canonical].raidsAttended++;
+          playerStats[canonical].onTimeCount++; // Bench raiders were ready on time
+          playerStats[canonical].totalBossKillsAttended += session.allBossKills.length;
+          presentBench.push(canonical);
+        }
+      });
     } else {
       // Optional / Alt / PUG Run: Credit boss kills to attendees, but DO NOT penalize absent raiders or increment official raid nights
       uniqueSessionMains.forEach(canonical => {
@@ -3833,11 +3859,13 @@ function syncWarcraftLogsSeasonAttendance() {
 
     const titlePrefix = isOfficial ? '' : '📦 [Optional / PUG] ';
     raidLedger.push({
+      dateKey: session.dateKey,
       date: session.formattedDate,
       title: titlePrefix + (session.reports[0].title || 'Guild Raid'),
       bossesDefeated: session.allBossKills.join(', '),
       killCount: session.allBossKills.length,
-      rosterPresentCount: isOfficial ? (presentOnTime.length + presentLate.length) : uniqueSessionMains.size,
+      rosterPresentCount: isOfficial ? (presentOnTime.length + presentLate.length + presentBench.length) : uniqueSessionMains.size,
+      benchList: presentBench.length > 0 ? presentBench.join(', ') : (sessionBench.join(', ') || 'None'),
       presentOnTimeList: presentOnTime.join(', ') || 'None',
       presentLateList: isOfficial ? (presentLate.join(', ') || 'None') : 'N/A (Optional Run)',
       reports: session.reports,
@@ -3886,7 +3914,7 @@ function syncWarcraftLogsSeasonAttendance() {
 
   ui.alert(
     'Warcraft Logs Synced!',
-    `Successfully merged logs into ${totalOfficialRaids} official raid nights (Tue/Wed Pacific Time).\n\nAll attendance %, on-time punctuality, and boss kills have been updated on "Attendance & History" AND all badges refreshed on "Loot & Chase Items"!`,
+    `Successfully merged logs into ${totalOfficialRaids} official raid nights (Tue/Wed Pacific Time).\n\nAll attendance %, on-time punctuality, bench credit, and boss kills have been updated on "Attendance & History" AND all badges refreshed on "Loot & Chase Items"!`,
     ui.ButtonSet.OK
   );
 }
@@ -3908,16 +3936,16 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
   const output = [];
 
   // 1. Executive Summary Banner
-  output.push(['🏛️ GUILD RAID ATTENDANCE, PUNCTUALITY & SEASON 2 HISTORY', '', '', '', '', '', '', '', '']);
+  output.push(['🏛️ GUILD RAID ATTENDANCE, PUNCTUALITY & SEASON 2 HISTORY', '', '', '', '', '', '', '', '', '']);
   output.push([
     `Total Official Guild Raid Nights: ${totalRaids} (Tue & Wed 7:00 - 10:00 PM Pacific)   |   Total Boss Encounters Defeated: ${raidLedger.reduce((sum, r) => sum + r.killCount, 0)}`,
-    '', '', '', '', '', '', '', ''
+    '', '', '', '', '', '', '', '', ''
   ]);
-  output.push(['', '', '', '', '', '', '', '', '']);
+  output.push(['', '', '', '', '', '', '', '', '', '']);
 
   // 2. Section 1: Raider Season Attendance Leaderboard
-  output.push(['👑 RAIDER ATTENDANCE & PUNCTUALITY LEADERBOARD', '═════════════════════', '', '', '', '', '', '', '']);
-  output.push(['Rank', 'Raider Name', 'Assigned Spec', 'Attendance %', 'On-Time %', 'Raids Attended', 'Tardies', 'Total Boss Kills', 'Reliability Tier']);
+  output.push(['👑 RAIDER ATTENDANCE & PUNCTUALITY LEADERBOARD', '═════════════════════', '', '', '', '', '', '', '', '']);
+  output.push(['Rank', 'Raider Name', 'Assigned Spec', 'Attendance %', 'On-Time %', 'Raids Attended', 'Tardies', 'Total Boss Kills', 'Reliability Tier', '']);
 
   leaderboard.forEach((p, idx) => {
     output.push([
@@ -3929,16 +3957,17 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
       `${p.raidsAttended} / ${p.totalRaids}`,
       p.lateCount,
       p.bossKills,
-      p.rating
+      p.rating,
+      ''
     ]);
   });
 
-  output.push(['', '', '', '', '', '', '', '', '']);
-  output.push(['', '', '', '', '', '', '', '', '']);
+  output.push(['', '', '', '', '', '', '', '', '', '']);
+  output.push(['', '', '', '', '', '', '', '', '', '']);
 
   // 3. Section 2: Historical Guild Raid Night Ledger
-  output.push(['📜 HISTORICAL GUILD RAID NIGHT LEDGER', '═════════════════════', '', '', '', '', '', '', '']);
-  output.push(['Raid Date', 'Raid Title', 'Bosses Defeated', 'Kills', 'Guild Raiders', 'On-Time Raiders', 'Late Arrivals', 'Warcraft Logs Link', '']);
+  output.push(['📜 HISTORICAL GUILD RAID NIGHT LEDGER', '═════════════════════', '', '', '', '', '', '', '', '']);
+  output.push(['Raid Date', 'Raid Title', 'Bosses Defeated', 'Kills', 'Guild Raiders', '🪑 Bench / Standby (Credit Awarded)', 'On-Time Raiders', 'Late Arrivals', 'Warcraft Logs Link', '']);
 
   raidLedger.forEach(r => {
     // Generate clean, uniform clickable HYPERLINK formula for single or merged reports
@@ -3951,6 +3980,7 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
       r.bossesDefeated,
       r.killCount,
       r.rosterPresentCount,
+      r.benchList || 'None',
       r.presentOnTimeList,
       r.presentLateList,
       linkFormula,
@@ -3958,46 +3988,47 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
     ]);
   });
 
-  sheet.getRange(1, 1, output.length, 9).setValues(output);
+  sheet.getRange(1, 1, output.length, 10).setValues(output);
 
   // Formatting & Widths
   sheet.getDataRange().setFontFamily('Roboto');
   sheet.setFrozenRows(1);
 
   // Banner formatting
-  sheet.getRange('A1:I1').merge().setBackground('#0f172a').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(11).setHorizontalAlignment('center');
-  sheet.getRange('A2:I2').merge().setBackground('#1e293b').setFontColor('#94a3b8').setFontSize(9).setHorizontalAlignment('center');
+  sheet.getRange('A1:J1').merge().setBackground('#0f172a').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(11).setHorizontalAlignment('center');
+  sheet.getRange('A2:J2').merge().setBackground('#1e293b').setFontColor('#94a3b8').setFontSize(9).setHorizontalAlignment('center');
 
   // Table Headers
-  sheet.getRange('A4:I4').setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
-  sheet.getRange('A5:I5').setBackground('#334155').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(9).setHorizontalAlignment('center');
+  sheet.getRange('A4:J4').setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
+  sheet.getRange('A5:J5').setBackground('#334155').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(9).setHorizontalAlignment('center');
 
-  // Section 2: Historical Ledger Headers (Accurately computed offsets)
+  // Section 2: Historical Ledger Headers
   const ledgerTitleRow = leaderboard.length + 8;
   const ledgerHeaderRow = leaderboard.length + 9;
-  sheet.getRange(ledgerTitleRow, 1, 1, 9).setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
-  sheet.getRange(ledgerHeaderRow, 1, 1, 9).setBackground('#334155').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(9).setHorizontalAlignment('center');
+  sheet.getRange(ledgerTitleRow, 1, 1, 10).setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
+  sheet.getRange(ledgerHeaderRow, 1, 1, 10).setBackground('#334155').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(9).setHorizontalAlignment('center');
 
   // Alternating Row Colors for Ledger Data
   for (let rowIdx = 0; rowIdx < raidLedger.length; rowIdx++) {
     const targetRow = ledgerHeaderRow + 1 + rowIdx;
     const bgColor = rowIdx % 2 === 0 ? '#ffffff' : '#f8fafc';
-    sheet.getRange(targetRow, 1, 1, 9).setBackground(bgColor).setFontSize(9).setVerticalAlignment('middle');
+    sheet.getRange(targetRow, 1, 1, 10).setBackground(bgColor).setFontSize(9).setVerticalAlignment('middle');
     sheet.getRange(targetRow, 1).setHorizontalAlignment('center'); // Date
     sheet.getRange(targetRow, 4, 1, 2).setHorizontalAlignment('center'); // Kills, Guild Raiders
-    sheet.getRange(targetRow, 8).setHorizontalAlignment('center'); // Link
+    sheet.getRange(targetRow, 9).setHorizontalAlignment('center'); // Link
   }
 
   // Column Widths
   sheet.setColumnWidth(1, 130); // Rank / Date
   sheet.setColumnWidth(2, 180); // Name / Title
   sheet.setColumnWidth(3, 260); // Spec / Bosses Defeated
-  sheet.setColumnWidth(4, 110); // Attendance % / Kills
-  sheet.setColumnWidth(5, 110); // On-Time % / Guild Raiders
-  sheet.setColumnWidth(6, 130); // Raids Attended / On-Time List
-  sheet.setColumnWidth(7, 100); // Tardies / Late Arrivals
-  sheet.setColumnWidth(8, 220); // Boss Kills / WCL Link
-  sheet.setColumnWidth(9, 180); // Reliability Tier
+  sheet.setColumnWidth(4, 90);  // Attendance % / Kills
+  sheet.setColumnWidth(5, 90);  // On-Time % / Guild Raiders
+  sheet.setColumnWidth(6, 220); // Raids Attended / Bench Raiders
+  sheet.setColumnWidth(7, 180); // Tardies / On-Time List
+  sheet.setColumnWidth(8, 120); // Late Arrivals
+  sheet.setColumnWidth(9, 180); // WCL Link
+  sheet.setColumnWidth(10, 160); // Reliability Tier
 
   // Attendance & On-Time Soft Conditional Formatting
   const rules = [];
@@ -4008,10 +4039,340 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('9').setBackground('#d1fae5').setFontColor('#065f46').setRanges([...attRange, ...onTimeRange]).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('8').setBackground('#fef3c7').setFontColor('#92400e').setRanges([...attRange, ...onTimeRange]).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('7').setBackground('#fef3c7').setFontColor('#92400e').setRanges([...attRange, ...onTimeRange]).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('6').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges([...attRange, ...onTimeRange]).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('5').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges([...attRange, ...onTimeRange]).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('0%').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges(attRange).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('N/A').setBackground('#f1f5f9').setFontColor('#64748b').setRanges(onTimeRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('0%').setBackground('#fee2e2').setFontColor('#991b1b').setRanges([...attRange, ...onTimeRange]).build());
   sheet.setConditionalFormatRules(rules);
+}
+
+/**
+ * Returns data needed by the Bench & Standby Raiders interactive modal dialog.
+ */
+function getBenchDialogData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const config = getConfigurationFromSheet();
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const benchRecords = JSON.parse(scriptProperties.getProperty('bench_records') || '{}');
+
+  const members = (config.MEMBERS_TO_TRACK || []).map(m => ({
+    name: m.name,
+    spec: m.expectedSpec || '',
+    realm: m.realm || ''
+  }));
+
+  // Extract raid dates from Attendance & History sheet ledger if available
+  const raidDates = [];
+  const attSheet = ss.getSheetByName(ATTENDANCE_SHEET_NAME);
+  if (attSheet && attSheet.getLastRow() >= 10) {
+    const values = attSheet.getDataRange().getValues();
+    let inLedger = false;
+    for (let r = 0; r < values.length; r++) {
+      const col0 = (values[r][0] || '').toString().trim();
+      if (col0.includes('HISTORICAL GUILD RAID NIGHT LEDGER')) {
+        inLedger = true;
+        r += 1; // Skip header row
+        continue;
+      }
+      if (inLedger && col0 && !col0.includes('Rank') && !col0.includes('═')) {
+        const title = (values[r][1] || '').toString().trim();
+        raidDates.push({
+          dateStr: col0,
+          title: title
+        });
+      }
+    }
+  }
+
+  // If no dates on sheet yet, provide recent dates
+  if (raidDates.length === 0) {
+    const today = new Date();
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(today.getTime() - i * 86400000 * 3);
+      const str = Utilities.formatDate(d, 'America/Los_Angeles', 'EEE, MMM d, yyyy');
+      raidDates.push({ dateStr: str, title: 'Official Guild Raid' });
+    }
+  }
+
+  return {
+    raidDates: raidDates,
+    members: members,
+    benchRecords: benchRecords
+  };
+}
+
+/**
+ * Saves selected bench raiders for a specific raid night and refreshes attendance & loot sheets.
+ */
+function saveBenchRaiders(dateKey, selectedPlayerNames) {
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const benchRecords = JSON.parse(scriptProperties.getProperty('bench_records') || '{}');
+  
+  benchRecords[dateKey] = selectedPlayerNames || [];
+  scriptProperties.setProperty('bench_records', JSON.stringify(benchRecords));
+
+  // Automatically trigger WCL sync to recalculate leaderboard and loot scores
+  syncWarcraftLogsSeasonAttendance();
+
+  return {
+    success: true,
+    dateKey: dateKey,
+    count: selectedPlayerNames.length
+  };
+}
+
+/**
+ * Displays the modern, interactive Mythic Bench & Standby Raiders checkbox dialog.
+ */
+function showBenchRaidersDialog() {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <base target="_top">
+        <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+        <style>
+          body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            margin: 0;
+            padding: 16px;
+          }
+          h3 {
+            margin: 0 0 12px 0;
+            color: #38bdf8;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+          .subtitle {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 14px;
+          }
+          label {
+            font-size: 12px;
+            font-weight: 500;
+            color: #cbd5e1;
+            display: block;
+            margin-bottom: 6px;
+          }
+          select, input[type="text"] {
+            width: 100%;
+            padding: 8px 10px;
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: #f8fafc;
+            border-radius: 6px;
+            font-size: 13px;
+            box-sizing: border-box;
+            margin-bottom: 12px;
+          }
+          .grid-container {
+            max-height: 240px;
+            overflow-y: auto;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 10px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+          }
+          .member-card {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #0f172a;
+            padding: 6px 8px;
+            border-radius: 4px;
+            border: 1px solid #334155;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          }
+          .member-card:hover {
+            border-color: #38bdf8;
+          }
+          .member-card input {
+            cursor: pointer;
+          }
+          .member-name {
+            font-size: 12px;
+            font-weight: 500;
+          }
+          .member-spec {
+            font-size: 10px;
+            color: #94a3b8;
+          }
+          .actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 14px;
+          }
+          .quick-btn {
+            background: none;
+            border: 1px solid #475569;
+            color: #94a3b8;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+          }
+          .quick-btn:hover {
+            color: #f8fafc;
+            border-color: #94a3b8;
+          }
+          .btn-save {
+            background: #10b981;
+            color: #ffffff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+          }
+          .btn-save:hover {
+            background: #059669;
+          }
+          .btn-save:disabled {
+            background: #475569;
+            cursor: not-allowed;
+          }
+          #statusMsg {
+            font-size: 11px;
+            color: #34d399;
+            margin-top: 8px;
+            text-align: center;
+            min-height: 16px;
+          }
+        </style>
+      </head>
+      <body>
+        <h3>🪑 Mythic Bench & Standby Credit Manager</h3>
+        <div class="subtitle">Select the raid night and check all raiders on standby in Discord to award them 100% attendance & punctuality credit.</div>
+
+        <label for="dateSelect">Select Raid Night:</label>
+        <select id="dateSelect" onchange="onDateChange()"></select>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <label style="margin:0;">Select Bench Raiders:</label>
+          <div>
+            <button class="quick-btn" onclick="toggleAll(true)">Select All</button>
+            <button class="quick-btn" onclick="toggleAll(false)">Clear</button>
+          </div>
+        </div>
+
+        <div class="grid-container" id="rosterContainer">
+          <div style="color:#94a3b8; font-size:12px; grid-column:span 2;">Loading guild roster...</div>
+        </div>
+
+        <div id="statusMsg"></div>
+
+        <div class="actions">
+          <button class="quick-btn" onclick="google.script.host.close()">Cancel</button>
+          <button class="btn-save" id="btnSave" onclick="saveBench()">💾 Save & Award Bench Credit</button>
+        </div>
+
+        <script>
+          let dialogData = null;
+
+          function init() {
+            google.script.run
+              .withSuccessHandler(function(data) {
+                dialogData = data;
+                populateDates();
+                populateRoster();
+              })
+              .withFailureHandler(function(err) {
+                document.getElementById('statusMsg').innerText = 'Error loading data: ' + err.message;
+              })
+              .getBenchDialogData();
+          }
+
+          function populateDates() {
+            const select = document.getElementById('dateSelect');
+            select.innerHTML = '';
+            dialogData.raidDates.forEach(function(d) {
+              const opt = document.createElement('option');
+              opt.value = d.dateStr;
+              opt.innerText = d.dateStr + ' (' + d.title + ')';
+              select.appendChild(opt);
+            });
+            onDateChange();
+          }
+
+          function populateRoster() {
+            const container = document.getElementById('rosterContainer');
+            container.innerHTML = '';
+            const selectedDate = document.getElementById('dateSelect').value;
+            const currentBench = (dialogData.benchRecords && dialogData.benchRecords[selectedDate]) || [];
+
+            dialogData.members.forEach(function(m) {
+              const isChecked = currentBench.includes(m.name);
+              const card = document.createElement('label');
+              card.className = 'member-card';
+              card.innerHTML = 
+                '<input type="checkbox" value="' + m.name + '" ' + (isChecked ? 'checked' : '') + '> ' +
+                '<div>' +
+                  '<div class="member-name">' + m.name + '</div>' +
+                  '<div class="member-spec">' + (m.spec || 'Main Spec') + '</div>' +
+                '</div>';
+              container.appendChild(card);
+            });
+          }
+
+          function onDateChange() {
+            if (!dialogData) return;
+            populateRoster();
+          }
+
+          function toggleAll(check) {
+            const checkboxes = document.querySelectorAll('#rosterContainer input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = check);
+          }
+
+          function saveBench() {
+            const btn = document.getElementById('btnSave');
+            const status = document.getElementById('statusMsg');
+            const dateVal = document.getElementById('dateSelect').value;
+            
+            const selected = [];
+            const checkboxes = document.querySelectorAll('#rosterContainer input[type="checkbox"]:checked');
+            checkboxes.forEach(cb => selected.push(cb.value));
+
+            btn.disabled = true;
+            btn.innerText = '⏳ Syncing Attendance...';
+            status.style.color = '#38bdf8';
+            status.innerText = 'Saving bench credit and recalculating attendance scores...';
+
+            google.script.run
+              .withSuccessHandler(function(res) {
+                status.style.color = '#34d399';
+                status.innerText = '✅ Successfully awarded bench credit to ' + res.count + ' raiders!';
+                setTimeout(function() {
+                  google.script.host.close();
+                }, 1500);
+              })
+              .withFailureHandler(function(err) {
+                btn.disabled = false;
+                btn.innerText = '💾 Save & Award Bench Credit';
+                status.style.color = '#f87171';
+                status.innerText = '❌ Error: ' + err.message;
+              })
+              .saveBenchRaiders(dateVal, selected);
+          }
+
+          window.onload = init;
+        </script>
+      </body>
+    </html>
+  `;
+
+  const htmlOutput = HtmlService.createHtmlOutput(html)
+    .setWidth(520)
+    .setHeight(480);
+  SpreadsheetApp.getUi().showModalDialog(htmlOutput, '🪑 Mythic Bench & Standby Credit Manager');
 }
 
