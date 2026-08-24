@@ -3818,9 +3818,14 @@ function syncWarcraftLogsSeasonAttendance() {
   // 4. Write onto "Attendance & History" sheet
   createAttendanceAndHistorySheet(leaderboard, raidLedger, totalOfficialRaids);
 
+  // 5. Automatically refresh Loot & Chase Items sheet so all contenders receive live Attendance % badges!
+  if (ss.getSheetByName(LOOT_SHEET_NAME)) {
+    createLootAndChaseItemsSheet();
+  }
+
   ui.alert(
     'Warcraft Logs Synced!',
-    `Successfully merged logs into ${totalOfficialRaids} official raid nights (Tue/Wed Pacific Time).\n\nAll attendance, on-time punctuality, and boss kills have been updated on the "Attendance & History" sheet!`,
+    `Successfully merged logs into ${totalOfficialRaids} official raid nights (Tue/Wed Pacific Time).\n\nAll attendance %, on-time punctuality, and boss kills have been updated on "Attendance & History" AND all badges refreshed on "Loot & Chase Items"!`,
     ui.ButtonSet.OK
   );
 }
