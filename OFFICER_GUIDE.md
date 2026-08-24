@@ -102,6 +102,12 @@ An intelligent **Loot Council Assistant** configured with all 8 bosses of **The 
   * Shields are assigned strictly to Shield specs (Prot Warrior, Prot/Holy Paladin, Ele/Resto Shaman).
   * Holdables are assigned strictly to Intellect casters & healers.
 
+### 👑 Real-Time Contender Context (Role & Attendance Badges):
+Contenders display their mathematical upgrade alongside their **Roster Tenure** and **Season Attendance**:
+* **Veteran:** `Castite (+4.77% DPS • 👑 Veteran • 100% Att)`
+* **Raider:** `Spellbreakr (+4.12% DPS • ⚔️ Raider • 95% Att)`
+* **Trial:** `NewRecruit (+5.20% DPS • 🛡️ Trial • 100% Att)`
+
 ### 🎨 Top Contender Color-Coding (Column G):
 * 🟢 **Mint Green (`#d1fae5`)**: Item is evaluated via an active sim (**Raidbots `% DPS`** or **QE Live `% HPS`**).
 * 🟡 **Soft Yellow (`#fef3c7`)**: Item is evaluated via **Live Armory ilvl Delta (`+ilvl`)** fallback.
