@@ -3458,6 +3458,7 @@ function getWCLAccessToken() {
  * Merges multi-uploader reports by Pacific calendar date into official raid nights (Tue/Wed).
  */
 function syncWarcraftLogsSeasonAttendance() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
   const ui = SpreadsheetApp.getUi();
   const config = getConfigurationFromSheet();
   if (!config) return;
