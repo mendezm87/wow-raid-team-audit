@@ -2756,17 +2756,16 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
   sheet.autoResizeColumns(2, lootHeaders.length - 1);
   for (let c = 2; c <= lootHeaders.length; c++) {
     const calculatedWidth = sheet.getColumnWidth(c);
-    sheet.setColumnWidth(c, Math.max(calculatedWidth + 24, 80));
+    sheet.setColumnWidth(c, Math.max(calculatedWidth + 16, 75));
   }
 
-  // Ensure Top Contender and Notes have guaranteed comfortable minimum widths
-  if (sheet.getColumnWidth(7) < 380) sheet.setColumnWidth(7, 380);
-  if (sheet.getColumnWidth(13) < 750) sheet.setColumnWidth(13, 750);
+  // Ensure Notes has guaranteed comfortable minimum width
+  if (sheet.getColumnWidth(13) < 650) sheet.setColumnWidth(13, 650);
 
-  // Align text for natural readability
+  // Align text: Keep Top Contender & Equipped centered for clean badge symmetry, Notes left-aligned for readability
   if (fullData.length > 1) {
-    sheet.getRange(2, 7, fullData.length - 1, 1).setHorizontalAlignment('left');
-    sheet.getRange(2, 8, fullData.length - 1, 1).setHorizontalAlignment('left');
+    sheet.getRange(2, 7, fullData.length - 1, 1).setHorizontalAlignment('center');
+    sheet.getRange(2, 8, fullData.length - 1, 1).setHorizontalAlignment('center');
     sheet.getRange(2, 13, fullData.length - 1, 1).setHorizontalAlignment('left');
   }
 }
@@ -3169,8 +3168,8 @@ function processAndIngestRaidbotsSims(input) {
 
   // Save back all updated and newly registered items
   sheet.getRange(2, 1, values.length, values[0].length).setValues(values);
-  sheet.getRange(2, 7, values.length, 1).setHorizontalAlignment('left');
-  sheet.getRange(2, 8, values.length, 1).setHorizontalAlignment('left');
+  sheet.getRange(2, 7, values.length, 1).setHorizontalAlignment('center');
+  sheet.getRange(2, 8, values.length, 1).setHorizontalAlignment('center');
   sheet.getRange(2, 13, values.length, 1).setHorizontalAlignment('left');
 
   // Set clean dynamic column widths (Unmerged flat layout)
@@ -3178,10 +3177,9 @@ function processAndIngestRaidbotsSims(input) {
   sheet.autoResizeColumns(2, values[0].length - 1);
   for (let c = 2; c <= values[0].length; c++) {
     const calculatedWidth = sheet.getColumnWidth(c);
-    sheet.setColumnWidth(c, Math.max(calculatedWidth + 24, 80));
+    sheet.setColumnWidth(c, Math.max(calculatedWidth + 16, 75));
   }
-  if (sheet.getColumnWidth(7) < 380) sheet.setColumnWidth(7, 380);
-  if (sheet.getColumnWidth(13) < 750) sheet.setColumnWidth(13, 750);
+  if (sheet.getColumnWidth(13) < 650) sheet.setColumnWidth(13, 650);
 
   return {
     success: true,
@@ -3392,8 +3390,8 @@ function processAndIngestQELiveReport(reportUrlOrId) {
 
   // Save back all updated values
   sheet.getRange(2, 1, values.length, values[0].length).setValues(values);
-  sheet.getRange(2, 7, values.length, 1).setHorizontalAlignment('left');
-  sheet.getRange(2, 8, values.length, 1).setHorizontalAlignment('left');
+  sheet.getRange(2, 7, values.length, 1).setHorizontalAlignment('center');
+  sheet.getRange(2, 8, values.length, 1).setHorizontalAlignment('center');
   sheet.getRange(2, 13, values.length, 1).setHorizontalAlignment('left');
 
   // Set clean dynamic column widths (Unmerged flat layout)
@@ -3401,10 +3399,9 @@ function processAndIngestQELiveReport(reportUrlOrId) {
   sheet.autoResizeColumns(2, values[0].length - 1);
   for (let c = 2; c <= values[0].length; c++) {
     const calculatedWidth = sheet.getColumnWidth(c);
-    sheet.setColumnWidth(c, Math.max(calculatedWidth + 24, 80));
+    sheet.setColumnWidth(c, Math.max(calculatedWidth + 16, 75));
   }
-  if (sheet.getColumnWidth(7) < 380) sheet.setColumnWidth(7, 380);
-  if (sheet.getColumnWidth(13) < 750) sheet.setColumnWidth(13, 750);
+  if (sheet.getColumnWidth(13) < 650) sheet.setColumnWidth(13, 650);
 
   return {
     success: true,
