@@ -126,7 +126,7 @@ On the **`Loot & Chase Items`** sheet, you can see all 8 raid bosses and every p
 ### 🧮 Objective Priority Score Engine:
 To keep loot distribution 100% fair, transparent, and free of officer bias, the spreadsheet automatically calculates an objective **Priority Score** for every contender:
 
-$$\text{Priority Score} = \text{Raw Upgrade Gain} \times \text{Reliability Index} \times \text{Role Multiplier}$$
+$$\text{Priority Score} = \text{Raw Upgrade Gain} \times \text{Reliability Index} \times \text{Role Multiplier} \times \text{Prep Multiplier}$$
 
 1. **Role Multipliers**:
    * 👑 **`👑 Veteran` ($1.10\times$)**: $+10\%$ priority bonus for proven multi-season loyalty.
@@ -134,7 +134,10 @@ $$\text{Priority Score} = \text{Raw Upgrade Gain} \times \text{Reliability Index
    * 🛡️ **`🛡️ Trial` ($0.80\times$)**: $-20\%$ modifier until trial graduation.
 2. **Reliability Index**:
    * Combines **$85\%$ Season Attendance** $+ \mathbf{15\%}$ **On-Time Punctuality** (being ready for the first pull).
-3. **🪑 Mythic Bench / Standby Credit**:
+3. **Raid Preparation (Gems & Enchants)**:
+   * 🟢 **`READY` ($1.00\times$)**: Full priority credit.
+   * ⚠️ **Missing Enchants / Sockets ($0.90\times$)**: $-10\%$ modifier and `⚠️ Missing Enchants` badge until gear is enchanted.
+4. **🪑 Mythic Bench / Standby Credit**:
    * If you are sitting on the bench / standby in Discord on a Mythic raid night, officers award you **full 100% Attendance & On-Time credit** so you are never penalized in loot priority for taking one for the team!
 
 ### 🎨 How Contenders are Displayed:

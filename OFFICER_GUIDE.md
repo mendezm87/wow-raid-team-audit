@@ -103,19 +103,23 @@ An intelligent **Loot Council Assistant** configured with all 8 bosses of **The 
   * Holdables are assigned strictly to Intellect casters & healers.
 
 ### 🧮 Objective Composite Priority Score Engine:
-To eliminate guesswork, contenders are sorted automatically by a mathematically objective **Priority Score**:
+To eliminate guesswork and reward preparation, contenders are sorted automatically by a mathematically objective **Priority Score**:
 
-$$\text{Priority Score} = \text{Raw Upgrade Gain} \times \left(\frac{\text{Attendance \%}}{100}\right) \times \text{Role Multiplier}$$
+$$\text{Priority Score} = \text{Raw Upgrade Gain} \times \text{Reliability Index} \times \text{Role Multiplier} \times \text{Prep Multiplier}$$
 
 * **Role Multipliers**:
   * 👑 **`👑 Veteran` ($1.10\times$)**: $+10\%$ priority bonus for proven multi-season loyalty.
   * ⚔️ **`⚔️ Raider` ($1.00\times$)**: Core standard baseline.
   * 🛡️ **`🛡️ Trial` ($0.80\times$)**: $-20\%$ modifier until trial graduation.
-* **Attendance Factor**: Scaled from active season raid attendance (`Attendance % / 100`).
+* **Reliability Index**: Scaled from active season attendance and on-time punctuality: $(0.85 \times \text{Att \%}) + (0.15 \times \text{On-Time \%})$.
+* **Raid Preparation Factor (Gems & Enchants)**:
+  * 🟢 **`READY` ($1.00\times$)**: Fully gemmed and enchanted.
+  * ⚠️ **Missing Enchants / Sockets ($0.90\times$)**: $-10\%$ preparation penalty until gear is properly gemmed/enchanted.
 
 ### 👑 Contender Display Badges:
-* **Top Contender (Column G):** `Summzr [Score: 4.62] (+4.20% DPS • 👑 Veteran • 100% Att)`
-* **Loot Council Notes (Column M):** `Rankings: 1. Summzr [Score: 4.62] (+4.20% | 👑 Veteran | 100%) | 2. NewTrial [Score: 4.00] (+5.00% | 🛡️ Trial | 100%)`
+* **Prepared Raider (Column G):** `Summzr [Score: 4.62] (+4.20% DPS • 👑 Veteran • 100% Att)`
+* **Un-enchanted Raider (Column G):** `Summzr [Score: 4.16] (+4.20% DPS • 👑 Veteran • 100% Att • ⚠️ Missing Enchants)`
+* **Loot Council Notes (Column M):** `Rankings: 1. Summzr [Score: 4.62] (+4.20% | 👑 Veteran | 100%) | 2. Unready [Score: 3.60] (+4.00% | ⚔️ Raider | 100% | ⚠️ Unenchanted)`
 
 ### 🎨 Top Contender Color-Coding (Column G):
 * 🟢 **Mint Green (`#d1fae5`)**: Item is evaluated via an active sim (**Raidbots `% DPS`** or **QE Live `% HPS`**).

@@ -2054,7 +2054,7 @@ function getRosterContextMap(ss) {
       if (name && attStr.includes('%')) {
         const lower = name.toLowerCase();
         if (!contextMap[lower]) {
-          contextMap[lower] = { name: name, role: '⚔️ Raider', attPct: null, onTimePct: null };
+          contextMap[lower] = { name: name, role: '⚔️ Raider', attPct: null, onTimePct: null, isRaidReady: true };
         }
         contextMap[lower].attPct = attStr;
         contextMap[lower].onTimePct = onTimeStr;
@@ -2062,21 +2062,46 @@ function getRosterContextMap(ss) {
     });
   }
 
+  // 3. Read Raid Readiness (Gems & Enchants) from Guild Audit tab if available
+  const auditSheet = ss.getSheetByName(AUDIT_SHEET_NAME);
+  if (auditSheet && auditSheet.getLastRow() >= 2) {
+    const auditValues = auditSheet.getDataRange().getValues();
+    const headers = auditValues[0].map(h => (h || '').toString().trim());
+    const nameCol = headers.indexOf('Name');
+    const readyCol = headers.indexOf('Raid Ready');
+    if (nameCol > -1 && readyCol > -1) {
+      for (let r = 1; r < auditValues.length; r++) {
+        const charName = (auditValues[r][nameCol] || '').toString().trim();
+        const readyStatus = (auditValues[r][readyCol] || '').toString().trim();
+        if (charName) {
+          const lower = charName.toLowerCase();
+          if (!contextMap[lower]) {
+            contextMap[lower] = { name: charName, role: '⚔️ Raider', attPct: null, onTimePct: null, isRaidReady: true };
+          }
+          const isMissingEnchantOrGem = readyStatus.toLowerCase().includes('missing') || readyStatus.toLowerCase().includes('empty socket') || readyStatus.toLowerCase().includes('socket');
+          contextMap[lower].isRaidReady = !isMissingEnchantOrGem;
+          contextMap[lower].readyStatus = readyStatus;
+        }
+      }
+    }
+  }
+
   return contextMap;
 }
 
 /**
- * Calculates a composite Loot Council Priority Score balancing mathematical upgrade, season attendance, punctuality, and roster role.
- * Formula: Score = RawGain * ReliabilityFactor * RoleMultiplier
+ * Calculates a composite Loot Council Priority Score balancing mathematical upgrade, season attendance, punctuality, roster role, and raid prep.
+ * Formula: Score = RawGain * ReliabilityFactor * RoleMultiplier * PrepMultiplier
  * - Role: Veteran (1.10x), Raider (1.00x), Trial (0.80x)
  * - Reliability: (0.85 * Attendance% + 0.15 * OnTime%) with min floor at 0.40
+ * - Prep (Gems & Enchants): READY (1.00x), Missing Enchants / Sockets (0.90x)
  */
 function calculatePriorityScore(rawGain, charName, isSim, contextMap) {
   const numGain = parseFloat(rawGain) || 0;
   const normalizedGain = isSim ? numGain : (numGain / 10); // Scale +ilvl deltas comparable to % gain
 
   const lower = (charName || '').toLowerCase().trim();
-  const ctx = (contextMap && contextMap[lower]) || { role: '⚔️ Raider', attPct: null, onTimePct: null };
+  const ctx = (contextMap && contextMap[lower]) || { role: '⚔️ Raider', attPct: null, onTimePct: null, isRaidReady: true };
   const role = ctx.role || '⚔️ Raider';
 
   let roleMult = 1.00;
@@ -2098,7 +2123,11 @@ function calculatePriorityScore(rawGain, charName, isSim, contextMap) {
   // Composite Reliability Index: 85% Attendance + 15% On-Time Punctuality
   const reliabilityFactor = Math.min(1.0, Math.max(0.40, (0.85 * attVal) + (0.15 * onTimeVal)));
 
-  const score = normalizedGain * reliabilityFactor * roleMult;
+  // Raid Preparation Factor: 1.00x if READY, 0.90x (-10% penalty) if missing enchants / gems
+  const isReady = (ctx.isRaidReady !== false);
+  const prepMult = isReady ? 1.00 : 0.90;
+
+  const score = normalizedGain * reliabilityFactor * roleMult * prepMult;
   return {
     score: Number(score.toFixed(2)),
     rawGain: numGain,
@@ -2106,16 +2135,18 @@ function calculatePriorityScore(rawGain, charName, isSim, contextMap) {
     roleMult: roleMult,
     attPct: ctx.attPct || '100%',
     onTimePct: ctx.onTimePct || '100%',
-    reliabilityFactor: Number(reliabilityFactor.toFixed(2))
+    reliabilityFactor: Number(reliabilityFactor.toFixed(2)),
+    isRaidReady: isReady,
+    prepMult: prepMult
   };
 }
 
 /**
- * Formats a contender string with their Priority Score, Roster Role, and Attendance % context.
+ * Formats a contender string with their Priority Score, Roster Role, Attendance %, and Prep context.
  */
 function formatContenderDisplay(name, valueStr, isSim, contextMap, scoreObj) {
   const lower = (name || '').toLowerCase().trim();
-  const ctx = (contextMap && contextMap[lower]) || { role: '⚔️ Raider', attPct: null };
+  const ctx = (contextMap && contextMap[lower]) || { role: '⚔️ Raider', attPct: null, isRaidReady: true };
   const roleBadge = ctx.role || '⚔️ Raider';
   const attBadge = ctx.attPct ? ` • ${ctx.attPct} Att` : '';
 
@@ -2123,12 +2154,13 @@ function formatContenderDisplay(name, valueStr, isSim, contextMap, scoreObj) {
     scoreObj = calculatePriorityScore(valueStr, name, isSim, contextMap);
   }
 
+  const prepBadge = (!scoreObj.isRaidReady) ? ' • ⚠️ Missing Enchants' : '';
   const scoreBadge = `[Score: ${scoreObj.score}]`;
 
   if (isSim) {
-    return `${name} ${scoreBadge} (+${valueStr}% DPS • ${roleBadge}${attBadge})`;
+    return `${name} ${scoreBadge} (+${valueStr}% DPS • ${roleBadge}${attBadge}${prepBadge})`;
   } else {
-    return `${name} ${scoreBadge} (+${valueStr} • ${roleBadge}${attBadge})`;
+    return `${name} ${scoreBadge} (+${valueStr} • ${roleBadge}${attBadge}${prepBadge})`;
   }
 }
 
@@ -2589,7 +2621,8 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
           const topList = simContenders.slice(0, 5).map((c, i) => {
             const pRole = c.priority.role ? ` | ${c.priority.role}` : '';
             const pAtt = c.priority.attPct ? ` | ${c.priority.attPct}` : '';
-            return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.pct}%${pRole}${pAtt})`;
+            const pPrep = (!c.priority.isRaidReady) ? ' | ⚠️ Unenchanted' : '';
+            return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.pct}%${pRole}${pAtt}${pPrep})`;
           });
           row[12] = prefix + topList.join(' | ');
         } else {
@@ -2664,7 +2697,8 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
         const top3List = contenders.slice(0, 3).map((c, i) => {
           const cRole = c.priority.role ? ` | ${c.priority.role}` : '';
           const cAtt = c.priority.attPct ? ` | ${c.priority.attPct}` : '';
-          return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.delta}${cRole}${cAtt})`;
+          const cPrep = (!c.priority.isRaidReady) ? ' | ⚠️ Unenchanted' : '';
+          return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.delta}${cRole}${cAtt}${cPrep})`;
         }).join(' | ');
         row[12] = `${baseNotes} (Top Upgrades: ${top3List})`;
       }
@@ -3130,7 +3164,8 @@ function processAndIngestRaidbotsSims(input) {
       const topList = sorted.slice(0, 5).map((c, i) => {
         const cRole = c.priority.role ? ` | ${c.priority.role}` : '';
         const cAtt = c.priority.attPct ? ` | ${c.priority.attPct}` : '';
-        return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.pct}%${cRole}${cAtt})`;
+        const cPrep = (!c.priority.isRaidReady) ? ' | ⚠️ Unenchanted' : '';
+        return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.pct}%${cRole}${cAtt}${cPrep})`;
       }).join(' | ');
       row[12] = `Raidbots Sim Upgrades: ${topList}`;
 
@@ -3353,7 +3388,8 @@ function processAndIngestQELiveReport(reportUrlOrId) {
       const topList = sorted.slice(0, 5).map((c, i) => {
         const cRole = c.priority.role ? ` | ${c.priority.role}` : '';
         const cAtt = c.priority.attPct ? ` | ${c.priority.attPct}` : '';
-        return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.pct}%${cRole}${cAtt})`;
+        const cPrep = (!c.priority.isRaidReady) ? ' | ⚠️ Unenchanted' : '';
+        return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.pct}%${cRole}${cAtt}${cPrep})`;
       }).join(' | ');
       row[12] = `Sim / QE Live Upgrades: ${topList}`;
 
