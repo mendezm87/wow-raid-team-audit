@@ -2751,20 +2751,27 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     }
   }
 
-  // Set widths
-  sheet.setColumnWidth(1, 240); // Boss
+  // Set generous column widths to ensure full visibility without truncation
+  sheet.setColumnWidth(1, 220); // Boss
   sheet.setColumnWidth(2, 260); // Item Name
   sheet.setColumnWidth(3, 110); // Slot
-  sheet.setColumnWidth(4, 100); // Difficulty
-  sheet.setColumnWidth(5, 85);  // Drop ilvl
-  sheet.setColumnWidth(6, 280); // Target Specs
-  sheet.setColumnWidth(7, 190); // Top Contender
-  sheet.setColumnWidth(8, 320); // Equipped Item
-  sheet.setColumnWidth(9, 100); // Equipped ilvl
-  sheet.setColumnWidth(10, 150);// Upgrade Delta
-  sheet.setColumnWidth(11, 180);// Priority / BiS Tier
-  sheet.setColumnWidth(12, 200);// Sim Status / Last Updated
-  sheet.setColumnWidth(13, 550);// Notes
+  sheet.setColumnWidth(4, 90);  // Difficulty
+  sheet.setColumnWidth(5, 80);  // Drop ilvl
+  sheet.setColumnWidth(6, 260); // Target Specs / Roles
+  sheet.setColumnWidth(7, 380); // Top Contender (Assigned) - widened so full Score, Role & Attendance badge fits with zero cutoff
+  sheet.setColumnWidth(8, 300); // Current Equipped Item
+  sheet.setColumnWidth(9, 90);  // Equipped ilvl
+  sheet.setColumnWidth(10, 130);// Upgrade Delta
+  sheet.setColumnWidth(11, 150);// Priority / BiS Tier
+  sheet.setColumnWidth(12, 180);// Sim Status / Last Updated
+  sheet.setColumnWidth(13, 800);// Loot Council Notes - widened so full Top 5 contender ranking fits comfortably
+
+  // Align text for natural readability
+  if (fullData.length > 1) {
+    sheet.getRange(2, 7, fullData.length - 1, 1).setHorizontalAlignment('left');
+    sheet.getRange(2, 8, fullData.length - 1, 1).setHorizontalAlignment('left');
+    sheet.getRange(2, 13, fullData.length - 1, 1).setHorizontalAlignment('left').setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
+  }
 }
 
 /**
@@ -3165,6 +3172,11 @@ function processAndIngestRaidbotsSims(input) {
 
   // Save back all updated and newly registered items
   sheet.getRange(2, 1, values.length, values[0].length).setValues(values);
+  sheet.getRange(2, 7, values.length, 1).setHorizontalAlignment('left');
+  sheet.getRange(2, 8, values.length, 1).setHorizontalAlignment('left');
+  sheet.getRange(2, 13, values.length, 1).setHorizontalAlignment('left').setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
+  sheet.setColumnWidth(7, 380);
+  sheet.setColumnWidth(13, 800);
 
   return {
     success: true,
@@ -3374,6 +3386,11 @@ function processAndIngestQELiveReport(reportUrlOrId) {
   });
 
   sheet.getRange(2, 1, values.length, values[0].length).setValues(values);
+  sheet.getRange(2, 7, values.length, 1).setHorizontalAlignment('left');
+  sheet.getRange(2, 8, values.length, 1).setHorizontalAlignment('left');
+  sheet.getRange(2, 13, values.length, 1).setHorizontalAlignment('left').setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
+  sheet.setColumnWidth(7, 380);
+  sheet.setColumnWidth(13, 800);
 
   return {
     success: true,
