@@ -2737,13 +2737,12 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
 
   sheet.setConditionalFormatRules(rules);
 
-  // Style Boss Separator Rows with distinctive Dark Slate / Indigo Banners (Merged across full row)
+  // Style Boss Separator Rows with distinctive Dark Slate / Indigo Banners (Unmerged flat rows)
   for (let i = 0; i < chaseItemsCatalog.length; i++) {
     const rowTitle = (chaseItemsCatalog[i][0] || '').toString();
     if (rowTitle.startsWith('⚔️') || rowTitle.startsWith('🛡️') || rowTitle.startsWith('🧭') || rowTitle.startsWith('🧪') || rowTitle.startsWith('🐊') || rowTitle.startsWith('🏛️') || rowTitle.startsWith('👑') || rowTitle.startsWith('📦')) {
       const rowIdx = i + 2;
       sheet.getRange(rowIdx, 1, 1, sheet.getMaxColumns())
-        .merge()
         .setBackground('#0f172a')
         .setFontColor('#f8fafc')
         .setFontWeight('bold')
@@ -2752,16 +2751,17 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     }
   }
 
-  // Dynamically auto-resize all columns to fit the exact width of their text contents + 24px breathing room
-  sheet.autoResizeColumns(1, lootHeaders.length);
-  for (let c = 1; c <= lootHeaders.length; c++) {
+  // Set clean dynamic column widths (Unmerged flat layout)
+  sheet.setColumnWidth(1, 230); // Boss / Source header
+  sheet.autoResizeColumns(2, lootHeaders.length - 1);
+  for (let c = 2; c <= lootHeaders.length; c++) {
     const calculatedWidth = sheet.getColumnWidth(c);
-    sheet.setColumnWidth(c, Math.max(calculatedWidth + 24, 75));
+    sheet.setColumnWidth(c, Math.max(calculatedWidth + 24, 80));
   }
 
   // Ensure Top Contender and Notes have guaranteed comfortable minimum widths
-  if (sheet.getColumnWidth(7) < 360) sheet.setColumnWidth(7, 360);
-  if (sheet.getColumnWidth(13) < 650) sheet.setColumnWidth(13, 650);
+  if (sheet.getColumnWidth(7) < 380) sheet.setColumnWidth(7, 380);
+  if (sheet.getColumnWidth(13) < 750) sheet.setColumnWidth(13, 750);
 
   // Align text for natural readability
   if (fullData.length > 1) {
@@ -3173,14 +3173,15 @@ function processAndIngestRaidbotsSims(input) {
   sheet.getRange(2, 8, values.length, 1).setHorizontalAlignment('left');
   sheet.getRange(2, 13, values.length, 1).setHorizontalAlignment('left');
 
-  // Dynamically auto-resize all columns to fit text contents perfectly
-  sheet.autoResizeColumns(1, values[0].length);
-  for (let c = 1; c <= values[0].length; c++) {
+  // Set clean dynamic column widths (Unmerged flat layout)
+  sheet.setColumnWidth(1, 230); // Boss / Source header
+  sheet.autoResizeColumns(2, values[0].length - 1);
+  for (let c = 2; c <= values[0].length; c++) {
     const calculatedWidth = sheet.getColumnWidth(c);
-    sheet.setColumnWidth(c, Math.max(calculatedWidth + 24, 75));
+    sheet.setColumnWidth(c, Math.max(calculatedWidth + 24, 80));
   }
-  if (sheet.getColumnWidth(7) < 360) sheet.setColumnWidth(7, 360);
-  if (sheet.getColumnWidth(13) < 650) sheet.setColumnWidth(13, 650);
+  if (sheet.getColumnWidth(7) < 380) sheet.setColumnWidth(7, 380);
+  if (sheet.getColumnWidth(13) < 750) sheet.setColumnWidth(13, 750);
 
   return {
     success: true,
@@ -3395,14 +3396,15 @@ function processAndIngestQELiveReport(reportUrlOrId) {
   sheet.getRange(2, 8, values.length, 1).setHorizontalAlignment('left');
   sheet.getRange(2, 13, values.length, 1).setHorizontalAlignment('left');
 
-  // Dynamically auto-resize all columns to fit text contents perfectly
-  sheet.autoResizeColumns(1, values[0].length);
-  for (let c = 1; c <= values[0].length; c++) {
+  // Set clean dynamic column widths (Unmerged flat layout)
+  sheet.setColumnWidth(1, 230); // Boss / Source header
+  sheet.autoResizeColumns(2, values[0].length - 1);
+  for (let c = 2; c <= values[0].length; c++) {
     const calculatedWidth = sheet.getColumnWidth(c);
-    sheet.setColumnWidth(c, Math.max(calculatedWidth + 24, 75));
+    sheet.setColumnWidth(c, Math.max(calculatedWidth + 24, 80));
   }
-  if (sheet.getColumnWidth(7) < 360) sheet.setColumnWidth(7, 360);
-  if (sheet.getColumnWidth(13) < 650) sheet.setColumnWidth(13, 650);
+  if (sheet.getColumnWidth(7) < 380) sheet.setColumnWidth(7, 380);
+  if (sheet.getColumnWidth(13) < 750) sheet.setColumnWidth(13, 750);
 
   return {
     success: true,
