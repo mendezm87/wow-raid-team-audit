@@ -28,6 +28,39 @@ const CLASS_COLORS = {
   'Priest': '#FFFFFF', 'Death Knight': '#C41F3B', 'Monk': '#00FF96',
   'Demon Hunter': '#A330C9', 'Evoker': '#33937F',
 };
+
+// Accessible high-contrast WoW Class Colors for rich text rendering on light Google Sheets backgrounds
+const CLASS_ACCESSIBLE_COLORS = {
+  'Death Knight': '#c41f3b', // Crimson Red
+  'Demon Hunter': '#9333ea', // Purple
+  'Druid': '#ea580c',        // Sunset Orange
+  'Evoker': '#0d9488',       // Emerald Teal
+  'Hunter': '#4d7c0f',       // Forest Olive Green
+  'Mage': '#0284c7',         // Sky Blue
+  'Monk': '#059669',         // Jade Green
+  'Paladin': '#db2777',      // Pink / Rose
+  'Priest': '#475569',       // Silver Slate
+  'Rogue': '#b45309',        // Amber Gold
+  'Shaman': '#0070de',       // Deep Blue
+  'Warlock': '#7c3aed',      // Fel Violet
+  'Warrior': '#854d0e'       // Deep Bronze
+};
+
+const SPEC_TO_CLASS_MAP = {
+  'affliction': 'Warlock', 'demonology': 'Warlock', 'destruction': 'Warlock',
+  'arcane': 'Mage', 'fire': 'Mage', 'frost': 'Mage',
+  'arms': 'Warrior', 'fury': 'Warrior', 'protection': 'Warrior',
+  'assassination': 'Rogue', 'outlaw': 'Rogue', 'subtlety': 'Rogue',
+  'augmentation': 'Evoker', 'devastation': 'Evoker', 'preservation': 'Evoker',
+  'balance': 'Druid', 'feral': 'Druid', 'guardian': 'Druid', 'restoration': 'Druid',
+  'beast mastery': 'Hunter', 'marksmanship': 'Hunter', 'survival': 'Hunter',
+  'blood': 'Death Knight', 'unholy': 'Death Knight',
+  'brewmaster': 'Monk', 'mistweaver': 'Monk', 'windwalker': 'Monk',
+  'discipline': 'Priest', 'holy': 'Priest', 'shadow': 'Priest',
+  'elemental': 'Shaman', 'enhancement': 'Shaman',
+  'havoc': 'Demon Hunter', 'vengeance': 'Demon Hunter', 'devourer': 'Demon Hunter',
+  'retribution': 'Paladin'
+};
 // --- END CONFIGURATION ---
 
 function onOpen() {
@@ -2023,21 +2056,25 @@ function getRosterContextMap(ss) {
   const contextMap = {};
   if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // 1. Read Roster Roles from Config
+  // 1. Read Roster Roles and Specs from Config
   const configSheet = ss.getSheetByName('Config');
   if (configSheet && configSheet.getLastRow() >= 9) {
     const numRows = Math.min(configSheet.getLastRow() - 8, 37);
     const configData = configSheet.getRange(9, 1, numRows, 4).getValues();
     configData.forEach(row => {
       const rawName = (row[0] || '').toString().trim();
+      const spec = (row[1] || '').toString().trim().toLowerCase();
       const { name } = parseCharacterAndRealm(rawName, '');
       const role = (row[2] || '⚔️ Raider').toString().trim() || '⚔️ Raider';
       if (name && !name.toLowerCase().includes('main character')) {
         contextMap[name.toLowerCase()] = {
           name: name,
           role: role,
+          spec: spec,
+          charClass: SPEC_TO_CLASS_MAP[spec] || '',
           attPct: null,
-          onTimePct: null
+          onTimePct: null,
+          isRaidReady: true
         };
       }
     });
@@ -2062,22 +2099,25 @@ function getRosterContextMap(ss) {
     });
   }
 
-  // 3. Read Raid Readiness (Gems & Enchants) from Guild Audit tab if available
+  // 3. Read Class & Raid Readiness (Gems & Enchants) from Guild Audit tab if available
   const auditSheet = ss.getSheetByName(AUDIT_SHEET_NAME);
   if (auditSheet && auditSheet.getLastRow() >= 2) {
     const auditValues = auditSheet.getDataRange().getValues();
     const headers = auditValues[0].map(h => (h || '').toString().trim());
     const nameCol = headers.indexOf('Name');
+    const classCol = headers.indexOf('Class');
     const readyCol = headers.indexOf('Raid Ready');
     if (nameCol > -1 && readyCol > -1) {
       for (let r = 1; r < auditValues.length; r++) {
         const charName = (auditValues[r][nameCol] || '').toString().trim();
+        const className = classCol > -1 ? (auditValues[r][classCol] || '').toString().trim() : '';
         const readyStatus = (auditValues[r][readyCol] || '').toString().trim();
         if (charName) {
           const lower = charName.toLowerCase();
           if (!contextMap[lower]) {
-            contextMap[lower] = { name: charName, role: '⚔️ Raider', attPct: null, onTimePct: null, isRaidReady: true };
+            contextMap[lower] = { name: charName, role: '⚔️ Raider', attPct: null, onTimePct: null, isRaidReady: true, charClass: className };
           }
+          if (className) contextMap[lower].charClass = className;
           const isMissingEnchantOrGem = readyStatus.toLowerCase().includes('missing') || readyStatus.toLowerCase().includes('empty socket') || readyStatus.toLowerCase().includes('socket');
           contextMap[lower].isRaidReady = !isMissingEnchantOrGem;
           contextMap[lower].readyStatus = readyStatus;
@@ -2162,6 +2202,41 @@ function formatContenderDisplay(name, valueStr, isSim, contextMap, scoreObj) {
   } else {
     return `${name} ${scoreBadge} (+${valueStr} • ${roleBadge}${attBadge}${prepBadge})`;
   }
+}
+
+/**
+ * Constructs a Google Sheets RichTextValue with player names styled in their official high-contrast WoW class colors.
+ */
+function buildRichTextWithClassColors(fullText, rosterContextMap) {
+  const str = (fullText || '').toString();
+  if (!str) return SpreadsheetApp.newRichTextValue().setText('').build();
+
+  const builder = SpreadsheetApp.newRichTextValue().setText(str);
+  
+  if (!rosterContextMap) return builder.build();
+
+  Object.keys(rosterContextMap).forEach(charLower => {
+    const ctx = rosterContextMap[charLower];
+    const charName = ctx.name || charLower;
+    const charClass = ctx.charClass || '';
+    const color = CLASS_ACCESSIBLE_COLORS[charClass] || CLASS_COLORS[charClass];
+
+    if (color && charName) {
+      const regex = new RegExp(`\\b(${charName})\\b`, 'gi');
+      let match;
+      while ((match = regex.exec(str)) !== null) {
+        const start = match.index;
+        const end = start + match[0].length;
+        const nameStyle = SpreadsheetApp.newTextStyle()
+          .setForegroundColor(color)
+          .setBold(true)
+          .build();
+        builder.setTextStyle(start, end, nameStyle);
+      }
+    }
+  });
+
+  return builder.build();
 }
 
 /**
@@ -2801,6 +2876,18 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     sheet.getRange(2, 7, fullData.length - 1, 1).setHorizontalAlignment('center');
     sheet.getRange(2, 8, fullData.length - 1, 1).setHorizontalAlignment('center');
     sheet.getRange(2, 13, fullData.length - 1, 1).setHorizontalAlignment('left');
+
+    // Apply Rich Text Class Colors to Top Contender (Col G) and Loot Council Notes (Col M)
+    const richTopContenders = [];
+    const richNotes = [];
+    for (let r = 0; r < chaseItemsCatalog.length; r++) {
+      const topText = (chaseItemsCatalog[r][6] || '').toString();
+      const noteText = (chaseItemsCatalog[r][12] || '').toString();
+      richTopContenders.push([buildRichTextWithClassColors(topText, rosterContextMap)]);
+      richNotes.push([buildRichTextWithClassColors(noteText, rosterContextMap)]);
+    }
+    sheet.getRange(2, 7, richTopContenders.length, 1).setRichTextValues(richTopContenders);
+    sheet.getRange(2, 13, richNotes.length, 1).setRichTextValues(richNotes);
   }
 }
 
@@ -3207,6 +3294,18 @@ function processAndIngestRaidbotsSims(input) {
   sheet.getRange(2, 8, values.length, 1).setHorizontalAlignment('center');
   sheet.getRange(2, 13, values.length, 1).setHorizontalAlignment('left');
 
+  // Apply Rich Text Class Colors to Top Contender and Notes
+  const richTopContenders = [];
+  const richNotes = [];
+  for (let r = 0; r < values.length; r++) {
+    const topText = (values[r][6] || '').toString();
+    const noteText = (values[r][12] || '').toString();
+    richTopContenders.push([buildRichTextWithClassColors(topText, rosterContextMap)]);
+    richNotes.push([buildRichTextWithClassColors(noteText, rosterContextMap)]);
+  }
+  sheet.getRange(2, 7, richTopContenders.length, 1).setRichTextValues(richTopContenders);
+  sheet.getRange(2, 13, richNotes.length, 1).setRichTextValues(richNotes);
+
   // Set clean dynamic column widths (Unmerged flat layout)
   sheet.setColumnWidth(1, 230); // Boss / Source header
   sheet.autoResizeColumns(2, values[0].length - 1);
@@ -3429,6 +3528,18 @@ function processAndIngestQELiveReport(reportUrlOrId) {
   sheet.getRange(2, 7, values.length, 1).setHorizontalAlignment('center');
   sheet.getRange(2, 8, values.length, 1).setHorizontalAlignment('center');
   sheet.getRange(2, 13, values.length, 1).setHorizontalAlignment('left');
+
+  // Apply Rich Text Class Colors to Top Contender and Notes
+  const richTopContenders = [];
+  const richNotes = [];
+  for (let r = 0; r < values.length; r++) {
+    const topText = (values[r][6] || '').toString();
+    const noteText = (values[r][12] || '').toString();
+    richTopContenders.push([buildRichTextWithClassColors(topText, rosterContextMap)]);
+    richNotes.push([buildRichTextWithClassColors(noteText, rosterContextMap)]);
+  }
+  sheet.getRange(2, 7, richTopContenders.length, 1).setRichTextValues(richTopContenders);
+  sheet.getRange(2, 13, richNotes.length, 1).setRichTextValues(richNotes);
 
   // Set clean dynamic column widths (Unmerged flat layout)
   sheet.setColumnWidth(1, 230); // Boss / Source header
