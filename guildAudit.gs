@@ -2737,12 +2737,13 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
 
   sheet.setConditionalFormatRules(rules);
 
-  // Style Boss Separator Rows with distinctive Dark Slate / Indigo Banners
+  // Style Boss Separator Rows with distinctive Dark Slate / Indigo Banners (Merged across full row)
   for (let i = 0; i < chaseItemsCatalog.length; i++) {
     const rowTitle = (chaseItemsCatalog[i][0] || '').toString();
     if (rowTitle.startsWith('⚔️') || rowTitle.startsWith('🛡️') || rowTitle.startsWith('🧭') || rowTitle.startsWith('🧪') || rowTitle.startsWith('🐊') || rowTitle.startsWith('🏛️') || rowTitle.startsWith('👑') || rowTitle.startsWith('📦')) {
       const rowIdx = i + 2;
       sheet.getRange(rowIdx, 1, 1, sheet.getMaxColumns())
+        .merge()
         .setBackground('#0f172a')
         .setFontColor('#f8fafc')
         .setFontWeight('bold')
@@ -2751,26 +2752,22 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     }
   }
 
-  // Set generous column widths to ensure full visibility without truncation
-  sheet.setColumnWidth(1, 220); // Boss
-  sheet.setColumnWidth(2, 260); // Item Name
-  sheet.setColumnWidth(3, 110); // Slot
-  sheet.setColumnWidth(4, 90);  // Difficulty
-  sheet.setColumnWidth(5, 80);  // Drop ilvl
-  sheet.setColumnWidth(6, 260); // Target Specs / Roles
-  sheet.setColumnWidth(7, 380); // Top Contender (Assigned) - widened so full Score, Role & Attendance badge fits with zero cutoff
-  sheet.setColumnWidth(8, 300); // Current Equipped Item
-  sheet.setColumnWidth(9, 90);  // Equipped ilvl
-  sheet.setColumnWidth(10, 130);// Upgrade Delta
-  sheet.setColumnWidth(11, 150);// Priority / BiS Tier
-  sheet.setColumnWidth(12, 180);// Sim Status / Last Updated
-  sheet.setColumnWidth(13, 800);// Loot Council Notes - widened so full Top 5 contender ranking fits comfortably
+  // Dynamically auto-resize all columns to fit the exact width of their text contents + 24px breathing room
+  sheet.autoResizeColumns(1, lootHeaders.length);
+  for (let c = 1; c <= lootHeaders.length; c++) {
+    const calculatedWidth = sheet.getColumnWidth(c);
+    sheet.setColumnWidth(c, Math.max(calculatedWidth + 24, 75));
+  }
+
+  // Ensure Top Contender and Notes have guaranteed comfortable minimum widths
+  if (sheet.getColumnWidth(7) < 360) sheet.setColumnWidth(7, 360);
+  if (sheet.getColumnWidth(13) < 650) sheet.setColumnWidth(13, 650);
 
   // Align text for natural readability
   if (fullData.length > 1) {
     sheet.getRange(2, 7, fullData.length - 1, 1).setHorizontalAlignment('left');
     sheet.getRange(2, 8, fullData.length - 1, 1).setHorizontalAlignment('left');
-    sheet.getRange(2, 13, fullData.length - 1, 1).setHorizontalAlignment('left').setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
+    sheet.getRange(2, 13, fullData.length - 1, 1).setHorizontalAlignment('left');
   }
 }
 
@@ -3174,9 +3171,16 @@ function processAndIngestRaidbotsSims(input) {
   sheet.getRange(2, 1, values.length, values[0].length).setValues(values);
   sheet.getRange(2, 7, values.length, 1).setHorizontalAlignment('left');
   sheet.getRange(2, 8, values.length, 1).setHorizontalAlignment('left');
-  sheet.getRange(2, 13, values.length, 1).setHorizontalAlignment('left').setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
-  sheet.setColumnWidth(7, 380);
-  sheet.setColumnWidth(13, 800);
+  sheet.getRange(2, 13, values.length, 1).setHorizontalAlignment('left');
+
+  // Dynamically auto-resize all columns to fit text contents perfectly
+  sheet.autoResizeColumns(1, values[0].length);
+  for (let c = 1; c <= values[0].length; c++) {
+    const calculatedWidth = sheet.getColumnWidth(c);
+    sheet.setColumnWidth(c, Math.max(calculatedWidth + 24, 75));
+  }
+  if (sheet.getColumnWidth(7) < 360) sheet.setColumnWidth(7, 360);
+  if (sheet.getColumnWidth(13) < 650) sheet.setColumnWidth(13, 650);
 
   return {
     success: true,
@@ -3385,12 +3389,20 @@ function processAndIngestQELiveReport(reportUrlOrId) {
     }
   });
 
+  // Save back all updated values
   sheet.getRange(2, 1, values.length, values[0].length).setValues(values);
   sheet.getRange(2, 7, values.length, 1).setHorizontalAlignment('left');
   sheet.getRange(2, 8, values.length, 1).setHorizontalAlignment('left');
-  sheet.getRange(2, 13, values.length, 1).setHorizontalAlignment('left').setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
-  sheet.setColumnWidth(7, 380);
-  sheet.setColumnWidth(13, 800);
+  sheet.getRange(2, 13, values.length, 1).setHorizontalAlignment('left');
+
+  // Dynamically auto-resize all columns to fit text contents perfectly
+  sheet.autoResizeColumns(1, values[0].length);
+  for (let c = 1; c <= values[0].length; c++) {
+    const calculatedWidth = sheet.getColumnWidth(c);
+    sheet.setColumnWidth(c, Math.max(calculatedWidth + 24, 75));
+  }
+  if (sheet.getColumnWidth(7) < 360) sheet.setColumnWidth(7, 360);
+  if (sheet.getColumnWidth(13) < 650) sheet.setColumnWidth(13, 650);
 
   return {
     success: true,
