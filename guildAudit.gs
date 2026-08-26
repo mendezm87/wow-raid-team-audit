@@ -2679,8 +2679,12 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
             if (pMatch) {
               const pName = pMatch[1];
               const pPct = parseFloat(pMatch[2]);
-              const prio = calculatePriorityScore(pPct, pName, true, rosterContextMap);
-              simContenders.push({ name: pName, pct: pPct, priority: prio });
+              const charInfo = rosterContextMap[pName.toLowerCase()] || {};
+              const isEligible = isCharacterEligibleForItem(charInfo.charClass, charInfo.spec, slot, targetRole, rawItemName);
+              if (isEligible) {
+                const prio = calculatePriorityScore(pPct, pName, true, rosterContextMap);
+                simContenders.push({ name: pName, pct: pPct, priority: prio });
+              }
             }
           });
         }
@@ -2700,35 +2704,19 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
             return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.pct}%${pRole}${pAtt}${pPrep})`;
           });
           row[12] = prefix + topList.join(' | ');
-        } else {
-          // Fallback if notes were plain text
-          const match = preservedSim.topContender.match(/^([A-Za-z0-9\u00C0-\u024F]+)(?:\s*\[Score:\s*[0-9.]+\])?(?:\s*\(\+?([0-9.]+)(?:%| ilvl)?.*?\))?/);
-          if (match && match[2]) {
-            const charName = match[1];
-            const val = parseFloat(match[2]);
-            const isPct = preservedSim.upgradeDelta.includes('%') || preservedSim.topContender.includes('%');
-            const prio = calculatePriorityScore(val, charName, isPct, rosterContextMap);
-            row[6] = formatContenderDisplay(charName, val, isPct, rosterContextMap, prio);
-          } else {
-            row[6] = preservedSim.topContender;
-          }
-          row[9] = preservedSim.upgradeDelta;
-          row[12] = preservedSim.notes;
-        }
 
-        row[11] = preservedSim.simStatus;
-
-        // Update live equipped item & ilvl for the top contender
-        const topNameMatch = (row[6] || '').match(/^([A-Za-z0-9\u00C0-\u024F]+)/);
-        if (topNameMatch) {
-          const topChar = mainCharacterData.find(c => c['Name'] && c['Name'].toLowerCase() === topNameMatch[1].toLowerCase());
-          if (topChar) {
-            const eq = resolveEquippedItemForChar(topChar, slot);
-            row[7] = eq.text;
-            row[8] = eq.ilvl || '-';
+          // Update live equipped item & ilvl for the top contender
+          const topNameMatch = (row[6] || '').match(/^([A-Za-z0-9\u00C0-\u024F]+)/);
+          if (topNameMatch) {
+            const topChar = mainCharacterData.find(c => c['Name'] && c['Name'].toLowerCase() === topNameMatch[1].toLowerCase());
+            if (topChar) {
+              const eq = resolveEquippedItemForChar(topChar, slot);
+              row[7] = eq.text;
+              row[8] = eq.ilvl || '-';
+            }
           }
+          return;
         }
-        return;
       }
 
       // 2. FALLBACK: For unsimmed items, calculate Live Equipped ilvl Delta with Priority Score
@@ -3239,52 +3227,61 @@ function processAndIngestRaidbotsSims(input) {
     }
 
     if (contenders && contenders.length > 0) {
-      contenders.forEach(c => {
-        c.priority = calculatePriorityScore(c.pct, c.name, true, rosterContextMap);
+      const slot = row[2] || '';
+      const targetRole = (row[5] || '').toLowerCase();
+      const eligibleContenders = contenders.filter(c => {
+        const charInfo = rosterContextMap[c.name.toLowerCase()] || {};
+        const charClass = charInfo.charClass || (charMap[c.name.toLowerCase()] && charMap[c.name.toLowerCase()]['Class']) || '';
+        const charSpec = charInfo.spec || (charMap[c.name.toLowerCase()] && charMap[c.name.toLowerCase()]['Spec']) || '';
+        return isCharacterEligibleForItem(charClass, charSpec, slot, targetRole, sheetItemName);
       });
-      const sorted = contenders.sort((a, b) => b.priority.score - a.priority.score || b.pct - a.pct);
-      const top = sorted[0];
-      row[6] = formatContenderDisplay(top.name, top.pct, true, rosterContextMap, top.priority);
-      row[9] = `+${top.pct}% DPS`;
-      row[11] = simStatusBadge;
 
-      const topList = sorted.slice(0, 5).map((c, i) => {
-        const cRole = c.priority.role ? ` | ${c.priority.role}` : '';
-        const cAtt = c.priority.attPct ? ` | ${c.priority.attPct}` : '';
-        const cPrep = (!c.priority.isRaidReady) ? ' | ⚠️ Unenchanted' : '';
-        return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.pct}%${cRole}${cAtt}${cPrep})`;
-      }).join(' | ');
-      row[12] = `Raidbots Sim Upgrades: ${topList}`;
+      if (eligibleContenders.length > 0) {
+        eligibleContenders.forEach(c => {
+          c.priority = calculatePriorityScore(c.pct, c.name, true, rosterContextMap);
+        });
+        const sorted = eligibleContenders.sort((a, b) => b.priority.score - a.priority.score || b.pct - a.pct);
+        const top = sorted[0];
+        row[6] = formatContenderDisplay(top.name, top.pct, true, rosterContextMap, top.priority);
+        row[9] = `+${top.pct}% DPS`;
+        row[11] = simStatusBadge;
 
-      // Populate live equipped item and ilvl for the top contender!
-      const topChar = charMap[top.name.toLowerCase()];
-      if (topChar) {
-        const slot = row[2] || '';
-        let currentSlotText = '-';
-        if (slot.includes('Trinket')) {
-          const t1 = topChar['Trinket 1'] || '-';
-          const t2 = topChar['Trinket 2'] || '-';
-          const ilvl1 = extractIlvl(t1);
-          const ilvl2 = extractIlvl(t2);
-          currentSlotText = (ilvl1 <= ilvl2 && ilvl1 > 0) ? t1 : (ilvl2 > 0 ? t2 : t1);
-        } else if (slot.includes('Ring')) {
-          const r1 = topChar['Ring 1'] || '-';
-          const r2 = topChar['Ring 2'] || '-';
-          const ilvl1 = extractIlvl(r1);
-          const ilvl2 = extractIlvl(r2);
-          currentSlotText = (ilvl1 <= ilvl2 && ilvl1 > 0) ? r1 : (ilvl2 > 0 ? r2 : r1);
-        } else if (slot.includes('Two-Hand') || slot.includes('One-Hand') || slot.includes('Main Hand') || slot.includes('Ranged')) {
-          currentSlotText = topChar['Main Hand'] || '-';
-        } else if (slot.includes('Off Hand') || slot.includes('Shield')) {
-          currentSlotText = topChar['Off Hand'] || '-';
-        } else {
-          currentSlotText = topChar[slot] || '-';
+        const topList = sorted.slice(0, 5).map((c, i) => {
+          const cRole = c.priority.role ? ` | ${c.priority.role}` : '';
+          const cAtt = c.priority.attPct ? ` | ${c.priority.attPct}` : '';
+          const cPrep = (!c.priority.isRaidReady) ? ' | ⚠️ Unenchanted' : '';
+          return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.pct}%${cRole}${cAtt}${cPrep})`;
+        }).join(' | ');
+        row[12] = `Raidbots Sim Upgrades: ${topList}`;
+
+        // Populate live equipped item and ilvl for the top contender!
+        const topChar = charMap[top.name.toLowerCase()];
+        if (topChar) {
+          let currentSlotText = '-';
+          if (slot.includes('Trinket')) {
+            const t1 = topChar['Trinket 1'] || '-';
+            const t2 = topChar['Trinket 2'] || '-';
+            const ilvl1 = extractIlvl(t1);
+            const ilvl2 = extractIlvl(t2);
+            currentSlotText = (ilvl1 <= ilvl2 && ilvl1 > 0) ? t1 : (ilvl2 > 0 ? t2 : t1);
+          } else if (slot.includes('Ring')) {
+            const r1 = topChar['Ring 1'] || '-';
+            const r2 = topChar['Ring 2'] || '-';
+            const ilvl1 = extractIlvl(r1);
+            const ilvl2 = extractIlvl(r2);
+            currentSlotText = (ilvl1 <= ilvl2 && ilvl1 > 0) ? r1 : (ilvl2 > 0 ? r2 : r1);
+          } else if (slot.includes('Two-Hand') || slot.includes('One-Hand') || slot.includes('Main Hand') || slot.includes('Ranged')) {
+            currentSlotText = topChar['Main Hand'] || '-';
+          } else if (slot.includes('Off Hand') || slot.includes('Shield')) {
+            currentSlotText = topChar['Off Hand'] || '-';
+          } else {
+            currentSlotText = topChar[slot] || '-';
+          }
+          row[7] = currentSlotText;
+          row[8] = extractIlvl(currentSlotText) || '-';
         }
-        row[7] = currentSlotText;
-        row[8] = extractIlvl(currentSlotText) || '-';
+        totalMatches++;
       }
-
-      totalMatches++;
     }
   });
 
@@ -3475,51 +3472,61 @@ function processAndIngestQELiveReport(reportUrlOrId) {
     }
 
     if (contenders && contenders.length > 0) {
-      contenders.forEach(c => {
-        c.priority = calculatePriorityScore(c.pct, c.name, true, rosterContextMap);
+      const slot = row[2] || '';
+      const targetRole = (row[5] || '').toLowerCase();
+      const eligibleContenders = contenders.filter(c => {
+        const charInfo = rosterContextMap[c.name.toLowerCase()] || {};
+        const charClass = charInfo.charClass || (charMap[c.name.toLowerCase()] && charMap[c.name.toLowerCase()]['Class']) || '';
+        const charSpec = charInfo.spec || (charMap[c.name.toLowerCase()] && charMap[c.name.toLowerCase()]['Spec']) || '';
+        return isCharacterEligibleForItem(charClass, charSpec, slot, targetRole, sheetItemName);
       });
-      const sorted = contenders.sort((a, b) => b.priority.score - a.priority.score || b.pct - a.pct);
-      const top = sorted[0];
-      row[6] = formatContenderDisplay(top.name, top.pct, true, rosterContextMap, top.priority);
-      row[9] = `+${top.pct}% HPS`;
-      row[11] = simStatusBadge;
 
-      const topList = sorted.slice(0, 5).map((c, i) => {
-        const cRole = c.priority.role ? ` | ${c.priority.role}` : '';
-        const cAtt = c.priority.attPct ? ` | ${c.priority.attPct}` : '';
-        const cPrep = (!c.priority.isRaidReady) ? ' | ⚠️ Unenchanted' : '';
-        return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.pct}%${cRole}${cAtt}${cPrep})`;
-      }).join(' | ');
-      row[12] = `Sim / QE Live Upgrades: ${topList}`;
+      if (eligibleContenders.length > 0) {
+        eligibleContenders.forEach(c => {
+          c.priority = calculatePriorityScore(c.pct, c.name, true, rosterContextMap);
+        });
+        const sorted = eligibleContenders.sort((a, b) => b.priority.score - a.priority.score || b.pct - a.pct);
+        const top = sorted[0];
+        row[6] = formatContenderDisplay(top.name, top.pct, true, rosterContextMap, top.priority);
+        row[9] = `+${top.pct}% HPS`;
+        row[11] = simStatusBadge;
 
-      const topChar = charMap[top.name.toLowerCase()];
-      if (topChar) {
-        const slot = row[2] || '';
-        let currentSlotText = '-';
-        if (slot.includes('Trinket')) {
-          const t1 = topChar['Trinket 1'] || '-';
-          const t2 = topChar['Trinket 2'] || '-';
-          const ilvl1 = extractIlvl(t1);
-          const ilvl2 = extractIlvl(t2);
-          currentSlotText = (ilvl1 <= ilvl2 && ilvl1 > 0) ? t1 : (ilvl2 > 0 ? t2 : t1);
-        } else if (slot.includes('Ring')) {
-          const r1 = topChar['Ring 1'] || '-';
-          const r2 = topChar['Ring 2'] || '-';
-          const ilvl1 = extractIlvl(r1);
-          const ilvl2 = extractIlvl(r2);
-          currentSlotText = (ilvl1 <= ilvl2 && ilvl1 > 0) ? r1 : (ilvl2 > 0 ? r2 : r1);
-        } else if (slot.includes('Two-Hand') || slot.includes('One-Hand') || slot.includes('Main Hand') || slot.includes('Ranged')) {
-          currentSlotText = topChar['Main Hand'] || '-';
-        } else if (slot.includes('Off Hand') || slot.includes('Shield')) {
-          currentSlotText = topChar['Off Hand'] || '-';
-        } else {
-          currentSlotText = topChar[slot] || '-';
+        const topList = sorted.slice(0, 5).map((c, i) => {
+          const cRole = c.priority.role ? ` | ${c.priority.role}` : '';
+          const cAtt = c.priority.attPct ? ` | ${c.priority.attPct}` : '';
+          const cPrep = (!c.priority.isRaidReady) ? ' | ⚠️ Unenchanted' : '';
+          return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.pct}%${cRole}${cAtt}${cPrep})`;
+        }).join(' | ');
+        row[12] = `Sim / QE Live Upgrades: ${topList}`;
+
+        const topChar = charMap[top.name.toLowerCase()];
+        if (topChar) {
+          let currentSlotText = '-';
+          if (slot.includes('Trinket')) {
+            const t1 = topChar['Trinket 1'] || '-';
+            const t2 = topChar['Trinket 2'] || '-';
+            const ilvl1 = extractIlvl(t1);
+            const ilvl2 = extractIlvl(t2);
+            currentSlotText = (ilvl1 <= ilvl2 && ilvl1 > 0) ? t1 : (ilvl2 > 0 ? t2 : t1);
+          } else if (slot.includes('Ring')) {
+            const r1 = topChar['Ring 1'] || '-';
+            const r2 = topChar['Ring 2'] || '-';
+            const ilvl1 = extractIlvl(r1);
+            const ilvl2 = extractIlvl(r2);
+            currentSlotText = (ilvl1 <= ilvl2 && ilvl1 > 0) ? r1 : (ilvl2 > 0 ? r2 : r1);
+          } else if (slot.includes('Two-Hand') || slot.includes('One-Hand') || slot.includes('Main Hand') || slot.includes('Ranged')) {
+            currentSlotText = topChar['Main Hand'] || '-';
+          } else if (slot.includes('Off Hand') || slot.includes('Shield')) {
+            currentSlotText = topChar['Off Hand'] || '-';
+          } else {
+            currentSlotText = topChar[slot] || '-';
+          }
+          row[7] = currentSlotText;
+          row[8] = extractIlvl(currentSlotText) || '-';
         }
-        row[7] = currentSlotText;
-        row[8] = extractIlvl(currentSlotText) || '-';
-      }
 
-      totalMatches++;
+        totalMatches++;
+      }
     }
   });
 
