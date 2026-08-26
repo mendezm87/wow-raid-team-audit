@@ -2894,20 +2894,34 @@ function cleanItemNameForMatching(str) {
     .trim();
 }
 
+const STOP_WORDS_SET = ['the', 'and', 'for', 'from', 'with', 'into', 'under', 'over', 'of', 'by', 'in', 'on', 'at', 'to', 'a', 'an'];
+
 /**
  * Checks if a catalog item matches a Raidbots sim item name.
+ * Filters out common English stop words (e.g. "the", "of") so two items starting with "Crown of the" are not falsely matched.
  */
 function isItemNameMatch(sheetItem, simItem) {
   const cSheet = cleanItemNameForMatching(sheetItem);
   const cSim = cleanItemNameForMatching(simItem);
   if (!cSheet || !cSim) return false;
   if (cSheet === cSim) return true;
-  if (cSheet.includes(cSim) || cSim.includes(cSheet)) return true;
 
-  const sheetWords = cSheet.split(' ').filter(w => w.length >= 3);
-  const simWords = cSim.split(' ').filter(w => w.length >= 3);
+  const alphaSheet = cSheet.replace(/[^a-z0-9]/g, '');
+  const alphaSim = cSim.replace(/[^a-z0-9]/g, '');
+  if (alphaSheet === alphaSim) return true;
+
+  const sheetWords = cSheet.split(' ').filter(w => w.length >= 3 && !STOP_WORDS_SET.includes(w));
+  const simWords = cSim.split(' ').filter(w => w.length >= 3 && !STOP_WORDS_SET.includes(w));
+
+  if (sheetWords.length === 0 || simWords.length === 0) return false;
+
   const commonWords = sheetWords.filter(w => simWords.includes(w));
-  return commonWords.length >= 2 || (sheetWords.length === 1 && commonWords.length === 1);
+
+  if (sheetWords.length > 0 && commonWords.length === sheetWords.length) return true;
+  if (simWords.length > 0 && commonWords.length === simWords.length) return true;
+
+  const overlapRatio = commonWords.length / Math.max(sheetWords.length, simWords.length);
+  return overlapRatio >= 0.75 || commonWords.length >= 3;
 }
 
 /**
