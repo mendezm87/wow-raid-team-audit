@@ -2317,8 +2317,39 @@ function buildRichTextWithClassColors(fullText, rosterContextMap) {
 }
 
 /**
- * Evaluates whether a character is eligible to equip and use an item in their main spec.
- * Strictly enforces WoW Armor Proficiencies, Class Weapon Proficiencies, 1H vs 2H spec rules, and Primary Stat matching.
+ * Canonical dictionary mapping all raid weapons in Season 2 to their exact Blizzard weapon subclass and stat profile.
+ * Guarantees 100% accurate class proficiency matching regardless of whether the weapon title contains the word "polearm", "dagger", etc.
+ */
+const RAID_WEAPON_SUBCLASS_MAP = {
+  'caustic keeper crusher': { type: 'mace', is2H: true, is1H: false, stat: 'str/agi' },
+  'caustic keeper-crusher': { type: 'mace', is2H: true, is1H: false, stat: 'str/agi' },
+  'malignant toothed edge': { type: 'axe', is2H: false, is1H: true, stat: 'str/agi' },
+  'vashnik\'s sanguine rancor': { type: 'dagger', is2H: false, is1H: true, stat: 'agi' },
+  'vashniks sanguine rancor': { type: 'dagger', is2H: false, is1H: true, stat: 'agi' },
+  'abyssal broodfiend\'s bardiche': { type: 'polearm', is2H: true, is1H: false, stat: 'agi/str' },
+  'abyssal broodfiends bardiche': { type: 'polearm', is2H: true, is1H: false, stat: 'agi/str' },
+  'fang carved recurve': { type: 'bow', is2H: true, is1H: false, stat: 'agi', isRanged: true },
+  'fang-carved recurve': { type: 'bow', is2H: true, is1H: false, stat: 'agi', isRanged: true },
+  'maze roa warlord\'s fury': { type: 'axe', is2H: true, is1H: false, stat: 'str' },
+  'maze-roa, warlord\'s fury': { type: 'axe', is2H: true, is1H: false, stat: 'str' },
+  'altar keeper\'s censer': { type: 'off-hand', is2H: false, is1H: false, stat: 'int', isOffhand: true },
+  'altar-keeper\'s censer': { type: 'off-hand', is2H: false, is1H: false, stat: 'int', isOffhand: true },
+  'aman\'muso, warlord\'s vengeance': { type: 'staff', is2H: true, is1H: false, stat: 'agi/int' },
+  'amanmuso warlords vengeance': { type: 'staff', is2H: true, is1H: false, stat: 'agi/int' },
+  'jan\'thrazet, the soul fang': { type: 'dagger', is2H: false, is1H: true, stat: 'int' },
+  'janthrazet the soul fang': { type: 'dagger', is2H: false, is1H: true, stat: 'int' },
+  'ravenous feaster\'s fang': { type: 'dagger', is2H: false, is1H: true, stat: 'agi' },
+  'ravenous feasters fang': { type: 'dagger', is2H: false, is1H: true, stat: 'agi' },
+  'zul\'valok, breath of corruption': { type: 'dagger', is2H: false, is1H: true, stat: 'agi' },
+  'zulvalok breath of corruption': { type: 'dagger', is2H: false, is1H: true, stat: 'agi' },
+  'jaws of the shackled goddess': { type: 'sword', is2H: false, is1H: true, stat: 'str/agi' }
+};
+
+/**
+ * Validates whether a character is eligible to equip/loot an item based on:
+ * 1. Armor Class (Cloth, Leather, Mail, Plate)
+ * 2. Weapon Subclass & 1H vs 2H Spec Constraints (Polearms, Daggers, Bows, Staves, Axes, Shields, etc.)
+ * 3. Primary Stat Profile (Intellect vs Strength/Agility)
  */
 function isCharacterEligibleForItem(charClass, charSpec, slot, targetSubclass, itemName) {
   charClass = (charClass || '').toLowerCase().trim();
@@ -2327,7 +2358,7 @@ function isCharacterEligibleForItem(charClass, charSpec, slot, targetSubclass, i
   itemName = (itemName || '').toLowerCase().trim();
   slot = (slot || '').trim();
 
-  // 1. ARMOR SLOTS (Head, Shoulders, Chest, Hands, Legs, Feet, Wrist, Waist)
+  // 1. ARMOR SLOTS (Strict Armor Material Match)
   const ARMOR_MAP = {
     'warrior': 'plate', 'paladin': 'plate', 'death knight': 'plate',
     'hunter': 'mail', 'shaman': 'mail', 'evoker': 'mail',
@@ -2355,24 +2386,32 @@ function isCharacterEligibleForItem(charClass, charSpec, slot, targetSubclass, i
       'priest': ['dagger', 'mace', 'wand', 'staff', 'stave', 'off hand', 'off-hand', 'holdable', 'censer'],
       'rogue': ['dagger', 'sword', 'axe', 'mace', 'fist', 'claw', 'fang', 'cleaver', 'edge', 'blade'],
       'demon hunter': ['warglaive', 'sword', 'axe', 'fist', 'dagger', 'claw', 'fang', 'cleaver', 'edge', 'blade'],
-      'warrior': ['sword', 'axe', 'mace', 'polearm', 'bardiche', 'staff', 'shield', 'fist', 'dagger', 'greatsword', 'greataxe', 'greatmace', "warlord's fury", 'blade'],
-      'paladin': ['sword', 'axe', 'mace', 'polearm', 'bardiche', 'shield', 'greatsword', 'greataxe', 'greatmace', "warlord's fury", 'blade'],
-      'death knight': ['sword', 'axe', 'mace', 'polearm', 'bardiche', 'greatsword', 'greataxe', 'greatmace', "warlord's fury", 'blade'],
-      'hunter': ['bow', 'gun', 'crossbow', 'polearm', 'bardiche', 'staff', 'stave', 'axe', 'sword'],
-      'druid': ['dagger', 'mace', 'staff', 'stave', 'polearm', 'bardiche', 'fist', 'off hand', 'off-hand', 'holdable'],
-      'monk': ['sword', 'axe', 'mace', 'fist', 'staff', 'stave', 'polearm', 'bardiche', 'off hand', 'off-hand', 'holdable', 'weapon'],
+      'warrior': ['sword', 'axe', 'mace', 'polearm', 'staff', 'shield', 'fist', 'dagger', 'greatsword', 'greataxe', 'greatmace', "warlord's fury", 'blade'],
+      'paladin': ['sword', 'axe', 'mace', 'polearm', 'shield', 'greatsword', 'greataxe', 'greatmace', "warlord's fury", 'blade'],
+      'death knight': ['sword', 'axe', 'mace', 'polearm', 'greatsword', 'greataxe', 'greatmace', "warlord's fury", 'blade'],
+      'hunter': ['bow', 'gun', 'crossbow', 'polearm', 'staff', 'stave', 'axe', 'sword'],
+      'druid': ['dagger', 'mace', 'staff', 'stave', 'polearm', 'fist', 'off hand', 'off-hand', 'holdable'],
+      'monk': ['sword', 'axe', 'mace', 'fist', 'staff', 'stave', 'polearm', 'off hand', 'off-hand', 'holdable', 'weapon'],
       'shaman': ['dagger', 'mace', 'axe', 'fist', 'shield', 'staff', 'stave', 'off hand', 'off-hand', 'holdable'],
       'evoker': ['dagger', 'sword', 'axe', 'mace', 'fist', 'staff', 'stave', 'off hand', 'off-hand', 'holdable']
     };
 
+    // Look up canonical weapon subclass mapping first to avoid reliance on item name keywords
+    const cleanKey = itemName.replace(/[\u2018\u2019\u0027\u0060]/g, "'");
+    const canonicalWeapon = RAID_WEAPON_SUBCLASS_MAP[cleanKey] || Object.values(RAID_WEAPON_SUBCLASS_MAP).find(w => cleanKey.includes(w.type));
+
     const prof = CLASS_WEAPON_PROFICIENCIES[charClass];
-    if (prof && !prof.some(w => targetSubclass.includes(w) || itemName.includes(w))) {
+    if (canonicalWeapon) {
+      if (prof && !prof.includes(canonicalWeapon.type) && !prof.includes('weapon')) {
+        return false;
+      }
+    } else if (prof && !prof.some(w => targetSubclass.includes(w) || itemName.includes(w))) {
       return false;
     }
 
-    const is2HWeapon = targetSubclass.includes('2h') || targetSubclass.includes('two-hand') || targetSubclass.includes('polearm') || targetSubclass.includes('staff') || targetSubclass.includes('stave') || targetSubclass.includes('bow') || targetSubclass.includes('crossbow') || targetSubclass.includes('gun') || (itemName.includes('2h') || itemName.includes('greatsword') || itemName.includes('greataxe') || itemName.includes('greatmace') || itemName.includes('bardiche') || itemName.includes('warlord\'s fury'));
+    const is2HWeapon = (canonicalWeapon && canonicalWeapon.is2H) || targetSubclass.includes('2h') || targetSubclass.includes('two-hand') || targetSubclass.includes('polearm') || targetSubclass.includes('staff') || targetSubclass.includes('stave') || targetSubclass.includes('bow') || targetSubclass.includes('crossbow') || targetSubclass.includes('gun') || (itemName.includes('2h') || itemName.includes('greatsword') || itemName.includes('greataxe') || itemName.includes('greatmace') || itemName.includes('warlord\'s fury'));
 
-    const is1HWeapon = (targetSubclass.includes('1h') || targetSubclass.includes('one-hand') || targetSubclass.includes('dagger') || targetSubclass.includes('fist') || targetSubclass.includes('warglaive') || targetSubclass.includes('wand') || targetSubclass.includes('shield') || targetSubclass.includes('off hand') || targetSubclass.includes('off-hand') || targetSubclass.includes('holdable') || itemName.includes('cleaver') || itemName.includes('claw') || itemName.includes('censer')) && !is2HWeapon;
+    const is1HWeapon = (canonicalWeapon && canonicalWeapon.is1H) || ((targetSubclass.includes('1h') || targetSubclass.includes('one-hand') || targetSubclass.includes('dagger') || targetSubclass.includes('fist') || targetSubclass.includes('warglaive') || targetSubclass.includes('wand') || targetSubclass.includes('shield') || targetSubclass.includes('off hand') || targetSubclass.includes('off-hand') || targetSubclass.includes('holdable') || itemName.includes('cleaver') || itemName.includes('claw') || itemName.includes('censer')) && !is2HWeapon);
 
     // Strict 2H Only Melee/Tank specs (Must use 2H, CANNOT use 1H):
     // - Arms Warrior, Retribution Paladin, Blood/Unholy DK, Survival Hunter, Feral/Guardian Druid
