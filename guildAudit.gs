@@ -2489,8 +2489,10 @@ function isCharacterEligibleForItem(charClass, charSpec, slot, targetSubclass, i
     if (targetSubclass.includes('off-hand') || targetSubclass.includes('off hand') || targetSubclass.includes('holdable') || (canonicalWeapon && canonicalWeapon.isOffhand)) {
       return ['mage', 'warlock', 'priest', 'druid', 'monk', 'shaman', 'evoker'].includes(charClass);
     }
+    const weaponType = canonicalWeapon ? canonicalWeapon.type : '';
+
     // 2H Axes, 2H Swords, 2H Maces -> Str/Agi 2H Melee (Warrior, DK, Ret Paladin, Survival Hunter, Feral/Guardian Druid)
-    if (targetSubclass.includes('2h axe') || targetSubclass.includes('2h sword') || targetSubclass.includes('2h mace') || (targetSubclass.includes('axe') && !targetSubclass.includes('1h') && (itemName.includes('2h') || itemName.includes('cleaver') || itemName.includes('fury') || itemName.includes('axe')))) {
+    if (weaponType === 'axe' && canonicalWeapon.is2H || targetSubclass.includes('2h axe') || targetSubclass.includes('2h sword') || targetSubclass.includes('2h mace')) {
       if (['mage', 'warlock', 'priest', 'rogue', 'demon hunter', 'evoker'].includes(charClass)) return false;
       if (charClass === 'hunter' && !charSpec.includes('survival')) return false;
       if (charClass === 'druid' && !['feral', 'guardian'].some(s => charSpec.includes(s))) return false;
@@ -2499,38 +2501,38 @@ function isCharacterEligibleForItem(charClass, charSpec, slot, targetSubclass, i
       if (charClass === 'monk') return false;
     }
     // 1H Axes / Cleavers -> Melee physical classes. NO Pure Casters, NO Ranged Hunters!
-    if (targetSubclass.includes('axe') || targetSubclass.includes('cleaver')) {
+    if ((weaponType === 'axe' && canonicalWeapon.is1H) || (!canonicalWeapon && (targetSubclass.includes('axe') || targetSubclass.includes('cleaver')))) {
       if (['mage', 'warlock', 'priest', 'druid'].includes(charClass)) return false;
       if (charClass === 'hunter') return false;
       if (charClass === 'paladin' && charSpec.includes('holy')) return false;
       if (charClass === 'shaman' && !charSpec.includes('enhancement')) return false;
     }
     // Daggers -> Rogue, Mage, Priest, Warlock, Druid, Evoker, Shaman, Devourer DH. NO Plate classes, NO Hunters!
-    if (targetSubclass.includes('dagger')) {
+    if (weaponType === 'dagger' || (!canonicalWeapon && targetSubclass.includes('dagger'))) {
       if (['warrior', 'paladin', 'death knight', 'hunter'].includes(charClass)) return false;
       if (charClass === 'demon hunter' && !charSpec.includes('devourer')) return false;
     }
     // Fist Weapons -> Rogue, Monk, DH, Enh Shaman, Druid, Evoker, Warrior. NO Cloth/Paladin/DK/Hunter!
-    if (targetSubclass.includes('fist')) {
+    if (weaponType === 'fist' || (!canonicalWeapon && targetSubclass.includes('fist'))) {
       if (['mage', 'warlock', 'priest', 'paladin', 'death knight', 'hunter'].includes(charClass)) return false;
     }
     // Polearms -> Str/Agi 2H Melee (Warrior, Ret Paladin, Blood/Unholy DK, Survival Hunter, Feral/Guardian Druid, Brew/WW Monk)
-    if (targetSubclass.includes('polearm')) {
+    if (weaponType === 'polearm' || (!canonicalWeapon && targetSubclass.includes('polearm'))) {
       if (['mage', 'warlock', 'priest', 'rogue', 'demon hunter', 'evoker', 'shaman'].includes(charClass)) return false;
       if (charClass === 'hunter' && !charSpec.includes('survival')) return false;
       if (charClass === 'paladin' && charSpec.includes('holy')) return false;
     }
     // Staves -> Casters/Healers + Feral/Guardian Druid, Monk, Survival Hunter. NO DK, Paladin, Rogue, Warrior, BM/MM Hunter!
-    if (targetSubclass.includes('staff') || targetSubclass.includes('stave')) {
+    if (weaponType === 'staff' || (!canonicalWeapon && (targetSubclass.includes('staff') || targetSubclass.includes('stave')))) {
       if (['paladin', 'death knight', 'rogue', 'warrior', 'demon hunter'].includes(charClass)) return false;
       if (charClass === 'hunter' && !charSpec.includes('survival')) return false;
     }
     // 1H Maces -> Paladin, Warrior, DK, Rogue, Monk, Priest, Shaman, Druid, Evoker. NO Mage/Warlock/Hunter/DH!
-    if (targetSubclass.includes('mace') && !targetSubclass.includes('2h')) {
+    if ((weaponType === 'mace' && canonicalWeapon.is1H) || (!canonicalWeapon && targetSubclass.includes('mace') && !targetSubclass.includes('2h'))) {
       if (['mage', 'warlock', 'hunter', 'demon hunter'].includes(charClass)) return false;
     }
     // 1H Swords -> Warrior, Paladin, DK, Rogue, Monk, DH, Mage, Warlock. NO Priest/Shaman/Druid/Hunter!
-    if (targetSubclass.includes('sword') && !targetSubclass.includes('2h')) {
+    if ((weaponType === 'sword' && canonicalWeapon.is1H) || (!canonicalWeapon && targetSubclass.includes('sword') && !targetSubclass.includes('2h'))) {
       if (['priest', 'shaman', 'druid', 'hunter'].includes(charClass)) return false;
     }
   }
@@ -2538,16 +2540,16 @@ function isCharacterEligibleForItem(charClass, charSpec, slot, targetSubclass, i
   // 3. PRIMARY STAT & ROLE CONSTRAINTS (Weapons, Trinkets, Accessories)
   if (targetSubclass.includes('strength') || targetSubclass.includes('(str') || targetSubclass.includes('str /')) {
     const isStr = ['warrior', 'death knight'].includes(charClass) || (charClass === 'paladin' && !charSpec.includes('holy'));
-    if (!isStr && !targetSubclass.includes('agi') && !targetSubclass.includes('all')) return false;
+    if (!isStr && !targetSubclass.includes('agi') && !targetSubclass.includes('int') && !targetSubclass.includes('all')) return false;
   }
-  if (targetSubclass.includes('agility') || targetSubclass.includes('(agi') || targetSubclass.includes('/ agi')) {
+  if (targetSubclass.includes('agility') || targetSubclass.includes('(agi') || targetSubclass.includes('/ agi') || targetSubclass.includes('agi /')) {
     const isAgi = ['rogue', 'demon hunter', 'hunter'].includes(charClass) ||
                   (charClass === 'druid' && (charSpec.includes('feral') || charSpec.includes('guardian'))) ||
                   (charClass === 'monk' && !charSpec.includes('mistweaver')) ||
                   (charClass === 'shaman' && charSpec.includes('enhancement'));
-    if (!isAgi && !targetSubclass.includes('str') && !targetSubclass.includes('all')) return false;
+    if (!isAgi && !targetSubclass.includes('str') && !targetSubclass.includes('int') && !targetSubclass.includes('all')) return false;
   }
-  if (targetSubclass.includes('intellect') || targetSubclass.includes('(int') || targetSubclass.includes('/ int') || targetSubclass.includes('caster') || targetSubclass.includes('healer')) {
+  if (targetSubclass.includes('intellect') || targetSubclass.includes('(int') || targetSubclass.includes('/ int') || targetSubclass.includes('int /') || targetSubclass.includes('caster') || targetSubclass.includes('healer')) {
     const isInt = ['mage', 'warlock', 'priest', 'evoker'].includes(charClass) ||
                   (charClass === 'paladin' && charSpec.includes('holy')) ||
                   (charClass === 'druid' && (charSpec.includes('balance') || charSpec.includes('restoration'))) ||
