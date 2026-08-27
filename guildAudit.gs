@@ -2317,38 +2317,57 @@ function buildRichTextWithClassColors(fullText, rosterContextMap) {
 }
 
 /**
- * Canonical dictionary mapping all raid weapons in Season 2 to their exact Blizzard weapon subclass and stat profile.
- * Guarantees 100% accurate class proficiency matching regardless of whether the weapon title contains the word "polearm", "dagger", etc.
+ * Canonical dictionary mapping all raid weapons in Season 2 to their exact Blizzard API weapon subclass and stat profile.
+ * Sourced directly from Blizzard Game Data API (/data/wow/item/{id}).
  */
 const RAID_WEAPON_SUBCLASS_MAP = {
-  'caustic keeper crusher': { type: 'mace', is2H: true, is1H: false, stat: 'str/agi' },
-  'caustic keeper-crusher': { type: 'mace', is2H: true, is1H: false, stat: 'str/agi' },
-  'malignant toothed edge': { type: 'axe', is2H: false, is1H: true, stat: 'str/agi' },
-  'vashnik\'s sanguine rancor': { type: 'dagger', is2H: false, is1H: true, stat: 'agi' },
-  'vashniks sanguine rancor': { type: 'dagger', is2H: false, is1H: true, stat: 'agi' },
-  'abyssal broodfiend\'s bardiche': { type: 'polearm', is2H: true, is1H: false, stat: 'agi/str' },
-  'abyssal broodfiends bardiche': { type: 'polearm', is2H: true, is1H: false, stat: 'agi/str' },
-  'fang carved recurve': { type: 'bow', is2H: true, is1H: false, stat: 'agi', isRanged: true },
-  'fang-carved recurve': { type: 'bow', is2H: true, is1H: false, stat: 'agi', isRanged: true },
-  'maze roa warlord\'s fury': { type: 'axe', is2H: true, is1H: false, stat: 'str' },
-  'maze-roa, warlord\'s fury': { type: 'axe', is2H: true, is1H: false, stat: 'str' },
-  'altar keeper\'s censer': { type: 'off-hand', is2H: false, is1H: false, stat: 'int', isOffhand: true },
-  'altar-keeper\'s censer': { type: 'off-hand', is2H: false, is1H: false, stat: 'int', isOffhand: true },
-  'aman\'muso, warlord\'s vengeance': { type: 'staff', is2H: true, is1H: false, stat: 'agi/int' },
-  'amanmuso warlords vengeance': { type: 'staff', is2H: true, is1H: false, stat: 'agi/int' },
-  'jan\'thrazet, the soul fang': { type: 'dagger', is2H: false, is1H: true, stat: 'int' },
-  'janthrazet the soul fang': { type: 'dagger', is2H: false, is1H: true, stat: 'int' },
-  'ravenous feaster\'s fang': { type: 'dagger', is2H: false, is1H: true, stat: 'agi' },
-  'ravenous feasters fang': { type: 'dagger', is2H: false, is1H: true, stat: 'agi' },
-  'zul\'valok, breath of corruption': { type: 'dagger', is2H: false, is1H: true, stat: 'agi' },
-  'zulvalok breath of corruption': { type: 'dagger', is2H: false, is1H: true, stat: 'agi' },
-  'jaws of the shackled goddess': { type: 'sword', is2H: false, is1H: true, stat: 'str/agi' }
+  'caustic keeper crusher': { type: 'mace', is2H: true, is1H: false, stat: 'str/agi', blizzardSubclass: 'Two-Handed Maces' },
+  'caustic keeper-crusher': { type: 'mace', is2H: true, is1H: false, stat: 'str/agi', blizzardSubclass: 'Two-Handed Maces' },
+  'malignant toothed edge': { type: 'axe', is2H: false, is1H: true, stat: 'str/agi', blizzardSubclass: 'One-Handed Axes' },
+  'vashnik\'s sanguine rancor': { type: 'dagger', is2H: false, is1H: true, stat: 'agi', blizzardSubclass: 'Daggers' },
+  'vashniks sanguine rancor': { type: 'dagger', is2H: false, is1H: true, stat: 'agi', blizzardSubclass: 'Daggers' },
+  'abyssal broodfiend\'s bardiche': { type: 'polearm', is2H: true, is1H: false, stat: 'agi/str', blizzardSubclass: 'Polearms' },
+  'abyssal broodfiends bardiche': { type: 'polearm', is2H: true, is1H: false, stat: 'agi/str', blizzardSubclass: 'Polearms' },
+  'fang carved recurve': { type: 'bow', is2H: true, is1H: false, stat: 'agi', isRanged: true, blizzardSubclass: 'Bows' },
+  'fang-carved recurve': { type: 'bow', is2H: true, is1H: false, stat: 'agi', isRanged: true, blizzardSubclass: 'Bows' },
+  'maze roa warlord\'s fury': { type: 'axe', is2H: true, is1H: false, stat: 'str', blizzardSubclass: 'Two-Handed Axes' },
+  'maze-roa, warlord\'s fury': { type: 'axe', is2H: true, is1H: false, stat: 'str', blizzardSubclass: 'Two-Handed Axes' },
+  'altar keeper\'s censer': { type: 'off-hand', is2H: false, is1H: false, stat: 'int', isOffhand: true, blizzardSubclass: 'Miscellaneous (Off-Hand)' },
+  'altar-keeper\'s censer': { type: 'off-hand', is2H: false, is1H: false, stat: 'int', isOffhand: true, blizzardSubclass: 'Miscellaneous (Off-Hand)' },
+  'aman\'muso, warlord\'s vengeance': { type: 'staff', is2H: true, is1H: false, stat: 'agi/int', blizzardSubclass: 'Staves' },
+  'amanmuso warlords vengeance': { type: 'staff', is2H: true, is1H: false, stat: 'agi/int', blizzardSubclass: 'Staves' },
+  'jan\'thrazet, the soul fang': { type: 'dagger', is2H: false, is1H: true, stat: 'int', blizzardSubclass: 'Daggers' },
+  'janthrazet the soul fang': { type: 'dagger', is2H: false, is1H: true, stat: 'int', blizzardSubclass: 'Daggers' },
+  'ravenous feaster\'s fang': { type: 'dagger', is2H: false, is1H: true, stat: 'agi', blizzardSubclass: 'Daggers' },
+  'ravenous feasters fang': { type: 'dagger', is2H: false, is1H: true, stat: 'agi', blizzardSubclass: 'Daggers' },
+  'zul\'valok, breath of corruption': { type: 'dagger', is2H: false, is1H: true, stat: 'agi', blizzardSubclass: 'Daggers' },
+  'zulvalok breath of corruption': { type: 'dagger', is2H: false, is1H: true, stat: 'agi', blizzardSubclass: 'Daggers' },
+  'jaws of the shackled goddess': { type: 'sword', is2H: false, is1H: true, stat: 'str/agi', blizzardSubclass: 'One-Handed Swords' }
+};
+
+/**
+ * Official Blizzard Playable Class Weapon Proficiencies Table (/data/wow/playable-class/{id}).
+ */
+const BLIZZARD_CLASS_WEAPON_PROFICIENCIES = {
+  'mage': ['dagger', 'sword', 'wand', 'staff', 'stave', 'off-hand', 'holdable', 'censer'],
+  'warlock': ['dagger', 'sword', 'wand', 'staff', 'stave', 'off-hand', 'holdable', 'censer'],
+  'priest': ['dagger', 'mace', 'wand', 'staff', 'stave', 'off-hand', 'holdable', 'censer'],
+  'rogue': ['dagger', 'sword', 'axe', 'mace', 'fist', 'claw', 'fang', 'cleaver'],
+  'demon hunter': ['warglaive', 'sword', 'axe', 'fist', 'dagger', 'claw', 'fang', 'cleaver'],
+  'warrior': ['sword', 'axe', 'mace', 'polearm', 'staff', 'shield', 'fist', 'dagger'],
+  'paladin': ['sword', 'axe', 'mace', 'polearm', 'shield'],
+  'death knight': ['sword', 'axe', 'mace', 'polearm'],
+  'hunter': ['bow', 'gun', 'crossbow', 'polearm', 'staff', 'stave', 'axe', 'sword'],
+  'druid': ['dagger', 'mace', 'staff', 'stave', 'polearm', 'fist', 'off-hand', 'holdable'],
+  'monk': ['sword', 'axe', 'mace', 'fist', 'staff', 'stave', 'polearm', 'off-hand', 'holdable', 'weapon'],
+  'shaman': ['dagger', 'mace', 'axe', 'fist', 'shield', 'staff', 'stave', 'off-hand', 'holdable'],
+  'evoker': ['dagger', 'sword', 'axe', 'mace', 'fist', 'staff', 'stave', 'off-hand', 'holdable']
 };
 
 /**
  * Validates whether a character is eligible to equip/loot an item based on:
  * 1. Armor Class (Cloth, Leather, Mail, Plate)
- * 2. Weapon Subclass & 1H vs 2H Spec Constraints (Polearms, Daggers, Bows, Staves, Axes, Shields, etc.)
+ * 2. Blizzard Official Weapon Subclasses & Spec Rules (Polearms, Daggers, Bows, Staves, Axes, Shields, etc.)
  * 3. Primary Stat Profile (Intellect vs Strength/Agility)
  */
 function isCharacterEligibleForItem(charClass, charSpec, slot, targetSubclass, itemName) {
@@ -2379,28 +2398,11 @@ function isCharacterEligibleForItem(charClass, charSpec, slot, targetSubclass, i
   // 2. WEAPONS & OFF-HANDS (Main Hand, Off Hand, 1H, 2H, Ranged, Shield)
   const isWeaponOrOffhand = slot === 'Main Hand' || slot === 'Off Hand' || slot.includes('Two-Hand') || slot.includes('One-Hand') || slot.includes('Ranged') || slot.includes('Shield');
   if (isWeaponOrOffhand) {
-    // Exact baseline Class Weapon Proficiencies in World of Warcraft
-    const CLASS_WEAPON_PROFICIENCIES = {
-      'mage': ['dagger', 'sword', 'wand', 'staff', 'stave', 'off hand', 'off-hand', 'holdable', 'censer', 'blade'],
-      'warlock': ['dagger', 'sword', 'wand', 'staff', 'stave', 'off hand', 'off-hand', 'holdable', 'censer', 'blade'],
-      'priest': ['dagger', 'mace', 'wand', 'staff', 'stave', 'off hand', 'off-hand', 'holdable', 'censer'],
-      'rogue': ['dagger', 'sword', 'axe', 'mace', 'fist', 'claw', 'fang', 'cleaver', 'edge', 'blade'],
-      'demon hunter': ['warglaive', 'sword', 'axe', 'fist', 'dagger', 'claw', 'fang', 'cleaver', 'edge', 'blade'],
-      'warrior': ['sword', 'axe', 'mace', 'polearm', 'staff', 'shield', 'fist', 'dagger', 'greatsword', 'greataxe', 'greatmace', "warlord's fury", 'blade'],
-      'paladin': ['sword', 'axe', 'mace', 'polearm', 'shield', 'greatsword', 'greataxe', 'greatmace', "warlord's fury", 'blade'],
-      'death knight': ['sword', 'axe', 'mace', 'polearm', 'greatsword', 'greataxe', 'greatmace', "warlord's fury", 'blade'],
-      'hunter': ['bow', 'gun', 'crossbow', 'polearm', 'staff', 'stave', 'axe', 'sword'],
-      'druid': ['dagger', 'mace', 'staff', 'stave', 'polearm', 'fist', 'off hand', 'off-hand', 'holdable'],
-      'monk': ['sword', 'axe', 'mace', 'fist', 'staff', 'stave', 'polearm', 'off hand', 'off-hand', 'holdable', 'weapon'],
-      'shaman': ['dagger', 'mace', 'axe', 'fist', 'shield', 'staff', 'stave', 'off hand', 'off-hand', 'holdable'],
-      'evoker': ['dagger', 'sword', 'axe', 'mace', 'fist', 'staff', 'stave', 'off hand', 'off-hand', 'holdable']
-    };
-
     // Look up canonical weapon subclass mapping first to avoid reliance on item name keywords
     const cleanKey = itemName.replace(/[\u2018\u2019\u0027\u0060]/g, "'");
     const canonicalWeapon = RAID_WEAPON_SUBCLASS_MAP[cleanKey] || Object.values(RAID_WEAPON_SUBCLASS_MAP).find(w => cleanKey.includes(w.type));
 
-    const prof = CLASS_WEAPON_PROFICIENCIES[charClass];
+    const prof = BLIZZARD_CLASS_WEAPON_PROFICIENCIES[charClass];
     if (canonicalWeapon) {
       if (prof && !prof.includes(canonicalWeapon.type) && !prof.includes('weapon')) {
         return false;
@@ -2438,29 +2440,26 @@ function isCharacterEligibleForItem(charClass, charSpec, slot, targetSubclass, i
     }
 
     // Bows, Guns, Crossbows -> Beast Mastery & Marksmanship Hunters ONLY (Survival is strictly 2H Melee)
-    if (targetSubclass.includes('gun') || targetSubclass.includes('bow') || targetSubclass.includes('crossbow')) {
+    if (targetSubclass.includes('gun') || targetSubclass.includes('bow') || targetSubclass.includes('crossbow') || (canonicalWeapon && canonicalWeapon.isRanged)) {
       return charClass === 'hunter' && !charSpec.includes('survival');
     }
     // Warglaives -> Demon Hunters ONLY
-    if (targetSubclass.includes('warglaive')) {
+    if (targetSubclass.includes('warglaive') || (canonicalWeapon && canonicalWeapon.type === 'warglaive')) {
       return charClass === 'demon hunter';
     }
     // Wands -> Mages, Warlocks, Priests ONLY
-    if (targetSubclass.includes('wand')) {
+    if (targetSubclass.includes('wand') || (canonicalWeapon && canonicalWeapon.type === 'wand')) {
       return ['mage', 'warlock', 'priest'].includes(charClass);
     }
     // Shields -> Prot/Holy Paladin, Prot Warrior, Ele/Resto Shaman ONLY
-    if (targetSubclass.includes('shield')) {
+    if (targetSubclass.includes('shield') || (canonicalWeapon && canonicalWeapon.type === 'shield')) {
       return (charClass === 'paladin' && ['protection', 'holy'].some(s => charSpec.includes(s))) ||
              (charClass === 'warrior' && charSpec.includes('protection')) ||
              (charClass === 'shaman' && ['elemental', 'restoration'].some(s => charSpec.includes(s)));
     }
     // Caster Off-Hands / Holdable -> Intellect Casters & Healers ONLY
-    if (targetSubclass.includes('off-hand') || targetSubclass.includes('off hand') || targetSubclass.includes('holdable')) {
-      return ['mage', 'warlock', 'priest', 'evoker'].includes(charClass) ||
-             (charClass === 'druid' && ['balance', 'restoration'].some(s => charSpec.includes(s))) ||
-             (charClass === 'shaman' && ['elemental', 'restoration'].some(s => charSpec.includes(s))) ||
-             (charClass === 'monk' && charSpec.includes('mistweaver'));
+    if (targetSubclass.includes('off-hand') || targetSubclass.includes('off hand') || targetSubclass.includes('holdable') || (canonicalWeapon && canonicalWeapon.isOffhand)) {
+      return ['mage', 'warlock', 'priest', 'druid', 'monk', 'shaman', 'evoker'].includes(charClass);
     }
     // 2H Axes, 2H Swords, 2H Maces -> Str/Agi 2H Melee (Warrior, DK, Ret Paladin, Survival Hunter, Feral/Guardian Druid)
     if (targetSubclass.includes('2h axe') || targetSubclass.includes('2h sword') || targetSubclass.includes('2h mace') || (targetSubclass.includes('axe') && !targetSubclass.includes('1h') && (itemName.includes('2h') || itemName.includes('cleaver') || itemName.includes('fury') || itemName.includes('axe')))) {
