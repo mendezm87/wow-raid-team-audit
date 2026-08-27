@@ -2350,19 +2350,19 @@ function isCharacterEligibleForItem(charClass, charSpec, slot, targetSubclass, i
   if (isWeaponOrOffhand) {
     // Exact baseline Class Weapon Proficiencies in World of Warcraft
     const CLASS_WEAPON_PROFICIENCIES = {
-      'mage': ['dagger', 'sword', 'wand', 'staff', 'off hand', 'holdable'],
-      'warlock': ['dagger', 'sword', 'wand', 'staff', 'off hand', 'holdable'],
-      'priest': ['dagger', 'mace', 'wand', 'staff', 'off hand', 'holdable'],
-      'rogue': ['dagger', 'sword', 'axe', 'mace', 'fist'],
-      'demon hunter': ['warglaive', 'sword', 'axe', 'fist', 'dagger'],
-      'warrior': ['sword', 'axe', 'mace', 'polearm', 'shield', 'fist', 'dagger'],
-      'paladin': ['sword', 'axe', 'mace', 'polearm', 'shield'],
-      'death knight': ['sword', 'axe', 'mace', 'polearm'],
-      'hunter': ['bow', 'gun', 'crossbow', 'polearm', 'staff', 'axe', 'sword'],
-      'druid': ['dagger', 'mace', 'staff', 'polearm', 'fist', 'off hand', 'holdable'],
-      'monk': ['sword', 'axe', 'mace', 'fist', 'staff', 'polearm', 'off hand', 'holdable'],
-      'shaman': ['dagger', 'mace', 'axe', 'fist', 'shield', 'staff', 'off hand', 'holdable'],
-      'evoker': ['dagger', 'sword', 'axe', 'mace', 'fist', 'staff', 'off hand', 'holdable']
+      'mage': ['dagger', 'sword', 'wand', 'staff', 'stave', 'off hand', 'off-hand', 'holdable', 'censer', 'blade'],
+      'warlock': ['dagger', 'sword', 'wand', 'staff', 'stave', 'off hand', 'off-hand', 'holdable', 'censer', 'blade'],
+      'priest': ['dagger', 'mace', 'wand', 'staff', 'stave', 'off hand', 'off-hand', 'holdable', 'censer'],
+      'rogue': ['dagger', 'sword', 'axe', 'mace', 'fist', 'claw', 'fang', 'cleaver', 'edge', 'blade'],
+      'demon hunter': ['warglaive', 'sword', 'axe', 'fist', 'dagger', 'claw', 'fang', 'cleaver', 'edge', 'blade'],
+      'warrior': ['sword', 'axe', 'mace', 'polearm', 'bardiche', 'staff', 'shield', 'fist', 'dagger', 'greatsword', 'greataxe', 'greatmace', "warlord's fury", 'blade'],
+      'paladin': ['sword', 'axe', 'mace', 'polearm', 'bardiche', 'shield', 'greatsword', 'greataxe', 'greatmace', "warlord's fury", 'blade'],
+      'death knight': ['sword', 'axe', 'mace', 'polearm', 'bardiche', 'greatsword', 'greataxe', 'greatmace', "warlord's fury", 'blade'],
+      'hunter': ['bow', 'gun', 'crossbow', 'polearm', 'bardiche', 'staff', 'stave', 'axe', 'sword'],
+      'druid': ['dagger', 'mace', 'staff', 'stave', 'polearm', 'bardiche', 'fist', 'off hand', 'off-hand', 'holdable'],
+      'monk': ['sword', 'axe', 'mace', 'fist', 'staff', 'stave', 'polearm', 'bardiche', 'off hand', 'off-hand', 'holdable', 'weapon'],
+      'shaman': ['dagger', 'mace', 'axe', 'fist', 'shield', 'staff', 'stave', 'off hand', 'off-hand', 'holdable'],
+      'evoker': ['dagger', 'sword', 'axe', 'mace', 'fist', 'staff', 'stave', 'off hand', 'off-hand', 'holdable']
     };
 
     const prof = CLASS_WEAPON_PROFICIENCIES[charClass];
