@@ -2130,6 +2130,83 @@ function getRosterContextMap(ss) {
 }
 
 /**
+ * Reads all registered Alt character names from the Config sheet (Columns F-I, rows 9-45).
+ */
+function getAltNamesSet(ss) {
+  const altNames = new Set();
+  if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+  const configSheet = ss.getSheetByName('Config');
+  if (configSheet && configSheet.getLastRow() >= 9) {
+    const numRows = Math.min(configSheet.getLastRow() - 8, 37);
+    const altData = configSheet.getRange(9, 6, numRows, 1).getValues();
+    altData.forEach(row => {
+      const rawName = (row[0] || '').toString().trim();
+      const { name } = parseCharacterAndRealm(rawName, '');
+      if (name && !name.toLowerCase().includes('alt character')) {
+        altNames.add(name.toLowerCase());
+      }
+    });
+  }
+  return altNames;
+}
+
+/**
+ * Loads Main character gear and stats from the "Guild Audit" sheet, strictly excluding any Alt characters.
+ */
+function getGuildAuditCharacterList(ss) {
+  if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+  const auditSheet = ss.getSheetByName(AUDIT_SHEET_NAME);
+  if (!auditSheet || auditSheet.getLastRow() < 2) return [];
+
+  const altNamesSet = getAltNamesSet(ss);
+  const auditValues = auditSheet.getDataRange().getValues();
+  const headers = auditValues[0].map(h => (h || '').toString().trim());
+
+  const nameCol = headers.indexOf('Name');
+  const classCol = headers.indexOf('Class');
+  const specCol = headers.indexOf('Spec');
+  const ilvlCol = headers.indexOf('iLvl');
+  const readyCol = headers.indexOf('Raid Ready');
+
+  const mainCharacters = [];
+  let reachedAltSection = false;
+
+  for (let r = 1; r < auditValues.length; r++) {
+    const row = auditValues[r];
+    const name = nameCol > -1 ? (row[nameCol] || '').toString().trim() : '';
+
+    if (!name || name.toLowerCase().includes('alt') || name.startsWith('───') || name.startsWith('═══')) {
+      if (!name && r > 2 && auditValues[r + 1] && !auditValues[r + 1][nameCol]) {
+        reachedAltSection = true;
+      }
+      continue;
+    }
+
+    if (reachedAltSection || altNamesSet.has(name.toLowerCase())) {
+      continue; // Strictly exclude alts
+    }
+
+    const charObj = {
+      'Name': name,
+      'Class': classCol > -1 ? (row[classCol] || '').toString().trim() : '',
+      'Spec': specCol > -1 ? (row[specCol] || '').toString().trim() : '',
+      'iLvl': ilvlCol > -1 ? (row[ilvlCol] || 0) : 0,
+      'Raid Ready': readyCol > -1 ? (row[readyCol] || '') : ''
+    };
+
+    headers.forEach((h, colIdx) => {
+      if (h && !charObj[h]) {
+        charObj[h] = (row[colIdx] || '').toString().trim();
+      }
+    });
+
+    mainCharacters.push(charObj);
+  }
+
+  return mainCharacters;
+}
+
+/**
  * Calculates a composite Loot Council Priority Score balancing mathematical upgrade, season attendance, punctuality, roster role, and raid prep.
  * Formula: Score = RawGain * ReliabilityFactor * RoleMultiplier * PrepMultiplier
  * - Role: Veteran (1.10x), Raider (1.00x), Trial (0.80x)
@@ -2594,9 +2671,14 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
     return { text: currentSlotText, ilvl: extractIlvl(currentSlotText) };
   };
 
+  const altNamesSet = getAltNamesSet(ss);
+
   // If mainCharacterData wasn't passed directly, load character gear from the "Guild Audit" sheet!
   if (!mainCharacterData || mainCharacterData.length === 0) {
     mainCharacterData = getGuildAuditCharacterList(ss);
+  } else {
+    // Strictly filter out any alts if mainCharacterData was passed
+    mainCharacterData = mainCharacterData.filter(c => !altNamesSet.has((c.Name || c.name || '').toLowerCase().trim()));
   }
 
   // Helper to normalize item strings for flawless key comparison (handles unicode apostrophes, spaces, punctuation)
@@ -2615,13 +2697,17 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
       const equippedIlvl = row[8];
       const upgradeDelta = (row[9] || '').toString();
       const simStatus = (row[11] || '').toString();
-      const notes = (row[12] || '').toString();
+      let notes = (row[12] || '').toString();
+
+      // Clean out any alt names that may have previously leaked into notes or topContenders
+      const topContenderNameMatch = topContender.match(/([A-Za-z0-9\u00C0-\u024F]+)/);
+      const isAltTopContender = topContenderNameMatch && altNamesSet.has(topContenderNameMatch[1].toLowerCase());
 
       // If this item was previously simmed with Raidbots or QE Live, protect and preserve it!
       const isSimmed = notes.includes('Sim Upgrades:') || notes.includes('Raidbots') || notes.includes('QE Live') || 
                        upgradeDelta.includes('%') || simStatus.includes('Simmed') || simStatus.includes('QE Live');
 
-      if (isSimmed && normName) {
+      if (isSimmed && normName && !isAltTopContender) {
         const entry = {
           rawName: rawName,
           topContender: topContender,
@@ -3052,6 +3138,8 @@ function processAndIngestRaidbotsSims(input) {
   const processedPlayers = [];
   const topUpgradesSummary = [];
 
+  const altNamesSet = getAltNamesSet(ss);
+
   // 1. Deduplicate by character name: strictly keep only the single most recent sim report per character!
   const latestSimsByPlayer = {};
   simDataList.forEach(simData => {
@@ -3063,6 +3151,12 @@ function processAndIngestRaidbotsSims(input) {
       playerName = simData.sim.players[0].name;
     }
     const lower = playerName.toLowerCase().trim();
+
+    // Strictly skip Alt character sims from updating the Loot & Chase Items sheet
+    if (altNamesSet.has(lower)) {
+      Logger.log(`Skipping Alt character sim from Loot Sheet: ${playerName}`);
+      return;
+    }
     
     let simTime = 0;
     if (simData.sim && simData.sim.timestamp) simTime = simData.sim.timestamp * 1000;
@@ -3412,6 +3506,12 @@ function processAndIngestQELiveReport(reportUrlOrId) {
   }
 
   const playerName = (reportData.playername || reportData.player || 'Healer').toString().trim();
+  const altNamesSet = getAltNamesSet(sheet.getParent());
+  if (altNamesSet.has(playerName.toLowerCase())) {
+    Logger.log(`Skipping Alt character QE Live report from Loot Sheet: ${playerName}`);
+    return { success: true, message: `Skipped Alt character report for ${playerName}` };
+  }
+
   const spec = reportData.spec || 'Healer';
   const now = new Date();
   const dateStr = Utilities.formatDate(now, Session.getScriptTimeZone() || 'GMT', 'MMM d, yyyy');
