@@ -2346,6 +2346,34 @@ const RAID_WEAPON_SUBCLASS_MAP = {
 };
 
 /**
+ * Official Blizzard Item Class 2 (Weapon) Subclasses (/data/wow/item-class/2/item-subclass)
+ * Subclass IDs 0 through 20 (21 total weapon subclasses).
+ */
+const BLIZZARD_WEAPON_SUBCLASSES = {
+  0:  { id: 0,  name: 'One-Handed Axes',   key: 'axe',      is2H: false, is1H: true },
+  1:  { id: 1,  name: 'Two-Handed Axes',   key: '2h axe',   is2H: true,  is1H: false },
+  2:  { id: 2,  name: 'Bows',              key: 'bow',      is2H: true,  is1H: false, isRanged: true },
+  3:  { id: 3,  name: 'Guns',              key: 'gun',      is2H: true,  is1H: false, isRanged: true },
+  4:  { id: 4,  name: 'One-Handed Maces',  key: 'mace',     is2H: false, is1H: true },
+  5:  { id: 5,  name: 'Two-Handed Maces',  key: '2h mace',  is2H: true,  is1H: false },
+  6:  { id: 6,  name: 'Polearms',          key: 'polearm',  is2H: true,  is1H: false },
+  7:  { id: 7,  name: 'One-Handed Swords', key: 'sword',    is2H: false, is1H: true },
+  8:  { id: 8,  name: 'Two-Handed Swords', key: '2h sword', is2H: true,  is1H: false },
+  9:  { id: 9,  name: 'Warglaives',        key: 'warglaive',is2H: false, is1H: true },
+  10: { id: 10, name: 'Staves',            key: 'staff',    is2H: true,  is1H: false },
+  11: { id: 11, name: 'Bear Claws',        key: 'fist',     is2H: false, is1H: true },
+  12: { id: 12, name: 'Cat Claws',         key: 'fist',     is2H: false, is1H: true },
+  13: { id: 13, name: 'Fist Weapons',      key: 'fist',     is2H: false, is1H: true },
+  14: { id: 14, name: 'Miscellaneous',     key: 'off-hand', is2H: false, is1H: false, isOffhand: true },
+  15: { id: 15, name: 'Daggers',           key: 'dagger',   is2H: false, is1H: true },
+  16: { id: 16, name: 'Thrown',            key: 'ranged',   is2H: false, is1H: true, isRanged: true },
+  17: { id: 17, name: 'Spears',            key: 'polearm',  is2H: true,  is1H: false },
+  18: { id: 18, name: 'Crossbows',         key: 'crossbow', is2H: true,  is1H: false, isRanged: true },
+  19: { id: 19, name: 'Wands',             key: 'wand',     is2H: false, is1H: true },
+  20: { id: 20, name: 'Fishing Poles',     key: 'fishing',  is2H: true,  is1H: false }
+};
+
+/**
  * Official Blizzard Playable Class Weapon Proficiencies Table (/data/wow/playable-class/{id}).
  */
 const BLIZZARD_CLASS_WEAPON_PROFICIENCIES = {
