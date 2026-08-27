@@ -3052,10 +3052,52 @@ function processAndIngestRaidbotsSims(input) {
   const processedPlayers = [];
   const topUpgradesSummary = [];
 
+  // 1. Deduplicate by character name: strictly keep only the single most recent sim report per character!
+  const latestSimsByPlayer = {};
   simDataList.forEach(simData => {
     if (!simData) return;
+    let playerName = 'Unknown';
+    if (simData.simbot && simData.simbot.player) {
+      playerName = simData.simbot.player;
+    } else if (simData.sim && simData.sim.players && simData.sim.players[0] && simData.sim.players[0].name) {
+      playerName = simData.sim.players[0].name;
+    }
+    const lower = playerName.toLowerCase().trim();
+    
+    let simTime = 0;
+    if (simData.sim && simData.sim.timestamp) simTime = simData.sim.timestamp * 1000;
+    else if (simData.sim && simData.sim.date) simTime = new Date(simData.sim.date).getTime();
+    else if (simData.simbot && simData.simbot.date) simTime = new Date(simData.simbot.date).getTime();
+    else if (simData.simbot && simData.simbot.jobSubmitted) simTime = new Date(simData.simbot.jobSubmitted).getTime();
 
-    // 1. Build Item ID to Name & Slot dictionary from simbot.meta.itemLibrary & instanceLibrary
+    if (!latestSimsByPlayer[lower] || simTime >= latestSimsByPlayer[lower].time) {
+      latestSimsByPlayer[lower] = {
+        simData: simData,
+        time: simTime,
+        playerName: playerName
+      };
+    }
+  });
+
+  const dedupedSimDataList = Object.values(latestSimsByPlayer).map(e => e.simData);
+
+  dedupedSimDataList.forEach(simData => {
+    if (!simData) return;
+
+    let playerName = 'Unknown';
+    if (simData.simbot && simData.simbot.player) {
+      playerName = simData.simbot.player;
+    } else if (simData.sim && simData.sim.players && simData.sim.players[0] && simData.sim.players[0].name) {
+      playerName = simData.sim.players[0].name;
+    }
+    if (!processedPlayers.includes(playerName)) processedPlayers.push(playerName);
+
+    // Purge previous/stale upgrades for this specific player so their newest sim fully replaces their old profile
+    Object.keys(itemUpgradeMap).forEach(k => {
+      itemUpgradeMap[k] = itemUpgradeMap[k].filter(e => e.name.toLowerCase() !== playerName.toLowerCase());
+    });
+
+    // 2. Build Item ID to Name & Slot dictionary from simbot.meta.itemLibrary & instanceLibrary
     const itemMap = {};
     const slotMap = {};
     const sourceMap = {};
@@ -3089,14 +3131,6 @@ function processAndIngestRaidbotsSims(input) {
         }
       }
     });
-
-    let playerName = 'Unknown';
-    if (simData.simbot && simData.simbot.player) {
-      playerName = simData.simbot.player;
-    } else if (simData.sim && simData.sim.players && simData.sim.players[0] && simData.sim.players[0].name) {
-      playerName = simData.sim.players[0].name;
-    }
-    if (!processedPlayers.includes(playerName)) processedPlayers.push(playerName);
 
     let baseDps = 0;
     if (simData.sim && simData.sim.players && simData.sim.players[0] && simData.sim.players[0].collected_data && simData.sim.players[0].collected_data.dps) {
