@@ -3618,13 +3618,40 @@ function processAndIngestQELiveReport(reportUrlOrId) {
 
 /**
  * Universal router for incoming sim/report submissions (Raidbots or QE Live).
+ * Seamlessly handles arrays, mixed batches, and single links.
  */
 function processUniversalSimOrReport(input) {
-  const str = (input || '').toString();
-  if (str.includes('questionablyepic.com') || str.includes('qe-live.com') || str.includes('upgradereport')) {
-    return processAndIngestQELiveReport(str);
+  let urls = [];
+  if (Array.isArray(input)) {
+    urls = input;
+  } else {
+    urls = (input || '').toString().split(/[\s,;]+/).filter(u => u.trim());
   }
-  return processAndIngestRaidbotsSims(str);
+
+  const qeUrls = urls.filter(u => u.includes('questionablyepic.com') || u.includes('qe-live.com') || u.includes('upgradereport'));
+  const rbUrls = urls.filter(u => !qeUrls.includes(u));
+
+  let rbResult = null;
+  let qeResult = null;
+
+  if (rbUrls.length > 0) {
+    rbResult = processAndIngestRaidbotsSims(rbUrls.join('\n'));
+  }
+  if (qeUrls.length > 0) {
+    qeUrls.forEach(q => {
+      qeResult = processAndIngestQELiveReport(q);
+    });
+  }
+
+  if (rbResult && qeResult) {
+    return {
+      success: true,
+      reportsProcessed: (rbResult.reportsProcessed || 0) + qeUrls.length,
+      players: [...(rbResult.players || []), ...(qeResult.players || [])],
+      message: `Successfully processed ${rbResult.reportsProcessed || 0} Raidbots sims and ${qeUrls.length} QE Live reports.`
+    };
+  }
+  return rbResult || qeResult || { success: false, message: 'No valid sim or report URLs provided.' };
 }
 
 /**
