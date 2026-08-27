@@ -2781,6 +2781,9 @@ function createLootAndChaseItemsSheet(mainCharacterData) {
           const top = simContenders[0];
           row[6] = formatContenderDisplay(top.name, top.pct, true, rosterContextMap, top.priority);
           row[9] = `+${top.pct}% DPS`;
+          row[11] = (preservedSim.simStatus && (preservedSim.simStatus.includes('✅') || preservedSim.simStatus.includes('Simmed') || preservedSim.simStatus.includes('QE Live'))) 
+                    ? preservedSim.simStatus 
+                    : '✅ Simmed';
 
           const prefix = preservedSim.notes.includes('Raidbots') ? 'Raidbots Sim Upgrades: ' : 'Sim / QE Live Upgrades: ';
           const topList = simContenders.slice(0, 5).map((c, i) => {
