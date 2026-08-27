@@ -3295,6 +3295,9 @@ function processAndIngestRaidbotsSims(input) {
       if (it && it.id) {
         itemMap[it.id] = it.name;
         slotMap[it.id] = it.slot;
+        if (it.sourceItem && it.sourceItem.id && it.sourceItem.name) {
+          itemMap[it.sourceItem.id] = it.sourceItem.name;
+        }
         if (it.encounter && it.encounter.name) {
           sourceMap[it.id] = it.encounter.name;
         } else if (it.source && it.source.encounter && it.source.encounter.name) {
@@ -3316,22 +3319,38 @@ function processAndIngestRaidbotsSims(input) {
 
     const itemsToProcess = [];
 
-    // Path A: Profilesets results
+    // Path A: Profilesets results (with automatic Revival Catalyst tier resolution)
     if (simData.sim && simData.sim.profilesets && Array.isArray(simData.sim.profilesets.results)) {
       simData.sim.profilesets.results.forEach(res => {
         const profileName = (res.name || '').toString();
         const parts = profileName.split('/');
+        let mainItemId = null;
+        let sourceItemId = null;
         let resolvedItemName = '';
         let resolvedSlot = '';
         let resolvedSource = '';
+        let isCatalyzed = false;
 
         if (parts.length >= 4) {
-          const itemId = parseInt(parts[3], 10);
-          if (itemId && itemMap[itemId]) {
-            resolvedItemName = itemMap[itemId];
-            resolvedSlot = slotMap[itemId] || '';
-            resolvedSource = sourceMap[itemId] || '';
+          mainItemId = parseInt(parts[3], 10);
+          if (parts.length > 7) {
+            for (let i = 7; i < parts.length; i++) {
+              const sid = parseInt(parts[i], 10);
+              if (sid && itemMap[sid]) {
+                sourceItemId = sid;
+                break;
+              }
+            }
           }
+        }
+
+        // If this was a catalyzed raid drop, map the upgrade to the actual drop that falls in the raid!
+        const dropItemId = sourceItemId || mainItemId;
+        if (dropItemId && itemMap[dropItemId]) {
+          resolvedItemName = itemMap[dropItemId];
+          resolvedSlot = slotMap[dropItemId] || slotMap[mainItemId] || '';
+          resolvedSource = sourceMap[dropItemId] || sourceMap[mainItemId] || '';
+          isCatalyzed = !!sourceItemId;
         }
 
         if (!resolvedItemName) {
@@ -3349,12 +3368,14 @@ function processAndIngestRaidbotsSims(input) {
           if (!existing || pct > existing.pct) {
             if (existing) {
               existing.pct = parseFloat(pct.toFixed(2));
+              existing.isCatalyzed = isCatalyzed;
             } else {
               itemsToProcess.push({
                 name: resolvedItemName,
                 pct: parseFloat(pct.toFixed(2)),
                 slot: resolvedSlot,
-                source: resolvedSource
+                source: resolvedSource,
+                isCatalyzed: isCatalyzed
               });
             }
           }
@@ -3410,11 +3431,15 @@ function processAndIngestRaidbotsSims(input) {
 
       const existingIdx = itemUpgradeMap[matchedCatalogKey].findIndex(e => e.name.toLowerCase() === playerName.toLowerCase());
       if (existingIdx >= 0) {
-        itemUpgradeMap[matchedCatalogKey][existingIdx].pct = simItem.pct;
+        if (simItem.pct > itemUpgradeMap[matchedCatalogKey][existingIdx].pct) {
+          itemUpgradeMap[matchedCatalogKey][existingIdx].pct = simItem.pct;
+          itemUpgradeMap[matchedCatalogKey][existingIdx].isCatalyzed = simItem.isCatalyzed;
+        }
       } else {
         itemUpgradeMap[matchedCatalogKey].push({
           name: playerName,
-          pct: simItem.pct
+          pct: simItem.pct,
+          isCatalyzed: simItem.isCatalyzed
         });
       }
     });
@@ -3470,10 +3495,11 @@ function processAndIngestRaidbotsSims(input) {
         row[11] = simStatusBadge;
 
         const topList = sorted.slice(0, 5).map((c, i) => {
+          const cCat = c.isCatalyzed ? ' [Tier Catalyzed]' : '';
           const cRole = c.priority.role ? ` | ${c.priority.role}` : '';
           const cAtt = c.priority.attPct ? ` | ${c.priority.attPct}` : '';
           const cPrep = (!c.priority.isRaidReady) ? ' | ⚠️ Unenchanted' : '';
-          return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.pct}%${cRole}${cAtt}${cPrep})`;
+          return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.pct}%${cCat}${cRole}${cAtt}${cPrep})`;
         }).join(' | ');
         row[12] = `Raidbots Sim Upgrades: ${topList}`;
 
