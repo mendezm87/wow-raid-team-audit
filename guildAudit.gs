@@ -1939,16 +1939,26 @@ function fetchLiveBlizzardRaidLootTable(config, token) {
           const qualityType = (itemData.quality && itemData.quality.type) ? itemData.quality.type.toUpperCase() : '';
           const invType = itemData.inventory_type ? (itemData.inventory_type.type || '').toUpperCase() : 'NON_EQUIP';
           const itemName = itemData.name || '';
-          const slot = mapBlizzardInvTypeToSlot(invType);
+          let slot = mapBlizzardInvTypeToSlot(invType);
+
+          // Detect official Season 2 Tier Set Tokens (e.g. Consecrated Flame tokens & Curios)
+          const isTierToken = itemName.toLowerCase().includes('consecrated flame') || itemName.toLowerCase().includes('curio') || itemName.toLowerCase().includes('tier');
+          if (isTierToken) {
+            if (itemName.toLowerCase().includes('helm') || itemName.toLowerCase().includes('warhelm') || itemName.toLowerCase().includes('head')) slot = 'Head';
+            else if (itemName.toLowerCase().includes('shoulder') || itemName.toLowerCase().includes('pauldrons')) slot = 'Shoulders';
+            else if (itemName.toLowerCase().includes('chest') || itemName.toLowerCase().includes('bulwark') || itemName.toLowerCase().includes('curio')) slot = 'Chest';
+            else if (itemName.toLowerCase().includes('hands') || itemName.toLowerCase().includes('gauntlets')) slot = 'Hands';
+            else if (itemName.toLowerCase().includes('legs') || itemName.toLowerCase().includes('greaves')) slot = 'Legs';
+          }
 
           // Omit cosmetics, junk, pets, mounts, toys, recipes, reagents, consumables, quest items
-          const isExcludedType = ['junk', 'mount', 'companion pets', 'pet', 'toy', 'holiday', 'recipe', 'reagent', 'housing', 'decor', 'consumable', 'currency', 'cosmetic', 'quest', 'profession'].some(ex => subclassName.includes(ex) || itemClassName.includes(ex));
+          const isExcludedType = !isTierToken && ['junk', 'mount', 'companion pets', 'pet', 'toy', 'holiday', 'recipe', 'reagent', 'housing', 'decor', 'consumable', 'currency', 'cosmetic', 'quest', 'profession'].some(ex => subclassName.includes(ex) || itemClassName.includes(ex));
           const isExcludedQuality = qualityType === 'COSMETIC' || qualityType === 'POOR';
-          const isNonEquip = invType === 'NON_EQUIP' || slot === 'Gear';
+          const isNonEquip = !isTierToken && (invType === 'NON_EQUIP' || slot === 'Gear');
 
-          // Strictly include ONLY valid, equippable raid armor, weapons, and accessories
-          if (!isExcludedType && !isExcludedQuality && !isNonEquip && (itemClassId === 2 || itemClassId === 4)) {
-            let cleanSubclass = (itemData.item_subclass && itemData.item_subclass.name) ? itemData.item_subclass.name : 'All Specs';
+          // Strictly include ONLY valid, equippable raid armor, weapons, tier tokens, and accessories
+          if ((isTierToken || (!isExcludedType && !isExcludedQuality && !isNonEquip)) && (itemClassId === 2 || itemClassId === 4 || isTierToken)) {
+            let cleanSubclass = isTierToken ? `All Classes (Tier ${slot})` : ((itemData.item_subclass && itemData.item_subclass.name) ? itemData.item_subclass.name : 'All Specs');
             
             // Extract primary stat from Blizzard item stats array
             let primaryStatLabel = '';
