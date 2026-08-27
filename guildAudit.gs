@@ -72,6 +72,7 @@ function onOpen() {
       .addItem('3. Run Full Audit & Talents', 'updateAllCharacterDataWithBonuses')
       .addItem('4. Create/Refresh Loot & Chase Items Sheet', 'createLootAndChaseItemsSheet')
       .addItem('5. Import Raidbots / QE Live Sim', 'promptAndImportRaidbotsDroptimizer')
+      .addItem('5b. 🔄 Pull & Sync All Latest Sims from Discord', 'syncLatestSimsFromDiscord')
       .addSeparator()
       .addItem('6. Sync Warcraft Logs Attendance & History', 'syncWarcraftLogsSeasonAttendance')
       .addItem('7. Set Warcraft Logs API Credentials', 'promptForWCLCredentials')
@@ -4839,4 +4840,104 @@ function showBenchRaidersDialog() {
     .setHeight(480);
   SpreadsheetApp.getUi().showModalDialog(htmlOutput, '🪑 Mythic Bench & Standby Credit Manager');
 }
+
+/**
+ * Connects directly to Discord REST API using the Bot Token, fetches the latest messages
+ * from the Sims channel, extracts all Raidbots / QE Live reports, deduplicates to the latest per player,
+ * and updates the Loot & Chase Items sheet in one single click without having to resend them!
+ */
+function syncLatestSimsFromDiscord() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi();
+  const props = PropertiesService.getScriptProperties();
+
+  let token = props.getProperty('DISCORD_BOT_TOKEN');
+  let channelId = props.getProperty('SIMS_CHANNEL_ID');
+
+  // Check Config sheet if not in script properties
+  const configSheet = ss.getSheetByName('Config') || ss.getSheetByName('config');
+  if (configSheet) {
+    const data = configSheet.getDataRange().getValues();
+    data.forEach(r => {
+      const k = (r[0] || '').toString().trim().toUpperCase();
+      const v = (r[1] || '').toString().trim();
+      if (k === 'DISCORD_BOT_TOKEN' && v) token = v;
+      if (k === 'SIMS_CHANNEL_ID' && v) channelId = v;
+    });
+  }
+
+  if (!token || !channelId) {
+    const promptRes = ui.prompt(
+      'Discord Bot Configuration',
+      'Enter your Discord Bot Token & Sims Channel ID (separated by a comma or newline):\nFormat: <BOT_TOKEN>, <CHANNEL_ID>',
+      ui.ButtonSet.OK_CANCEL
+    );
+    if (promptRes.getSelectedButton() !== ui.Button.OK) return;
+    const input = promptRes.getResponseText().trim();
+    const parts = input.split(/[\s,;\n]+/);
+    if (parts.length >= 2) {
+      token = parts[0];
+      channelId = parts[1];
+      props.setProperty('DISCORD_BOT_TOKEN', token);
+      props.setProperty('SIMS_CHANNEL_ID', channelId);
+    } else {
+      ui.alert('❌ Error', 'Please provide both the Discord Bot Token and Channel ID.', ui.ButtonSet.OK);
+      return;
+    }
+  }
+
+  ss.toast('Connecting to Discord and retrieving channel sim history...', '📡 Discord Sync', 5);
+
+  try {
+    const res = UrlFetchApp.fetch(`https://discord.com/api/v10/channels/${channelId}/messages?limit=100`, {
+      headers: {
+        'Authorization': `Bot ${token}`,
+        'User-Agent': 'DiscordBot (https://github.com/mendezm87/wow-raid-team-audit, 1.0.0)'
+      },
+      muteHttpExceptions: true
+    });
+
+    if (res.getResponseCode() !== 200) {
+      ui.alert('❌ Discord API Error', `Failed to connect to Discord (HTTP ${res.getResponseCode()}):\n${res.getContentText()}`, ui.ButtonSet.OK);
+      return;
+    }
+
+    const messages = JSON.parse(res.getContentText());
+    const rbRegex = /https?:\/\/(?:www\.)?raidbots\.com\/(?:simbot\/)?report\/([A-Za-z0-9_-]{10,35})/gi;
+    const qeRegex = /https?:\/\/(?:www\.)?(?:questionablyepic\.com|qe-live\.com)\/(?:live|ptr)\/upgradereport\/([A-Za-z0-9_-]{8,35})/gi;
+
+    const simUrls = [];
+    messages.forEach(msg => {
+      const content = msg.content || '';
+      let match;
+      while ((match = rbRegex.exec(content)) !== null) {
+        const id = match[1];
+        const url = `https://www.raidbots.com/simbot/report/${id}`;
+        if (!simUrls.includes(url)) simUrls.push(url);
+      }
+      while ((match = qeRegex.exec(content)) !== null) {
+        const id = match[1];
+        const url = `https://questionablyepic.com/live/upgradereport/${id}`;
+        if (!simUrls.includes(url)) simUrls.push(url);
+      }
+    });
+
+    if (simUrls.length === 0) {
+      ui.alert('⚠️ No Sims Found', 'No Raidbots or QE Live sim links were found in the recent messages of that channel.', ui.ButtonSet.OK);
+      return;
+    }
+
+    ss.toast(`Found ${simUrls.length} sim links. Ingesting and recalculating rankings...`, '📥 Processing Sims', 10);
+    const result = processUniversalSimOrReport(simUrls.join('\n'));
+
+    if (result && result.success) {
+      ui.alert('🎉 Discord Sync Complete!', `Successfully retrieved ${simUrls.length} sim reports from Discord and updated the Loot & Chase Items sheet!\n\n${result.message || ''}`, ui.ButtonSet.OK);
+    } else {
+      ui.alert('⚠️ Partial Sync', `Retrieved sim links but encountered an issue during ingestion:\n${result ? result.error : 'Unknown error'}`, ui.ButtonSet.OK);
+    }
+  } catch (err) {
+    ui.alert('❌ Sync Error', `Failed to sync sims from Discord: ${err.message}`, ui.ButtonSet.OK);
+  }
+}
+
 
