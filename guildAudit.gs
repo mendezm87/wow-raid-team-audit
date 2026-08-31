@@ -1268,10 +1268,12 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
       }
 
       // Off-Hand Enchant Exception Handling
-      if (isTwoHandWeapon && !hasOffHandItem) {
+      // In Modern WoW (Midnight / The War Within), only dual-wield weapons (1H Swords, Maces, Axes, Daggers, Fist Weapons, Warglaives) in the Off-Hand can be enchanted.
+      // Shields (SHIELD), Held in Off-Hand (HOLDABLE), and empty off-hand / 2H weapons CANNOT be enchanted and are marked N/A.
+      if (!hasOffHandItem || isTwoHandWeapon) {
         charRow['Enchant Off Hand'] = 'N/A';
-      } else if (hasOffHandItem && offHandInventoryType === 'HOLDABLE') {
-        charRow['Enchant Off Hand'] = 'N/A'; // Held in Off-Hand cannot be enchanted
+      } else if (hasOffHandItem && (offHandInventoryType === 'HOLDABLE' || offHandInventoryType === 'SHIELD' || offHandInventoryType === 'NON_EQUIP' || offHandInventoryType === 'SHIELDOFFHAND')) {
+        charRow['Enchant Off Hand'] = 'N/A'; // Held in Off-Hand and Shields cannot be enchanted
       }
 
       // Dynamic Tier Set Status Formatting
