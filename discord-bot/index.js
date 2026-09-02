@@ -167,10 +167,52 @@ function createSimConfirmationEmbed(result, authorName) {
   return embed;
 }
 
+// Helper to parse SimC string and generate 1-Click Droptimizer link
+function parseSimcAndGenerateLink(text) {
+  if (!text) return null;
+
+  // Match class/character name: e.g. hunter="Ainocee" or paladin="Wafflezealot"
+  const charMatch = text.match(/(?:death_knight|demon_hunter|druid|evoker|hunter|mage|monk|paladin|priest|rogue|shaman|warlock|warrior)\s*=\s*["']?([^"'\n\r]+)["']?/i);
+  // Match armory line: armory=us,kiljaeden,Ainocee or server=kiljaeden
+  const armoryMatch = text.match(/armory\s*=\s*([a-z]{2})\s*,\s*([^,\n\r]+)\s*,\s*([^,\n\r]+)/i);
+  const serverMatch = text.match(/server\s*=\s*["']?([^"'\n\r]+)["']?/i);
+  const regionMatch = text.match(/region\s*=\s*["']?([^"'\n\r]+)["']?/i);
+  const specMatch = text.match(/spec\s*=\s*["']?([^"'\n\r]+)["']?/i);
+
+  let charName = '';
+  let realm = 'kiljaeden';
+  let region = 'us';
+  let spec = '';
+
+  if (armoryMatch) {
+    region = armoryMatch[1].toLowerCase().trim();
+    realm = armoryMatch[2].toLowerCase().trim().replace(/['\s]/g, '-');
+    charName = armoryMatch[3].trim();
+  } else if (charMatch) {
+    charName = charMatch[1].trim();
+    if (serverMatch) realm = serverMatch[1].toLowerCase().trim().replace(/['\s]/g, '-');
+    if (regionMatch) region = regionMatch[1].toLowerCase().trim();
+  }
+
+  if (specMatch) spec = specMatch[1].replace(/_/g, ' ').trim();
+
+  if (!charName) return null;
+
+  const droptimizerUrl = `https://www.raidbots.com/simbot/droptimizer?region=${encodeURIComponent(region)}&realm=${encodeURIComponent(realm)}&name=${encodeURIComponent(charName)}&instances=1320&difficulties=heroic`;
+
+  return {
+    charName,
+    realm,
+    region,
+    spec,
+    droptimizerUrl
+  };
+}
+
 client.once('ready', async () => {
   console.log(`🤖 Logged in as ${client.user.tag}! Ready to ingest Raidbots & QE Live reports.`);
 
-  // Register Slash Command /sim
+  // Register Slash Commands /sim and /simc
   const commands = [
     new SlashCommandBuilder()
       .setName('sim')
@@ -179,16 +221,24 @@ client.once('ready', async () => {
         option.setName('report_url')
           .setDescription('Raidbots link (raidbots.com/...) or QE Live report link (questionablyepic.com/...)')
           .setRequired(true)
+      ),
+    new SlashCommandBuilder()
+      .setName('simc')
+      .setDescription('Generate an instant 1-Click Raidbots Droptimizer link with pre-selected raid presets')
+      .addStringOption(option =>
+        option.setName('character_or_string')
+          .setDescription('Your character name (e.g. Ainocee) or paste your /simc string')
+          .setRequired(true)
       )
   ];
 
   const rest = new REST({ version: '10' }).setToken(DISCORD_BOT_TOKEN);
   try {
-    console.log('Registering /sim slash command...');
+    console.log('Registering /sim and /simc slash commands...');
     await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-    console.log('✅ Slash command /sim registered globally!');
+    console.log('✅ Slash commands registered globally!');
   } catch (err) {
-    console.error('Failed to register slash command:', err);
+    console.error('Failed to register slash commands:', err);
   }
 });
 
@@ -207,30 +257,50 @@ client.on('messageCreate', async (message) => {
   }
 
   const urls = extractSimUrls(message.content);
-  if (urls.length === 0) return;
+  if (urls.length > 0) {
+    console.log(`📥 Detected ${urls.length} sim/report link(s) from ${message.author.username} in #${message.channel.name}`);
+    
+    // React with hourglass while processing
+    try { await message.react('⏳'); } catch (e) {}
 
-  console.log(`📥 Detected ${urls.length} sim/report link(s) from ${message.author.username} in #${message.channel.name}`);
-  
-  // React with hourglass while processing
-  try { await message.react('⏳'); } catch (e) {}
+    const result = await sendToGoogleSheets(urls);
 
-  const result = await sendToGoogleSheets(urls);
+    try {
+      if (result.success) {
+        await message.reactions.removeAll();
+        await message.react('✅');
+      } else {
+        await message.reactions.removeAll();
+        await message.react('⚠️');
+      }
+    } catch (e) {}
 
-  try {
-    if (result.success) {
-      await message.reactions.removeAll();
-      await message.react('✅');
-    } else {
-      await message.reactions.removeAll();
-      await message.react('⚠️');
-    }
-  } catch (e) {}
+    const embed = createSimConfirmationEmbed(result, message.author.username);
+    await message.reply({ embeds: [embed] });
+    return;
+  }
 
-  const embed = createSimConfirmationEmbed(result, message.author.username);
-  await message.reply({ embeds: [embed] });
+  // 2. Check if message is a pasted SimC addon export string
+  const simcData = parseSimcAndGenerateLink(message.content);
+  if (simcData) {
+    console.log(`⚡ Detected /simc string for ${simcData.charName} (${simcData.realm}) from ${message.author.username}`);
+    const embed = new EmbedBuilder()
+      .setColor(0x38BDF8) // Sky blue
+      .setTitle(`⚡ 1-Click Droptimizer Link Generated for ${simcData.charName}`)
+      .setDescription(`[👉 **Click Here to Run Droptimizer on Raidbots**](${simcData.droptimizerUrl})\n\nAll raid drop presets (*The Venomous Abyss • Heroic • Hero Track*) have been pre-selected for you!`)
+      .addFields(
+        { name: '👤 Character', value: simcData.charName, inline: true },
+        { name: '🌐 Realm', value: simcData.realm.toUpperCase(), inline: true },
+        { name: '🌲 Spec', value: simcData.spec || 'Assigned Spec', inline: true }
+      )
+      .setFooter({ text: 'Once the sim finishes, paste your report URL here to update the Loot Council sheet!' })
+      .setTimestamp();
+
+    await message.reply({ embeds: [embed] });
+  }
 });
 
-// 2. Slash command /sim handler
+// 2. Slash command handlers (/sim and /simc)
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -250,6 +320,45 @@ client.on('interactionCreate', async (interaction) => {
     const result = await sendToGoogleSheets(urls);
     const embed = createSimConfirmationEmbed(result, interaction.user.username);
     await interaction.editReply({ embeds: [embed] });
+  } else if (interaction.commandName === 'simc') {
+    const input = interaction.options.getString('character_or_string');
+    let simcData = parseSimcAndGenerateLink(input);
+
+    if (!simcData && input && input.trim().length > 0) {
+      // If user passed just a character name like "Ainocee" or "Ainocee-Kil'jaeden"
+      const parts = input.trim().split(/[-,\s]+/);
+      const charName = parts[0];
+      const realm = parts[1] ? parts[1].toLowerCase().replace(/['\s]/g, '-') : 'kiljaeden';
+      const droptimizerUrl = `https://www.raidbots.com/simbot/droptimizer?region=us&realm=${encodeURIComponent(realm)}&name=${encodeURIComponent(charName)}&instances=1320&difficulties=heroic`;
+      simcData = {
+        charName,
+        realm,
+        region: 'us',
+        spec: 'Assigned Spec',
+        droptimizerUrl
+      };
+    }
+
+    if (!simcData) {
+      await interaction.reply({
+        content: '⚠️ Could not parse character name or SimC string. Please provide your character name (e.g. `/simc Ainocee`) or paste your `/simc` string.',
+        ephemeral: true
+      });
+      return;
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(0x38BDF8)
+      .setTitle(`⚡ 1-Click Droptimizer Link for ${simcData.charName}`)
+      .setDescription(`[👉 **Click Here to Run Droptimizer on Raidbots**](${simcData.droptimizerUrl})\n\nAll raid drop presets (*The Venomous Abyss • Heroic • Hero Track*) have been pre-selected for you!`)
+      .addFields(
+        { name: '👤 Character', value: simcData.charName, inline: true },
+        { name: '🌐 Realm', value: simcData.realm.toUpperCase(), inline: true }
+      )
+      .setFooter({ text: 'Once the sim finishes, paste your report URL here to update the Loot Council sheet!' })
+      .setTimestamp();
+
+    await interaction.reply({ embeds: [embed] });
   }
 });
 
