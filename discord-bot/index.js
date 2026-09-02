@@ -171,10 +171,15 @@ function createSimConfirmationEmbed(result, authorName) {
 function parseSimcAndGenerateLink(text) {
   if (!text) return null;
 
-  // Match class/character name: e.g. hunter="Ainocee" or paladin="Wafflezealot"
-  const charMatch = text.match(/(?:death_knight|demon_hunter|druid|evoker|hunter|mage|monk|paladin|priest|rogue|shaman|warlock|warrior)\s*=\s*["']?([^"'\n\r]+)["']?/i);
-  // Match armory line: armory=us,kiljaeden,Ainocee or server=kiljaeden
+  // 1. Match header comment: # Character - Spec - Date - Region/Realm (e.g. # Wafflezealot - Retribution - 2026-09-01 22:40 - US/Dalaran)
+  const headerMatch = text.match(/#\s*([A-Za-z0-9\u00C0-\u024F]+)\s*-\s*([A-Za-z\s]+)\s*-\s*[\d-:\s]+\s*-\s*([A-Za-z]{2})\/([A-Za-z0-9\s'-]+)/i);
+
+  // 2. Match armory line: armory=us,dalaran,Wafflezealot
   const armoryMatch = text.match(/armory\s*=\s*([a-z]{2})\s*,\s*([^,\n\r]+)\s*,\s*([^,\n\r]+)/i);
+
+  // 3. Match class definition line: e.g. paladin="Wafflezealot" or hunter="Ainocee"
+  const charMatch = text.match(/(?:death_knight|demon_hunter|druid|evoker|hunter|mage|monk|paladin|priest|rogue|shaman|warlock|warrior)\s*=\s*["']?([^"'\n\r]+)["']?/i);
+  
   const serverMatch = text.match(/server\s*=\s*["']?([^"'\n\r]+)["']?/i);
   const regionMatch = text.match(/region\s*=\s*["']?([^"'\n\r]+)["']?/i);
   const specMatch = text.match(/spec\s*=\s*["']?([^"'\n\r]+)["']?/i);
@@ -184,7 +189,12 @@ function parseSimcAndGenerateLink(text) {
   let region = 'us';
   let spec = '';
 
-  if (armoryMatch) {
+  if (headerMatch) {
+    charName = headerMatch[1].trim();
+    spec = headerMatch[2].trim();
+    region = headerMatch[3].toLowerCase().trim();
+    realm = headerMatch[4].toLowerCase().trim().replace(/['\s]/g, '-');
+  } else if (armoryMatch) {
     region = armoryMatch[1].toLowerCase().trim();
     realm = armoryMatch[2].toLowerCase().trim().replace(/['\s]/g, '-');
     charName = armoryMatch[3].trim();
@@ -194,7 +204,7 @@ function parseSimcAndGenerateLink(text) {
     if (regionMatch) region = regionMatch[1].toLowerCase().trim();
   }
 
-  if (specMatch) spec = specMatch[1].replace(/_/g, ' ').trim();
+  if (specMatch && !spec) spec = specMatch[1].replace(/_/g, ' ').trim();
 
   if (!charName) return null;
 
@@ -242,7 +252,7 @@ client.once('ready', async () => {
   }
 });
 
-// 1. Auto-listen in channel for pasted Raidbots or QE Live links
+// 1. Auto-listen in channel for pasted Raidbots, QE Live links, or SimC addon text
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
@@ -256,7 +266,26 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  const urls = extractSimUrls(message.content);
+  let textContent = message.content || '';
+
+  // Handle Discord file attachments (e.g. message.txt when user pastes large text)
+  if (message.attachments && message.attachments.size > 0) {
+    for (const [id, att] of message.attachments) {
+      if (att.name && (att.name.endsWith('.txt') || att.name.endsWith('.simc') || att.name.includes('message'))) {
+        try {
+          const attRes = await fetch(att.url);
+          if (attRes.ok) {
+            const attText = await attRes.text();
+            textContent += '\n' + attText.slice(0, 3000);
+          }
+        } catch (e) {
+          console.warn('Could not read attachment:', e.message);
+        }
+      }
+    }
+  }
+
+  const urls = extractSimUrls(textContent);
   if (urls.length > 0) {
     console.log(`📥 Detected ${urls.length} sim/report link(s) from ${message.author.username} in #${message.channel.name}`);
     
@@ -281,7 +310,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // 2. Check if message is a pasted SimC addon export string
-  const simcData = parseSimcAndGenerateLink(message.content);
+  const simcData = parseSimcAndGenerateLink(textContent);
   if (simcData) {
     console.log(`⚡ Detected /simc string for ${simcData.charName} (${simcData.realm}) from ${message.author.username}`);
     const embed = new EmbedBuilder()
