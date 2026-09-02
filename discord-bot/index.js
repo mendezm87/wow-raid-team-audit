@@ -167,64 +167,10 @@ function createSimConfirmationEmbed(result, authorName) {
   return embed;
 }
 
-// Helper to parse SimC string and generate 1-Click Droptimizer link
-function parseSimcAndGenerateLink(text) {
-  if (!text) return null;
-
-  // 1. Match header comment: # Character - Spec - Date - Region/Realm (e.g. # Wafflezealot - Retribution - 2026-09-01 22:40 - US/Dalaran)
-  const headerMatch = text.match(/#\s*([A-Za-z0-9\u00C0-\u024F]+)\s*-\s*([A-Za-z\s]+)\s*-\s*[\d-:\s]+\s*-\s*([A-Za-z]{2})\/([A-Za-z0-9\s'-]+)/i);
-
-  // 2. Match armory line: armory=us,dalaran,Wafflezealot
-  const armoryMatch = text.match(/armory\s*=\s*([a-z]{2})\s*,\s*([^,\n\r]+)\s*,\s*([^,\n\r]+)/i);
-
-  // 3. Match class definition line: e.g. paladin="Wafflezealot" or hunter="Ainocee"
-  const charMatch = text.match(/(?:death_knight|demon_hunter|druid|evoker|hunter|mage|monk|paladin|priest|rogue|shaman|warlock|warrior)\s*=\s*["']?([^"'\n\r]+)["']?/i);
-  
-  const serverMatch = text.match(/server\s*=\s*["']?([^"'\n\r]+)["']?/i);
-  const regionMatch = text.match(/region\s*=\s*["']?([^"'\n\r]+)["']?/i);
-  const specMatch = text.match(/spec\s*=\s*["']?([^"'\n\r]+)["']?/i);
-
-  let charName = '';
-  let realm = 'kiljaeden';
-  let region = 'us';
-  let spec = '';
-
-  if (headerMatch) {
-    charName = headerMatch[1].trim();
-    spec = headerMatch[2].trim();
-    region = headerMatch[3].toLowerCase().trim();
-    realm = headerMatch[4].toLowerCase().trim().replace(/['\s]/g, '-');
-  } else if (armoryMatch) {
-    region = armoryMatch[1].toLowerCase().trim();
-    realm = armoryMatch[2].toLowerCase().trim().replace(/['\s]/g, '-');
-    charName = armoryMatch[3].trim();
-  } else if (charMatch) {
-    charName = charMatch[1].trim();
-    if (serverMatch) realm = serverMatch[1].toLowerCase().trim().replace(/['\s]/g, '-');
-    if (regionMatch) region = regionMatch[1].toLowerCase().trim();
-  }
-
-  if (specMatch && !spec) spec = specMatch[1].replace(/_/g, ' ').trim();
-
-  if (!charName) return null;
-
-  const heroicDroptimizerUrl = `https://www.raidbots.com/simbot/droptimizer?region=${encodeURIComponent(region)}&realm=${encodeURIComponent(realm)}&name=${encodeURIComponent(charName)}&instances=1320&difficulties=heroic`;
-  const mythicDroptimizerUrl = `https://www.raidbots.com/simbot/droptimizer?region=${encodeURIComponent(region)}&realm=${encodeURIComponent(realm)}&name=${encodeURIComponent(charName)}&instances=1320&difficulties=mythic`;
-
-  return {
-    charName,
-    realm,
-    region,
-    spec,
-    heroicDroptimizerUrl,
-    mythicDroptimizerUrl
-  };
-}
-
 client.once('ready', async () => {
   console.log(`🤖 Logged in as ${client.user.tag}! Ready to ingest Raidbots & QE Live reports.`);
 
-  // Register Slash Commands /sim and /simc
+  // Register Slash Command /sim
   const commands = [
     new SlashCommandBuilder()
       .setName('sim')
@@ -233,37 +179,20 @@ client.once('ready', async () => {
         option.setName('report_url')
           .setDescription('Raidbots link (raidbots.com/...) or QE Live report link (questionablyepic.com/...)')
           .setRequired(true)
-      ),
-    new SlashCommandBuilder()
-      .setName('simc')
-      .setDescription('Generate instant 1-Click Raidbots Droptimizer links for Heroic & Mythic')
-      .addStringOption(option =>
-        option.setName('character_or_string')
-          .setDescription('Your character name (e.g. Ainocee) or paste your /simc string')
-          .setRequired(true)
-      )
-      .addStringOption(option =>
-        option.setName('difficulty')
-          .setDescription('Raid Difficulty (Heroic or Mythic)')
-          .setRequired(false)
-          .addChoices(
-            { name: '⚔️ Heroic (Hero 6/6 • 318 ilvl)', value: 'heroic' },
-            { name: '👑 Mythic (Myth 6/6 • 334/344 ilvl)', value: 'mythic' }
-          )
       )
   ];
 
   const rest = new REST({ version: '10' }).setToken(DISCORD_BOT_TOKEN);
   try {
-    console.log('Registering /sim and /simc slash commands...');
+    console.log('Registering /sim slash command...');
     await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-    console.log('✅ Slash commands registered globally!');
+    console.log('✅ Slash command /sim registered globally!');
   } catch (err) {
-    console.error('Failed to register slash commands:', err);
+    console.error('Failed to register slash command:', err);
   }
 });
 
-// 1. Auto-listen in channel for pasted Raidbots, QE Live links, or SimC addon text
+// 1. Auto-listen in channel for pasted Raidbots or QE Live report links
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
@@ -277,75 +206,31 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  let textContent = message.content || '';
+  const urls = extractSimUrls(message.content);
+  if (urls.length === 0) return;
 
-  // Handle Discord file attachments (e.g. message.txt when user pastes large text)
-  if (message.attachments && message.attachments.size > 0) {
-    for (const [id, att] of message.attachments) {
-      if (att.name && (att.name.endsWith('.txt') || att.name.endsWith('.simc') || att.name.includes('message'))) {
-        try {
-          const attRes = await fetch(att.url);
-          if (attRes.ok) {
-            const attText = await attRes.text();
-            textContent += '\n' + attText.slice(0, 3000);
-          }
-        } catch (e) {
-          console.warn('Could not read attachment:', e.message);
-        }
-      }
+  console.log(`📥 Detected ${urls.length} sim/report link(s) from ${message.author.username} in #${message.channel.name}`);
+  
+  // React with hourglass while processing
+  try { await message.react('⏳'); } catch (e) {}
+
+  const result = await sendToGoogleSheets(urls);
+
+  try {
+    if (result.success) {
+      await message.reactions.removeAll();
+      await message.react('✅');
+    } else {
+      await message.reactions.removeAll();
+      await message.react('⚠️');
     }
-  }
+  } catch (e) {}
 
-  const urls = extractSimUrls(textContent);
-  if (urls.length > 0) {
-    console.log(`📥 Detected ${urls.length} sim/report link(s) from ${message.author.username} in #${message.channel.name}`);
-    
-    // React with hourglass while processing
-    try { await message.react('⏳'); } catch (e) {}
-
-    const result = await sendToGoogleSheets(urls);
-
-    try {
-      if (result.success) {
-        await message.reactions.removeAll();
-        await message.react('✅');
-      } else {
-        await message.reactions.removeAll();
-        await message.react('⚠️');
-      }
-    } catch (e) {}
-
-    const embed = createSimConfirmationEmbed(result, message.author.username);
-    await message.reply({ embeds: [embed] });
-    return;
-  }
-
-  // 2. Check if message is a pasted SimC addon export string
-  const simcData = parseSimcAndGenerateLink(textContent);
-  if (simcData) {
-    console.log(`⚡ Detected /simc string for ${simcData.charName} (${simcData.realm}) from ${message.author.username}`);
-    const embed = new EmbedBuilder()
-      .setColor(0x38BDF8) // Sky blue
-      .setTitle(`⚡ 1-Click Droptimizer Links for ${simcData.charName}`)
-      .setDescription(`Choose your raid difficulty:\n\n⚔️ **Heroic (Hero 6/6 • 318 ilvl):**\n[👉 **Click Here for Heroic Droptimizer**](${simcData.heroicDroptimizerUrl})\n\n👑 **Mythic (Myth 6/6 • 334/344 ilvl):**\n[👉 **Click Here for Mythic Droptimizer**](${simcData.mythicDroptimizerUrl})`)
-      .addFields(
-        { name: '👤 Character', value: `**${simcData.charName}**`, inline: true },
-        { name: '🌐 Realm', value: simcData.realm.toUpperCase(), inline: true },
-        { name: '🌲 Spec', value: simcData.spec || 'Assigned Spec', inline: true },
-        { 
-          name: '⚙️ Settings to Confirm on Raidbots', 
-          value: '1. **Raid:** *The Venomous Abyss*\n2. **Equipped Gear:** Check ☑️ *"Upgrade equipped gear to the same level when possible"*\n3. **Item Selection:** All Bosses / All Items checked (Default)', 
-          inline: false 
-        }
-      )
-      .setFooter({ text: 'Once the sim finishes, paste your report URL here to update the Loot Council sheet!' })
-      .setTimestamp();
-
-    await message.reply({ embeds: [embed] });
-  }
+  const embed = createSimConfirmationEmbed(result, message.author.username);
+  await message.reply({ embeds: [embed] });
 });
 
-// 2. Slash command handlers (/sim and /simc)
+// 2. Slash command /sim handler
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -365,62 +250,6 @@ client.on('interactionCreate', async (interaction) => {
     const result = await sendToGoogleSheets(urls);
     const embed = createSimConfirmationEmbed(result, interaction.user.username);
     await interaction.editReply({ embeds: [embed] });
-  } else if (interaction.commandName === 'simc') {
-    const input = interaction.options.getString('character_or_string');
-    const chosenDiff = interaction.options.getString('difficulty');
-    let simcData = parseSimcAndGenerateLink(input);
-
-    if (!simcData && input && input.trim().length > 0) {
-      // If user passed just a character name like "Ainocee" or "Ainocee-Kil'jaeden"
-      const parts = input.trim().split(/[-,\s]+/);
-      const charName = parts[0];
-      const realm = parts[1] ? parts[1].toLowerCase().replace(/['\s]/g, '-') : 'kiljaeden';
-      const heroicDroptimizerUrl = `https://www.raidbots.com/simbot/droptimizer?region=us&realm=${encodeURIComponent(realm)}&name=${encodeURIComponent(charName)}&instances=1320&difficulties=heroic`;
-      const mythicDroptimizerUrl = `https://www.raidbots.com/simbot/droptimizer?region=us&realm=${encodeURIComponent(realm)}&name=${encodeURIComponent(charName)}&instances=1320&difficulties=mythic`;
-      simcData = {
-        charName,
-        realm,
-        region: 'us',
-        spec: 'Assigned Spec',
-        heroicDroptimizerUrl,
-        mythicDroptimizerUrl
-      };
-    }
-
-    if (!simcData) {
-      await interaction.reply({
-        content: '⚠️ Could not parse character name or SimC string. Please provide your character name (e.g. `/simc Ainocee`) or paste your `/simc` string.',
-        ephemeral: true
-      });
-      return;
-    }
-
-    let description = '';
-    if (chosenDiff === 'mythic') {
-      description = `👑 **Mythic Difficulty (Myth 6/6 • 334/344 ilvl):**\n[👉 **Click Here to Run Mythic Droptimizer**](${simcData.mythicDroptimizerUrl})`;
-    } else if (chosenDiff === 'heroic') {
-      description = `⚔️ **Heroic Difficulty (Hero 6/6 • 318 ilvl):**\n[👉 **Click Here to Run Heroic Droptimizer**](${simcData.heroicDroptimizerUrl})`;
-    } else {
-      description = `Choose your raid difficulty:\n\n⚔️ **Heroic (Hero 6/6 • 318 ilvl):**\n[👉 **Click Here for Heroic Droptimizer**](${simcData.heroicDroptimizerUrl})\n\n👑 **Mythic (Myth 6/6 • 334/344 ilvl):**\n[👉 **Click Here for Mythic Droptimizer**](${simcData.mythicDroptimizerUrl})`;
-    }
-
-    const embed = new EmbedBuilder()
-      .setColor(0x38BDF8)
-      .setTitle(`⚡ 1-Click Droptimizer for ${simcData.charName}`)
-      .setDescription(description)
-      .addFields(
-        { name: '👤 Character', value: `**${simcData.charName}**`, inline: true },
-        { name: '🌐 Realm', value: simcData.realm.toUpperCase(), inline: true },
-        { 
-          name: '⚙️ Settings to Confirm on Raidbots', 
-          value: '1. **Raid:** *The Venomous Abyss*\n2. **Equipped Gear:** Check ☑️ *"Upgrade equipped gear to the same level when possible"*\n3. **Item Selection:** All Bosses / All Items checked (Default)', 
-          inline: false 
-        }
-      )
-      .setFooter({ text: 'Once the sim finishes, paste your report URL here to update the Loot Council sheet!' })
-      .setTimestamp();
-
-    await interaction.reply({ embeds: [embed] });
   }
 });
 
@@ -436,3 +265,4 @@ client.login(DISCORD_BOT_TOKEN.trim())
   .catch((err) => {
     console.error('❌ CRITICAL: Failed to login to Discord! Please check your DISCORD_BOT_TOKEN in Render environment variables:', err);
   });
+
