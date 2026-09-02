@@ -315,12 +315,17 @@ client.on('messageCreate', async (message) => {
     console.log(`⚡ Detected /simc string for ${simcData.charName} (${simcData.realm}) from ${message.author.username}`);
     const embed = new EmbedBuilder()
       .setColor(0x38BDF8) // Sky blue
-      .setTitle(`⚡ 1-Click Droptimizer Link Generated for ${simcData.charName}`)
-      .setDescription(`[👉 **Click Here to Run Droptimizer on Raidbots**](${simcData.droptimizerUrl})\n\nAll raid drop presets (*The Venomous Abyss • Heroic • Hero Track*) have been pre-selected for you!`)
+      .setTitle(`⚡ 1-Click Droptimizer Link for ${simcData.charName}`)
+      .setDescription(`[👉 **Click Here to Open Droptimizer on Raidbots**](${simcData.droptimizerUrl})`)
       .addFields(
-        { name: '👤 Character', value: simcData.charName, inline: true },
+        { name: '👤 Character', value: `**${simcData.charName}**`, inline: true },
         { name: '🌐 Realm', value: simcData.realm.toUpperCase(), inline: true },
-        { name: '🌲 Spec', value: simcData.spec || 'Assigned Spec', inline: true }
+        { name: '🌲 Spec', value: simcData.spec || 'Assigned Spec', inline: true },
+        { 
+          name: '⚙️ Settings to Confirm on Raidbots', 
+          value: '1. **Raid:** *The Venomous Abyss*\n2. **Difficulty:** *Heroic* (Hero 6/6 • 318 ilvl)\n3. **Equipped Gear:** Check ☑️ *"Upgrade equipped gear to the same level when possible"*\n4. **Item Selection:** All Bosses / All Items checked (Default)', 
+          inline: false 
+        }
       )
       .setFooter({ text: 'Once the sim finishes, paste your report URL here to update the Loot Council sheet!' })
       .setTimestamp();
@@ -379,10 +384,15 @@ client.on('interactionCreate', async (interaction) => {
     const embed = new EmbedBuilder()
       .setColor(0x38BDF8)
       .setTitle(`⚡ 1-Click Droptimizer Link for ${simcData.charName}`)
-      .setDescription(`[👉 **Click Here to Run Droptimizer on Raidbots**](${simcData.droptimizerUrl})\n\nAll raid drop presets (*The Venomous Abyss • Heroic • Hero Track*) have been pre-selected for you!`)
+      .setDescription(`[👉 **Click Here to Open Droptimizer on Raidbots**](${simcData.droptimizerUrl})`)
       .addFields(
-        { name: '👤 Character', value: simcData.charName, inline: true },
-        { name: '🌐 Realm', value: simcData.realm.toUpperCase(), inline: true }
+        { name: '👤 Character', value: `**${simcData.charName}**`, inline: true },
+        { name: '🌐 Realm', value: simcData.realm.toUpperCase(), inline: true },
+        { 
+          name: '⚙️ Settings to Confirm on Raidbots', 
+          value: '1. **Raid:** *The Venomous Abyss*\n2. **Difficulty:** *Heroic* (Hero 6/6 • 318 ilvl)\n3. **Equipped Gear:** Check ☑️ *"Upgrade equipped gear to the same level when possible"*\n4. **Item Selection:** All Bosses / All Items checked (Default)', 
+          inline: false 
+        }
       )
       .setFooter({ text: 'Once the sim finishes, paste your report URL here to update the Loot Council sheet!' })
       .setTimestamp();
