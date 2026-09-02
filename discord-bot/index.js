@@ -208,14 +208,16 @@ function parseSimcAndGenerateLink(text) {
 
   if (!charName) return null;
 
-  const droptimizerUrl = `https://www.raidbots.com/simbot/droptimizer?region=${encodeURIComponent(region)}&realm=${encodeURIComponent(realm)}&name=${encodeURIComponent(charName)}&instances=1320&difficulties=heroic`;
+  const heroicDroptimizerUrl = `https://www.raidbots.com/simbot/droptimizer?region=${encodeURIComponent(region)}&realm=${encodeURIComponent(realm)}&name=${encodeURIComponent(charName)}&instances=1320&difficulties=heroic`;
+  const mythicDroptimizerUrl = `https://www.raidbots.com/simbot/droptimizer?region=${encodeURIComponent(region)}&realm=${encodeURIComponent(realm)}&name=${encodeURIComponent(charName)}&instances=1320&difficulties=mythic`;
 
   return {
     charName,
     realm,
     region,
     spec,
-    droptimizerUrl
+    heroicDroptimizerUrl,
+    mythicDroptimizerUrl
   };
 }
 
@@ -234,11 +236,20 @@ client.once('ready', async () => {
       ),
     new SlashCommandBuilder()
       .setName('simc')
-      .setDescription('Generate an instant 1-Click Raidbots Droptimizer link with pre-selected raid presets')
+      .setDescription('Generate instant 1-Click Raidbots Droptimizer links for Heroic & Mythic')
       .addStringOption(option =>
         option.setName('character_or_string')
           .setDescription('Your character name (e.g. Ainocee) or paste your /simc string')
           .setRequired(true)
+      )
+      .addStringOption(option =>
+        option.setName('difficulty')
+          .setDescription('Raid Difficulty (Heroic or Mythic)')
+          .setRequired(false)
+          .addChoices(
+            { name: '⚔️ Heroic (Hero 6/6 • 318 ilvl)', value: 'heroic' },
+            { name: '👑 Mythic (Myth 6/6 • 334/344 ilvl)', value: 'mythic' }
+          )
       )
   ];
 
@@ -315,15 +326,15 @@ client.on('messageCreate', async (message) => {
     console.log(`⚡ Detected /simc string for ${simcData.charName} (${simcData.realm}) from ${message.author.username}`);
     const embed = new EmbedBuilder()
       .setColor(0x38BDF8) // Sky blue
-      .setTitle(`⚡ 1-Click Droptimizer Link for ${simcData.charName}`)
-      .setDescription(`[👉 **Click Here to Open Droptimizer on Raidbots**](${simcData.droptimizerUrl})`)
+      .setTitle(`⚡ 1-Click Droptimizer Links for ${simcData.charName}`)
+      .setDescription(`Choose your raid difficulty:\n\n⚔️ **Heroic (Hero 6/6 • 318 ilvl):**\n[👉 **Click Here for Heroic Droptimizer**](${simcData.heroicDroptimizerUrl})\n\n👑 **Mythic (Myth 6/6 • 334/344 ilvl):**\n[👉 **Click Here for Mythic Droptimizer**](${simcData.mythicDroptimizerUrl})`)
       .addFields(
         { name: '👤 Character', value: `**${simcData.charName}**`, inline: true },
         { name: '🌐 Realm', value: simcData.realm.toUpperCase(), inline: true },
         { name: '🌲 Spec', value: simcData.spec || 'Assigned Spec', inline: true },
         { 
           name: '⚙️ Settings to Confirm on Raidbots', 
-          value: '1. **Raid:** *The Venomous Abyss*\n2. **Difficulty:** *Heroic* (Hero 6/6 • 318 ilvl)\n3. **Equipped Gear:** Check ☑️ *"Upgrade equipped gear to the same level when possible"*\n4. **Item Selection:** All Bosses / All Items checked (Default)', 
+          value: '1. **Raid:** *The Venomous Abyss*\n2. **Equipped Gear:** Check ☑️ *"Upgrade equipped gear to the same level when possible"*\n3. **Item Selection:** All Bosses / All Items checked (Default)', 
           inline: false 
         }
       )
@@ -356,6 +367,7 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.editReply({ embeds: [embed] });
   } else if (interaction.commandName === 'simc') {
     const input = interaction.options.getString('character_or_string');
+    const chosenDiff = interaction.options.getString('difficulty');
     let simcData = parseSimcAndGenerateLink(input);
 
     if (!simcData && input && input.trim().length > 0) {
@@ -363,13 +375,15 @@ client.on('interactionCreate', async (interaction) => {
       const parts = input.trim().split(/[-,\s]+/);
       const charName = parts[0];
       const realm = parts[1] ? parts[1].toLowerCase().replace(/['\s]/g, '-') : 'kiljaeden';
-      const droptimizerUrl = `https://www.raidbots.com/simbot/droptimizer?region=us&realm=${encodeURIComponent(realm)}&name=${encodeURIComponent(charName)}&instances=1320&difficulties=heroic`;
+      const heroicDroptimizerUrl = `https://www.raidbots.com/simbot/droptimizer?region=us&realm=${encodeURIComponent(realm)}&name=${encodeURIComponent(charName)}&instances=1320&difficulties=heroic`;
+      const mythicDroptimizerUrl = `https://www.raidbots.com/simbot/droptimizer?region=us&realm=${encodeURIComponent(realm)}&name=${encodeURIComponent(charName)}&instances=1320&difficulties=mythic`;
       simcData = {
         charName,
         realm,
         region: 'us',
         spec: 'Assigned Spec',
-        droptimizerUrl
+        heroicDroptimizerUrl,
+        mythicDroptimizerUrl
       };
     }
 
@@ -381,16 +395,25 @@ client.on('interactionCreate', async (interaction) => {
       return;
     }
 
+    let description = '';
+    if (chosenDiff === 'mythic') {
+      description = `👑 **Mythic Difficulty (Myth 6/6 • 334/344 ilvl):**\n[👉 **Click Here to Run Mythic Droptimizer**](${simcData.mythicDroptimizerUrl})`;
+    } else if (chosenDiff === 'heroic') {
+      description = `⚔️ **Heroic Difficulty (Hero 6/6 • 318 ilvl):**\n[👉 **Click Here to Run Heroic Droptimizer**](${simcData.heroicDroptimizerUrl})`;
+    } else {
+      description = `Choose your raid difficulty:\n\n⚔️ **Heroic (Hero 6/6 • 318 ilvl):**\n[👉 **Click Here for Heroic Droptimizer**](${simcData.heroicDroptimizerUrl})\n\n👑 **Mythic (Myth 6/6 • 334/344 ilvl):**\n[👉 **Click Here for Mythic Droptimizer**](${simcData.mythicDroptimizerUrl})`;
+    }
+
     const embed = new EmbedBuilder()
       .setColor(0x38BDF8)
-      .setTitle(`⚡ 1-Click Droptimizer Link for ${simcData.charName}`)
-      .setDescription(`[👉 **Click Here to Open Droptimizer on Raidbots**](${simcData.droptimizerUrl})`)
+      .setTitle(`⚡ 1-Click Droptimizer for ${simcData.charName}`)
+      .setDescription(description)
       .addFields(
         { name: '👤 Character', value: `**${simcData.charName}**`, inline: true },
         { name: '🌐 Realm', value: simcData.realm.toUpperCase(), inline: true },
         { 
           name: '⚙️ Settings to Confirm on Raidbots', 
-          value: '1. **Raid:** *The Venomous Abyss*\n2. **Difficulty:** *Heroic* (Hero 6/6 • 318 ilvl)\n3. **Equipped Gear:** Check ☑️ *"Upgrade equipped gear to the same level when possible"*\n4. **Item Selection:** All Bosses / All Items checked (Default)', 
+          value: '1. **Raid:** *The Venomous Abyss*\n2. **Equipped Gear:** Check ☑️ *"Upgrade equipped gear to the same level when possible"*\n3. **Item Selection:** All Bosses / All Items checked (Default)', 
           inline: false 
         }
       )
