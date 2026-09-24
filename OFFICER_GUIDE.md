@@ -99,6 +99,7 @@ Every week before raid night (or after weekly reset):
 | `6. Sync Warcraft Logs Attendance & History` | Updates attendance, on-time %, kills, and the raid night ledger |
 | `7. Set Warcraft Logs API Credentials` | WCL **V2** Client ID / Secret (shared for all officers) |
 | `8. 🪑 Mark Bench & Standby Raiders` | Awards bench credit for a raid night |
+| `9. 📄 Publish Guides to Google Docs` | Replaces the guild's shared Google Docs guides with the latest versions (same links; old versions stay in each Doc's *File → Version history*) |
 
 ---
 

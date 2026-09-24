@@ -16,6 +16,8 @@
     "src/WebApp.gs",
     "src/Attendance.gs",
     "src/Bench.gs",
-    "src/SetupGuide.gs"
+    "src/SetupGuide.gs",
+    "src/GuideContent.gs",
+    "src/Guides.gs"
   ]
 }

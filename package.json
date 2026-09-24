@@ -8,9 +8,10 @@
     "bot": "node discord-bot/index.js",
     "gas:login": "clasp login",
     "gas:pull": "clasp pull",
-    "gas:push": "npm test && clasp push",
+    "gas:push": "npm run build:guides && npm test && clasp push",
     "gas:open": "clasp open-script",
-    "test": "node --test \"tests/**/*.test.js\""
+    "test": "node --test \"tests/**/*.test.js\"",
+    "build:guides": "node scripts/build-guides.js"
   },
   "dependencies": {
     "discord.js": "^14.16.3",

@@ -16,6 +16,8 @@ function onOpen() {
       .addItem('6. Sync Warcraft Logs Attendance & History', 'syncWarcraftLogsSeasonAttendance')
       .addItem('7. Set Warcraft Logs API Credentials', 'promptForWCLCredentials')
       .addItem('8. 🪑 Mark Bench & Standby Raiders', 'showBenchRaidersDialog')
+      .addSeparator()
+      .addItem('9. 📄 Publish Guides to Google Docs', 'publishGuidesToGoogleDocs')
       .addToUi();
 }
 
