@@ -71,6 +71,8 @@ Looking for optimal talent builds for heroic progression or mythic boss encounte
 
 To make sure the Loot Council knows which boss drops are your biggest upgrades, **submit your sim or healer report once a week** (or after getting new gear).
 
+> **Sim your main.** Only characters listed as **main characters on the Config sheet** count. Sims from alts or from characters not on the roster are rejected, and the bot will tell you why. If your main isn't on the roster, ask an officer to add it.
+
 ---
 
 ### A. ⚔️ DPS & Tanks (Raidbots Droptimizer)

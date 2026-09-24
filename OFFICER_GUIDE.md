@@ -229,6 +229,10 @@ The sheet natively supports **both DPS/Tank simulations (Raidbots)** and **Heale
 3. Paste into Discord `#sims` channel (or in Google Sheets via `5. Import Raidbots / QE Live Sim`).
 4. **Bonus Roll Exclusion**: The engine **automatically excludes personal loot / bonus roll items**, mapping only genuine raid drops to the Loot Council sheet with `✅ QE Live` status!
 
+> **Roster only:** sims and QE Live reports are accepted only for **main characters on the `Config` sheet**. Alts and anyone not on the roster are rejected with a message telling them to ask an officer. Earlier rankings from characters no longer on the roster are dropped the next time that item's rankings are updated.
+>
+> Each new import merges with everyone's earlier sims; a raider's newest sim replaces only their own previous one.
+
 > Sim imports and Loot sheet rebuilds take turns: if a sim arrives while the audit or attendance sync is rebuilding the Loot sheet, it waits (up to 3 minutes) instead of failing.
 
 ---

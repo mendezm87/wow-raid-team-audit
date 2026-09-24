@@ -82,6 +82,24 @@ function getRosterContextMap(ss) {
 /**
  * Reads all registered Alt character names from the Config sheet (Columns F-I, rows 9-45).
  */
+/**
+ * Lowercased names of the main characters on the Config sheet (rows 9-45, column A). Only these
+ * raiders' sims are used on the Loot sheet.
+ */
+function getRosterMainNamesSet(ss) {
+  const names = new Set();
+  if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+  const configSheet = ss.getSheetByName('Config');
+  if (configSheet && configSheet.getLastRow() >= 9) {
+    const numRows = Math.min(configSheet.getLastRow() - 8, 37);
+    configSheet.getRange(9, 1, numRows, 1).getValues().forEach(row => {
+      const { name } = parseCharacterAndRealm((row[0] || '').toString().trim(), '');
+      if (name && !name.toLowerCase().includes('main character')) names.add(name.toLowerCase());
+    });
+  }
+  return names;
+}
+
 function getAltNamesSet(ss) {
   const altNames = new Set();
   if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();

@@ -1,4 +1,29 @@
 /**
+ * Reads the contender rankings an earlier import wrote into a Loot sheet notes cell, e.g.
+ * "Raidbots Sim Upgrades: 1. Name [Score: 4.62] (+4.20% [Tier Catalyzed] | 👑 Veteran | 100%) | 2. ..."
+ * (also the "Sim / QE Live Upgrades:" form), so a new import merges with everyone's earlier sims
+ * instead of replacing them. Only raiders in rosterNames (lowercase) are kept.
+ */
+function parseSimUpgradeNotes_(notes, rosterNames) {
+  const text = (notes || '').toString();
+  const prefixMatch = text.match(/(Raidbots Sim Upgrades:|Sim \/ QE Live Upgrades:)([\s\S]*)/);
+  if (!prefixMatch) return [];
+  const entries = [];
+  const re = /(?:^|\|)\s*\d+\.\s*([A-Za-z0-9\u00C0-\u024F]+)(?:\s*\[Score:[^\]]*\])?\s*\(\+([0-9.]+)%([^)]*)\)/g;
+  let m;
+  while ((m = re.exec(prefixMatch[2])) !== null) {
+    if (rosterNames && !rosterNames.has(m[1].toLowerCase())) continue;
+    entries.push({ name: m[1], pct: parseFloat(m[2]), isCatalyzed: m[3].includes('Tier Catalyzed') });
+  }
+  return entries;
+}
+
+function notOnRosterMessage_(names) {
+  const list = names.join(', ');
+  return `${list} ${names.length === 1 ? 'is' : 'are'} not a main character on the Config sheet, so the sim was not added. Ask an officer to add ${names.length === 1 ? 'them' : 'these raiders'} to the Config roster, then re-post the link.`;
+}
+
+/**
  * Universal helper to clean item names for fuzzy matching.
  */
 function cleanItemNameForMatching(str) {
@@ -135,6 +160,9 @@ function ingestRaidbotsSims_(input) {
   }
   const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
 
+  // Only raiders listed as mains on the Config sheet count for loot
+  const rosterNames = getRosterMainNamesSet(ss);
+
   // Build itemUpgradeMap
   const itemUpgradeMap = {};
   values.forEach(row => {
@@ -142,21 +170,8 @@ function ingestRaidbotsSims_(input) {
     if (!itemName || row[0].toString().startsWith('⚔️') || row[0].toString().startsWith('🛡️') || row[0].toString().startsWith('🧭') || row[0].toString().startsWith('🧪') || row[0].toString().startsWith('🐊') || row[0].toString().startsWith('🏛️') || row[0].toString().startsWith('👑') || row[0].toString().startsWith('📦')) {
       return;
     }
-    itemUpgradeMap[itemName] = [];
-
-    const currentNotes = (row[12] || '').toString();
-    if (currentNotes.includes('Raidbots Sim Upgrades:')) {
-      const parts = currentNotes.replace('Raidbots Sim Upgrades:', '').split('|');
-      parts.forEach(p => {
-        const m = p.trim().match(/(?:\d+\.\s*)?([A-Za-z0-9\u00C0-\u024F]+)\s*\(\+([0-9.]+)%\)/);
-        if (m) {
-          itemUpgradeMap[itemName].push({
-            name: m[1],
-            pct: parseFloat(m[2])
-          });
-        }
-      });
-    }
+    // Keep everyone's earlier sims (roster mains only) so this import merges instead of replacing them
+    itemUpgradeMap[itemName] = parseSimUpgradeNotes_(row[12], rosterNames);
   });
 
   const now = Date.now();
@@ -180,6 +195,7 @@ function ingestRaidbotsSims_(input) {
 
   // 1. Deduplicate by character name: strictly keep only the single most recent sim report per character!
   const latestSimsByPlayer = {};
+  const skippedNotOnRoster = [];
   simDataList.forEach(simData => {
     if (!simData) return;
     let playerName = 'Unknown';
@@ -193,6 +209,13 @@ function ingestRaidbotsSims_(input) {
     // Strictly skip Alt character sims from updating the Loot & Chase Items sheet
     if (altNamesSet.has(lower)) {
       Logger.log(`Skipping Alt character sim from Loot Sheet: ${playerName}`);
+      if (!skippedNotOnRoster.includes(playerName)) skippedNotOnRoster.push(playerName);
+      return;
+    }
+    // Only raiders on the Config roster count
+    if (!rosterNames.has(lower)) {
+      Logger.log(`Skipping sim from ${playerName}: not a main character on the Config sheet`);
+      if (!skippedNotOnRoster.includes(playerName)) skippedNotOnRoster.push(playerName);
       return;
     }
     
@@ -212,6 +235,12 @@ function ingestRaidbotsSims_(input) {
   });
 
   const dedupedSimDataList = Object.values(latestSimsByPlayer).map(e => e.simData);
+  if (dedupedSimDataList.length === 0) {
+    return {
+      success: false,
+      error: skippedNotOnRoster.length > 0 ? notOnRosterMessage_(skippedNotOnRoster) : 'No usable sims found in the report.'
+    };
+  }
 
   dedupedSimDataList.forEach(simData => {
     if (!simData) return;
@@ -524,7 +553,9 @@ function ingestRaidbotsSims_(input) {
     players: processedPlayers,
     itemsMapped: totalMatches,
     topUpgrades: topUpgradesSummary,
-    message: `Successfully mapped DPS upgrades for ${processedPlayers.join(', ')} across ${totalMatches} raid items.`
+    skippedNotOnRoster: skippedNotOnRoster,
+    message: `Successfully mapped DPS upgrades for ${processedPlayers.join(', ')} across ${totalMatches} raid items.` +
+      (skippedNotOnRoster.length > 0 ? ` Skipped (not on the Config roster): ${skippedNotOnRoster.join(', ')}.` : '')
   };
 }
 
@@ -577,7 +608,12 @@ function ingestQELiveReport_(reportUrlOrId) {
   const altNamesSet = getAltNamesSet(sheet.getParent());
   if (altNamesSet.has(playerName.toLowerCase())) {
     Logger.log(`Skipping Alt character QE Live report from Loot Sheet: ${playerName}`);
-    return { success: true, message: `Skipped Alt character report for ${playerName}` };
+    return { success: false, error: `${playerName} is listed as an alt on the Config sheet, so the report was not added. Sims only count for main characters.` };
+  }
+  const rosterNames = getRosterMainNamesSet(sheet.getParent());
+  if (!rosterNames.has(playerName.toLowerCase())) {
+    Logger.log(`Skipping QE Live report from ${playerName}: not a main character on the Config sheet`);
+    return { success: false, error: notOnRosterMessage_([playerName]) };
   }
 
   const spec = reportData.spec || 'Healer';
@@ -597,17 +633,9 @@ function ingestQELiveReport_(reportUrlOrId) {
   values.forEach(row => {
     const itemName = (row[1] || '').toString().trim();
     if (itemName && !itemName.startsWith('═══')) {
-      itemUpgradeMap[itemName] = [];
-      const notes = (row[12] || '').toString();
-      const matchContenders = notes.match(/\d+\.\s+([A-Za-z0-9\u00C0-\u024F]+)\s+\(\+([0-9.]+)%\)/g);
-      if (matchContenders) {
-        matchContenders.forEach(entry => {
-          const m = entry.match(/\d+\.\s+([A-Za-z0-9\u00C0-\u024F]+)\s+\(\+([0-9.]+)%\)/);
-          if (m) {
-            itemUpgradeMap[itemName].push({ name: m[1], pct: parseFloat(m[2]) });
-          }
-        });
-      }
+      // Keep everyone else's earlier sims (roster mains only); this healer's newest report replaces their old one
+      itemUpgradeMap[itemName] = parseSimUpgradeNotes_(row[12], rosterNames)
+        .filter(e => e.name.toLowerCase() !== playerName.toLowerCase());
     }
   });
 

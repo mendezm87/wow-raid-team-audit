@@ -28,6 +28,8 @@ function createSheet(name) {
     isHidden: () => hidden,
     hideSheet() { hidden = true; return sheet; },
     getLastRow: () => data.length,
+    getLastColumn: () => Math.max(0, ...data.map(r => (r || []).length)),
+    getParent: () => sheet._parent,
     clearContents() { data = []; return sheet; },
     setFrozenRows() { return sheet; },
     getDataRange() { return sheet.getRange(1, 1, Math.max(data.length, 1), Math.max(1, ...data.map(r => r.length))); },
@@ -96,7 +98,7 @@ function loadAppsScript(opts = {}) {
   const sheets = {};
   const spreadsheet = {
     getSheetByName: n => sheets[n] || null,
-    insertSheet: n => (sheets[n] = createSheet(n))
+    insertSheet: n => { sheets[n] = createSheet(n); sheets[n]._parent = spreadsheet; return sheets[n]; }
   };
   const alerts = [];
   const logs = [];
