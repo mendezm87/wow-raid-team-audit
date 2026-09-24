@@ -103,6 +103,13 @@ function loadAppsScript(opts = {}) {
   const scriptProps = createPropertyStore(opts.scriptProperties);
   const userProps = createPropertyStore(opts.userProperties);
 
+  // Script lock mock: `lock.busy = true` simulates another execution holding it
+  const lock = {
+    busy: false, held: false, acquisitions: 0,
+    tryLock() { if (lock.busy) return false; lock.held = true; lock.acquisitions++; return true; },
+    releaseLock() { lock.held = false; }
+  };
+
   const ui = {
     alert: (title, message) => { alerts.push({ title, message }); },
     ButtonSet: { OK: 'OK', YES_NO: 'YES_NO', OK_CANCEL: 'OK_CANCEL' },
@@ -126,6 +133,7 @@ function loadAppsScript(opts = {}) {
       MimeType: { JSON: 'application/json' },
       createTextOutput: text => ({ text, setMimeType() { return this; } })
     },
+    LockService: { getScriptLock: () => lock },
     Logger: { log: m => logs.push(String(m)) },
     Session: { getScriptTimeZone: () => 'America/Los_Angeles' }
   };
@@ -134,7 +142,7 @@ function loadAppsScript(opts = {}) {
 
   // Top-level const/let aren't properties of the VM global, so expose them via a getter
   const get = expr => vm.runInContext(expr, context);
-  return { context, get, sheets, spreadsheet, alerts, logs, scriptProps, userProps, createSheet };
+  return { context, get, sheets, spreadsheet, alerts, logs, scriptProps, userProps, createSheet, lock };
 }
 
 module.exports = { loadAppsScript, readConcatenatedSource, getSourceFiles, createSheet, REPO_ROOT };

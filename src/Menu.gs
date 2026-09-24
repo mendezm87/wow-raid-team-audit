@@ -35,6 +35,29 @@ function notifyUser(title, message, isError) {
   if (isError) throw new Error(`${title}: ${message}`);
 }
 
+// True while this execution holds the script lock, so nested locked calls (e.g. a sim import that
+// rebuilds the Loot sheet) don't wait on themselves.
+let scriptLockHeld_ = false;
+
+/**
+ * Runs fn while holding the script-wide lock, so a Discord sim import can't read the Loot sheet while
+ * a sync/audit is clearing and rewriting it (and vice versa). Waits up to 3 minutes for the other run.
+ */
+function withScriptLock(fn) {
+  if (scriptLockHeld_) return fn();
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(3 * 60 * 1000)) {
+    throw new Error('Another Guild Audit update is still running. Please try again in a few minutes.');
+  }
+  scriptLockHeld_ = true;
+  try {
+    return fn();
+  } finally {
+    scriptLockHeld_ = false;
+    lock.releaseLock();
+  }
+}
+
 /**
  * Reads an API credential from Script Properties, which every officer and every trigger share.
  * Credentials saved per-user before sharing existed are copied into Script Properties the first time

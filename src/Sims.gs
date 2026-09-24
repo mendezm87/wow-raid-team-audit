@@ -76,6 +76,10 @@ function promptAndImportRaidbotsDroptimizer() {
  * Core engine to ingest Raidbots Droptimizer sims from strings, URLs, or webhooks.
  */
 function processAndIngestRaidbotsSims(input) {
+  return withScriptLock(() => ingestRaidbotsSims_(input));
+}
+
+function ingestRaidbotsSims_(input) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(LOOT_SHEET_NAME);
   if (!sheet) {
@@ -530,6 +534,10 @@ function processAndIngestRaidbotsSims(input) {
  * Maps raid item HPS upgrades directly to the Loot & Chase Items sheet.
  */
 function processAndIngestQELiveReport(reportUrlOrId) {
+  return withScriptLock(() => ingestQELiveReport_(reportUrlOrId));
+}
+
+function ingestQELiveReport_(reportUrlOrId) {
   if (!reportUrlOrId) return { success: false, error: 'No QE Live URL provided.' };
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();

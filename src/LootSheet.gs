@@ -272,6 +272,10 @@ function buildRichTextWithClassColors(fullText, rosterContextMap) {
  * Automatically queries Blizzard Journal API for complete drop tables and calculates upgrade deltas.
  */
 function createLootAndChaseItemsSheet(mainCharacterData) {
+  return withScriptLock(() => buildLootAndChaseItemsSheet_(mainCharacterData));
+}
+
+function buildLootAndChaseItemsSheet_(mainCharacterData) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(LOOT_SHEET_NAME);
   if (!sheet) {

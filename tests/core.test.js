@@ -113,3 +113,33 @@ test('notifyUser shows a popup with UI, logs without it, and throws for errors i
   assert.deepEqual(trigger.logs, ['Info: fine']);
   assert.throws(() => trigger.context.notifyUser('Bad', 'broken', true), /Bad: broken/);
 });
+
+test('sim imports and Loot sheet rebuilds share one lock without deadlocking when nested', () => {
+  const gas = loadAppsScript();
+  let rebuilds = 0;
+  gas.context.buildLootAndChaseItemsSheet_ = () => { rebuilds++; assert.equal(gas.lock.held, true); };
+  // An import that triggers a rebuild takes the lock once, not twice
+  gas.context.ingestRaidbotsSims_ = () => { gas.context.createLootAndChaseItemsSheet(); return { success: true }; };
+  assert.equal(gas.context.processAndIngestRaidbotsSims('x').success, true);
+  assert.equal(rebuilds, 1);
+  assert.equal(gas.lock.acquisitions, 1);
+  assert.equal(gas.lock.held, false, 'lock released afterwards');
+
+  gas.lock.busy = true; // another run (e.g. the hourly audit) is rebuilding the sheet
+  assert.throws(() => gas.context.createLootAndChaseItemsSheet(), /still running/);
+});
+
+test('webhook failures include an `error` field so the Discord bot shows the real reason', () => {
+  const gas = loadAppsScript();
+  const post = body => JSON.parse(gas.context.doPost({ postData: { contents: JSON.stringify(body) } }).text);
+
+  gas.context.processUniversalSimOrReport = () => { throw new Error('Service Spreadsheets timed out'); };
+  assert.match(post({ urls: ['x'] }).error, /Service Spreadsheets timed out/);
+
+  gas.context.processUniversalSimOrReport = () => ({ success: false, message: 'No valid sim or report URLs provided.' });
+  assert.equal(post({ urls: ['x'] }).error, 'No valid sim or report URLs provided.');
+
+  gas.context.processUniversalSimOrReport = () => ({ success: true, message: 'ok' });
+  assert.equal(post({ urls: ['x'] }).error, undefined);
+  assert.match(post({}).error, /No Raidbots or QE Live URL/);
+});
