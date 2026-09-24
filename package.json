@@ -5,10 +5,18 @@
   "main": "discord-bot/index.js",
   "scripts": {
     "start": "node discord-bot/index.js",
-    "bot": "node discord-bot/index.js"
+    "bot": "node discord-bot/index.js",
+    "gas:login": "clasp login",
+    "gas:pull": "clasp pull",
+    "gas:push": "npm test && clasp push",
+    "gas:open": "clasp open-script",
+    "test": "node --test \"tests/**/*.test.js\""
   },
   "dependencies": {
     "discord.js": "^14.16.3",
     "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@google/clasp": "^3.4.1"
   }
 }

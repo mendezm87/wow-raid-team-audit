@@ -1,0 +1,2 @@
+# Only Apps Script sources in src/ are pushed (rootDir). Nothing else to exclude.
+**/*.md

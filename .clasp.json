@@ -1,0 +1,21 @@
+{
+  "scriptId": "1TplzeTOlGyTHZ1aZ4RWB0fEHtx8-eej3MPFjSSb1AiP_sivUuUGx39p1",
+  "rootDir": "src",
+  "filePushOrder": [
+    "src/Season.gs",
+    "src/Constants.gs",
+    "src/Menu.gs",
+    "src/Config.gs",
+    "src/BlizzardApi.gs",
+    "src/Audit.gs",
+    "src/Talents.gs",
+    "src/LootTable.gs",
+    "src/LootEligibility.gs",
+    "src/LootSheet.gs",
+    "src/Sims.gs",
+    "src/WebApp.gs",
+    "src/Attendance.gs",
+    "src/Bench.gs",
+    "src/SetupGuide.gs"
+  ]
+}

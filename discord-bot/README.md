@@ -45,6 +45,7 @@ A lightweight Discord Bot that automatically catches Raidbots Droptimizer sim re
    * `DISCORD_BOT_TOKEN`: *(Your bot token from Step 2)*
    * `GOOGLE_SHEET_WEBHOOK_URL`: *(Your Web App URL from Step 1)*
    * `SIMS_CHANNEL_ID`: *(Optional: Channel ID of your #raid-sims channel)*
+   * `WEBHOOK_SECRET`: *(Recommended: any long random string. Set the same value as the `WEBHOOK_SECRET` Script Property in Apps Script → Project Settings → Script Properties, so only this bot can write to the sheet.)*
 6. Click **Create Web Service**.
 
 🎉 **Your bot is now live in the cloud 24/7!**

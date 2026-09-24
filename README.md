@@ -21,7 +21,7 @@ Raiders can share their Raidbots Droptimizer links directly in your guild Discor
 
 1. **Deploy Google Apps Script Web App**:
    * Open your Google Spreadsheet $\rightarrow$ **Extensions > Apps Script**.
-   * Make sure latest `guildAudit.gs` is pasted and saved (💾).
+   * Make sure the latest code is deployed (`npm run gas:push`, see **Developing & Deploying** below).
    * Click **Deploy > New deployment** in the top right.
    * Click the ⚙️ gear icon and choose **Web app**.
    * Set:
@@ -110,3 +110,36 @@ Raiders can post either **Raidbots** (DPS/Tanks) or **QE Live** (Healers) links 
    - Automated attendance %, on-time punctuality, and boss kills synced via WCL v2 GraphQL API.
    - **Difficulty-Aware Guild Quorums** ($\ge 10$ for Heroic, $\ge 15$ for Mythic) to automatically filter out off-hours PUGs from mandatory attendance.
    - **🪑 Mythic Bench & Standby Credit Manager**: Interactive modal dialog (`Guild Audit > 8. 🪑 Mark Bench & Standby Raiders`) to award standby raiders full 100% attendance and on-time credit with 1 click!
+   - **Persistent Attendance Archive**: every synced raid night is stored in a hidden `Attendance Archive` sheet, so season % keeps counting nights that have aged out of Warcraft Logs' 40-report window.
+   - **Scheduled syncs**: `syncWarcraftLogsSeasonAttendance` is safe to run from a time-driven trigger (errors mark the trigger Failed and email the owner).
+
+## 🛠️ Developing & Deploying
+
+The Apps Script code lives in [`src/`](src/) as one file per feature (all files share one global scope in Apps Script):
+
+| File | Contents |
+|---|---|
+| `Season.gs` | **Everything that changes each season**: vault ilvls, raid name, boss list (WCL names, Journal IDs, Archon slugs), offline loot table |
+| `Constants.gs` | Sheet names, class colors, spec lists, dropdown values |
+| `Menu.gs` | `onOpen` menu, popup/log helper, shared credential lookup |
+| `Config.gs` | Config sheet creation, dropdowns, parsing |
+| `BlizzardApi.gs` / `Audit.gs` / `Talents.gs` | Character audit, gear, talents |
+| `LootTable.gs` / `LootEligibility.gs` / `LootSheet.gs` | Loot table (weekly Blizzard cache, Heroic/Mythic toggle), class eligibility, Loot & Chase Items sheet |
+| `Sims.gs` / `WebApp.gs` | Raidbots / QE Live import, Discord bot webhook |
+| `Attendance.gs` / `Bench.gs` | Warcraft Logs sync, attendance archive, bench credit |
+| `SetupGuide.gs` | Officer API credentials guide |
+
+Load order is set by `filePushOrder` in [`.clasp.json`](.clasp.json): `Season.gs` and `Constants.gs` load first because other files' top-level constants read them.
+
+```bash
+npm install          # once
+npx clasp login      # once, with the Google account that owns the sheet
+npm test             # run the local test suite (Node 20+)
+npm run gas:push     # runs the tests, then pushes src/ to Apps Script
+```
+
+**New season checklist:** edit `src/Season.gs` (`VAULT_MAPPING`, `SEASON`, `FALLBACK_LOOT_CATALOG`), push, then run *4c. Re-download Loot Table from Blizzard*.
+
+**Secrets:** API credentials are stored in Apps Script **Script Properties** (set via the Guild Audit menu), never in the code. `WEBHOOK_SECRET` (Script Property) must match the Discord bot's `WEBHOOK_SECRET` env var.
+
+**Web app:** `clasp push` updates the code, but the Discord webhook runs a *versioned deployment*. After changing `doPost`, redeploy it in place so the URL stays the same: `npx clasp update-deployment <deploymentId>` (list IDs with `npx clasp list-deployments`).

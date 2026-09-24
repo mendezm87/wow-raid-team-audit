@@ -20,6 +20,7 @@ if (process.env.PORT) {
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GOOGLE_SHEET_WEBHOOK_URL = process.env.GOOGLE_SHEET_WEBHOOK_URL;
 const SIMS_CHANNEL_ID = process.env.SIMS_CHANNEL_ID; // Optional: Restrict auto-listening to a specific channel
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET; // Optional: must match WEBHOOK_SECRET in the sheet's Script Properties
 
 if (!DISCORD_BOT_TOKEN || !GOOGLE_SHEET_WEBHOOK_URL) {
   console.error('❌ Missing environment variables! Please configure DISCORD_BOT_TOKEN and GOOGLE_SHEET_WEBHOOK_URL in your .env or host dashboard.');
@@ -107,7 +108,7 @@ async function sendToGoogleSheets(urls) {
     const response = await fetch(GOOGLE_SHEET_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ urls: urls }),
+      body: JSON.stringify({ urls: urls, secret: WEBHOOK_SECRET || undefined }),
       redirect: 'follow'
     });
 
