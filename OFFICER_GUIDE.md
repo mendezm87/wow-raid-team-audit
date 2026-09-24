@@ -5,24 +5,30 @@ Welcome to the **WoW Raid Team Audit & Loot Council System**! This suite is an a
 ---
 
 ## 📑 Table of Contents
-1. [🔑 API Credentials Setup Guide (Blizzard, WCL, Discord)](#1--api-credentials-setup-guide-blizzard-wcl-discord)
-2. [Quick Start (Weekly Routine)](#2--quick-start-weekly-routine)
-3. [Config Sheet Setup](#3-️-config-sheet-setup)
-4. [Sheet 1: Guild Audit (Gear, Enchants, Vault)](#4--sheet-1-guild-audit)
-5. [Sheet 2: Talents & Builds (Meta Builds & Hero Trees)](#5--sheet-2-talents--builds)
-6. [Sheet 3: Loot & Chase Items (Loot Council Assistant)](#6--sheet-3-loot--chase-items)
-7. [Importing Sims: DPS (Raidbots) & Healers (QE Live)](#7--importing-sims-dps-raidbots--healers-qe-live)
-8. [Discord Bot & 24/7 PM2 Management](#8--discord-bot--247-pm2-management)
-9. [Officer FAQ & Troubleshooting](#9--officer-faq--troubleshooting)
+1. [🔑 API Credentials Setup (Blizzard, WCL, Discord)](#1--api-credentials-setup-blizzard-wcl-discord)
+2. [⚡ Quick Start (Weekly Routine)](#2--quick-start-weekly-routine)
+3. [⚙️ Config Sheet Setup](#3-️-config-sheet-setup)
+4. [🔍 Sheet 1: Guild Audit](#4--sheet-1-guild-audit)
+5. [🌲 Sheet 2: Talents & Builds](#5--sheet-2-talents--builds)
+6. [👑 Sheet 3: Loot & Chase Items](#6--sheet-3-loot--chase-items)
+7. [🚀 Importing Sims: DPS (Raidbots) & Healers (QE Live)](#7--importing-sims-dps-raidbots--healers-qe-live)
+8. [🏛️ Warcraft Logs Attendance & Season History](#8-️-warcraft-logs-attendance--season-history)
+9. [⏰ Automatic Updates (Triggers)](#9--automatic-updates-triggers)
+10. [🤖 Discord Bot & 24/7 PM2 Management](#10--discord-bot--247-pm2-management)
+11. [❓ Officer FAQ & Troubleshooting](#11--officer-faq--troubleshooting)
 
 ---
 
-## 1. 🔑 API Credentials Setup Guide (Blizzard, WCL, Discord)
+## 1. 🔑 API Credentials Setup (Blizzard, WCL, Discord)
 
 The system connects directly to **Blizzard's Game Data & Profile APIs**, **Warcraft Logs v2 API**, and your **Guild Discord Server**.
 
+> **🤝 Credentials are shared.** Whatever one officer enters is saved for the whole spreadsheet (Apps Script *Script Properties*), and is also used by scheduled triggers. **Other officers don't need to set anything up** — they only need edit access to the sheet and to click *Allow* on Google's one-time permission prompt the first time they use the `Guild Audit` menu.
+>
+> ⚠️ Anyone with **edit access** can open *Extensions → Apps Script → Project Settings* and see these credentials, so only give edit access to trusted officers.
+
 Officers can configure everything in **1 Click** using the built-in guide modal inside Google Sheets:
-👉 Click **`Guild Audit` $\rightarrow$ `📖 Officer Setup & API Credentials Guide`**!
+👉 Click **`Guild Audit` → `📖 Officer Setup & API Credentials Guide`**!
 
 ---
 
@@ -38,22 +44,23 @@ Officers can configure everything in **1 Click** using the built-in guide modal 
      * **Service URL / Description**: (Optional / leave blank)
   4. Click **Save**.
   5. Copy your **Client ID** and **Client Secret**.
-  6. In Google Sheets, click **`Guild Audit` $\rightarrow$ `1. Set Blizzard API Credentials`** (or paste them in the `📖 Officer Setup Guide` modal).
+  6. In Google Sheets, click **`Guild Audit` → `1. Set Blizzard API Credentials`** (or paste them in the `📖 Officer Setup Guide` modal).
 
 ---
 
 ### 📊 B. Warcraft Logs v2 API (Attendance & Raid History)
-* **What it powers**: Automated season attendance percentage, on-time punctuality tracking, mythic kill history, and bench credit consolidation.
+* **What it powers**: Automated season attendance percentage, on-time punctuality tracking, kill history, and bench credit.
+* **⚠️ Use a V2 client, not the V1 key.** The Warcraft Logs *Web API* settings page shows a single **"V1 Client Key"** — that key will **not** work. You need a **V2 Client ID + Client Secret**.
 * **Setup Steps**:
-  1. Visit the [Warcraft Logs API Clients Portal](https://www.warcraftlogs.com/api/clients/) and log into your Warcraft Logs account.
+  1. Visit the [Warcraft Logs V2 API Clients page](https://www.warcraftlogs.com/api/clients/) (on the Web API settings page, click **"manage your V2 clients here"**).
   2. Click **`Create Client`**.
   3. Fill in the client form:
-     * **Client Name**: `Guild Attendance Audit`
-     * **Client Type**: Choose **`Personal / User Client`**
+     * **Name**: `Guild Attendance Audit`
      * **Redirect URL**: `https://localhost`
+     * **Public Client**: leave **unchecked**
   4. Click **Create**.
-  5. Copy your **Client ID** and **Client Secret**.
-  6. In Google Sheets, click **`Guild Audit` $\rightarrow$ `7. Set Warcraft Logs API Credentials`** (or paste them in the `📖 Officer Setup Guide` modal).
+  5. Copy the **Client ID** (a long ID with dashes) and the **Client Secret** (~40 letters and numbers).
+  6. In Google Sheets, click **`Guild Audit` → `7. Set Warcraft Logs API Credentials`** (or paste them in the `📖 Officer Setup Guide` modal).
 
 ---
 
@@ -61,10 +68,10 @@ Officers can configure everything in **1 Click** using the built-in guide modal 
 * **What it powers**: Real-time sim ingestion via Discord Bot + the 1-Click **`5b. 🔄 Pull & Sync All Latest Sims from Discord`** button in Google Sheets.
 * **Setup Steps**:
   1. Visit the [Discord Developer Portal](https://discord.com/developers/applications) and select/create your application.
-  2. Navigate to the **Bot** tab on the left $\rightarrow$ Click **`Reset Token`** $\rightarrow$ Copy the **Bot Token**.
+  2. Navigate to the **Bot** tab on the left → Click **`Reset Token`** → Copy the **Bot Token**.
   3. In your Discord server:
-     * Make sure Developer Mode is enabled: *Discord Settings $\rightarrow$ Advanced $\rightarrow$ Developer Mode (ON)*.
-     * Right-click your `#sims` channel $\rightarrow$ Click **`Copy Channel ID`**.
+     * Make sure Developer Mode is enabled: *Discord Settings → Advanced → Developer Mode (ON)*.
+     * Right-click your `#sims` channel → Click **`Copy Channel ID`**.
   4. In Google Sheets, enter your **Bot Token** and **Channel ID** into the `📖 Officer Setup Guide` modal (or when clicking `5b. 🔄 Pull & Sync All Latest Sims from Discord`).
 
 ---
@@ -73,12 +80,29 @@ Officers can configure everything in **1 Click** using the built-in guide modal 
 
 Every week before raid night (or after weekly reset):
 1. Open the Google Spreadsheet.
-2. In the toolbar, click **`Guild Audit` $\rightarrow$ `3. Run Full Audit & Talents`**.
-3. In ~5 seconds, all 3 sheets will automatically synchronize with Blizzard's live Armory API, refreshing every raider's equipped gear, sockets, enchants, Great Vault unlocks, and talent trees.
+2. In the toolbar, click **`Guild Audit` → `3. Run Full Audit & Talents`** (skip this if the [hourly trigger](#9--automatic-updates-triggers) is running it for you).
+3. All 3 sheets synchronize with Blizzard's live Armory API, refreshing every raider's equipped gear, sockets, enchants, Great Vault unlocks, and talent trees.
+4. After raid, click **`6. Sync Warcraft Logs Attendance & History`** (or let a nightly trigger do it) and mark any bench raiders with **`8. 🪑 Mark Bench & Standby Raiders`**.
+
+### 📋 Full Menu Reference
+| Menu Item | What it does |
+| :--- | :--- |
+| `📖 Officer Setup & API Credentials Guide` | One screen to enter all API credentials |
+| `1. Set Blizzard API Credentials` | Blizzard Client ID / Secret (shared for all officers) |
+| `2. Create Config Sheet` | Builds / repairs the `Config` sheet layout and dropdowns |
+| `3. Run Full Audit & Talents` | Refreshes Guild Audit, Talents & Builds, and Loot & Chase Items |
+| `4. Create/Refresh Loot & Chase Items Sheet` | Rebuilds only the loot sheet |
+| `4b. ⚔️ Toggle Loot Difficulty (Heroic ↔ Mythic)` | Switches the loot table between Heroic (318) and Mythic (334) drops |
+| `4c. 🔄 Re-download Loot Table from Blizzard` | Forces a fresh loot table download (normally cached for a week) |
+| `5. Import Raidbots / QE Live Sim` | Paste a sim link manually |
+| `5b. 🔄 Pull & Sync All Latest Sims from Discord` | Imports recent sim links posted in the `#sims` channel |
+| `6. Sync Warcraft Logs Attendance & History` | Updates attendance, on-time %, kills, and the raid night ledger |
+| `7. Set Warcraft Logs API Credentials` | WCL **V2** Client ID / Secret (shared for all officers) |
+| `8. 🪑 Mark Bench & Standby Raiders` | Awards bench credit for a raid night |
 
 ---
 
-## 2. ⚙️ Config Sheet Setup
+## 3. ⚙️ Config Sheet Setup
 
 The `Config` sheet establishes the roster, official raid specs, alt-to-main assignments, and official raid schedule.
 
@@ -98,7 +122,7 @@ The `Config` sheet establishes the roster, official raid specs, alt-to-main assi
   * `🔄 Alt Character Name` (190px) | `Main Character (Owner ▼)` (240px) | `Assigned Spec ▼` (220px) | `Realm (If not in guild)` (180px)
 
 ### 💡 Key Features:
-* **Interactive Dropdowns**: Mains and Alts have interactive dropdowns for all 36 WoW specializations. Column G for Alts dynamically populates with active Main Character names!
+* **Interactive Dropdowns**: Mains and Alts have interactive dropdowns for all WoW specializations. Column G for Alts dynamically populates with active Main Character names! (Dropdowns are refreshed whenever you run `2. Create Config Sheet` or `3. Run Full Audit & Talents`.)
 * **Alt-to-Main Credit Consolidation**: When a raider plays an alt on raid night, the Warcraft Logs attendance engine credits their attendance, on-time percentage, and boss kills directly to their main character (strictly capped at 100% attendance per night).
 * **Assigned Main Spec Priority**: Loot eligibility is strictly evaluated against the **Assigned Main Spec**. If a raider logs out in an off-spec (e.g. questing in Retribution while assigned Holy Paladin), the audit will flag the logout but **never assign off-spec loot to them**.
 * **Zero-Config Auto-Learning**: If you leave spec blank, the script automatically detects each raider's active spec on the first audit run and saves it to the dropdown.
@@ -106,7 +130,7 @@ The `Config` sheet establishes the roster, official raid specs, alt-to-main assi
 
 ---
 
-## 3. 🔍 Sheet 1: Guild Audit
+## 4. 🔍 Sheet 1: Guild Audit
 
 Tracks equipped item levels, tier set bonuses, gems, enchants, and weekly Great Vault unlocks.
 
@@ -124,7 +148,7 @@ Tracks equipped item levels, tier set bonuses, gems, enchants, and weekly Great 
 
 ---
 
-## 4. 🌲 Sheet 2: Talents & Builds
+## 5. 🌲 Sheet 2: Talents & Builds
 
 Provides an instant overview of your raid team's talent selections and quick access to meta guides.
 
@@ -139,9 +163,18 @@ Provides an instant overview of your raid team's talent selections and quick acc
 
 ---
 
-## 5. 👑 Sheet 3: Loot & Chase Items
+## 6. 👑 Sheet 3: Loot & Chase Items
 
 An intelligent **Loot Council Assistant** configured with all 8 bosses of **The Venomous Abyss** raid.
+
+### ⚔️ Heroic vs. Mythic Loot
+* Click **`Guild Audit` → `4b. ⚔️ Toggle Loot Difficulty (Heroic ↔ Mythic)`** to switch the whole table between **Heroic (318)** and **Mythic (334)** boss drops. The choice is remembered.
+* Upgrade deltas are recalculated at the new item level. **Sims imported before switching were run at the old difficulty** — ask raiders to re-sim with the matching Droptimizer difficulty (see the [Raider Guide](RAIDER_GUIDE.md)).
+* *(344 items are personal loot / bonus rolls, not boss drops, so they are not on this sheet.)*
+
+### 📦 Loot Table Source
+* The drop list comes from **Blizzard's Journal API** and is **cached for a week** (it doesn't change mid-season). If Blizzard is unavailable, the last saved copy — or the built-in offline table — is used.
+* After a hotfix adds or changes drops, click **`4c. 🔄 Re-download Loot Table from Blizzard`**.
 
 ### 🛡️ Strict Class & Spec Equipment Rules:
 * **Strict 1H vs 2H Exclusivity**:
@@ -180,47 +213,81 @@ $$\text{Priority Score} = \text{Raw Upgrade Gain} \times \text{Reliability Index
 
 ---
 
-## 6. 🚀 Importing Sims: DPS (Raidbots) & Healers (QE Live)
+## 7. 🚀 Importing Sims: DPS (Raidbots) & Healers (QE Live)
 
 The sheet natively supports **both DPS/Tank simulations (Raidbots)** and **Healer mathematical models (Questionably Epic Live)**.
 
 ### A. DPS & Tanks (Raidbots Droptimizer):
-1. Raiders run a Droptimizer sim on [Raidbots](https://www.raidbots.com/simbot/droptimizer).
+1. Raiders run a Droptimizer sim on [Raidbots](https://www.raidbots.com/simbot/droptimizer) at the difficulty the loot sheet is set to (Heroic or Mythic).
 2. Copy the report URL: `https://www.raidbots.com/simbot/report/abc123xyz`
-3. Paste into Discord `#sims` channel (or in Google Sheets via `Guild Audit > Ingest Sim URL`).
+3. Paste into Discord `#sims` channel (or in Google Sheets via `Guild Audit > 5. Import Raidbots / QE Live Sim`).
 
 ### B. Healers (QE Live Upgrade Finder):
 1. Healers run an Upgrade Finder report on [QE Live](https://questionablyepic.com/live).
 2. Copy their upgrade report link: `https://questionablyepic.com/live/upgradereport/abc123xyz`
-3. Paste into Discord `#sims` channel (or in Google Sheets).
+3. Paste into Discord `#sims` channel (or in Google Sheets via `5. Import Raidbots / QE Live Sim`).
 4. **Bonus Roll Exclusion**: The engine **automatically excludes personal loot / bonus roll items**, mapping only genuine raid drops to the Loot Council sheet with `✅ QE Live` status!
+
+> Sim imports and Loot sheet rebuilds take turns: if a sim arrives while the audit or attendance sync is rebuilding the Loot sheet, it waits (up to 3 minutes) instead of failing.
 
 ---
 
-## 7. 🏛️ Warcraft Logs Attendance & Season History
+## 8. 🏛️ Warcraft Logs Attendance & Season History
 
-The spreadsheet features full **Warcraft Logs v2 GraphQL API integration** to automatically sync attendance, boss kills, and retroactive gear readiness for the entire season.
+The spreadsheet features full **Warcraft Logs v2 GraphQL API integration** to automatically sync attendance, boss kills (and progression wipes), and on-time punctuality for the entire season.
 
 ### 🌟 How to Sync:
-1. In Google Sheets, click **`Guild Audit` $\rightarrow$ `6. Sync Warcraft Logs Attendance & History`**.
-2. The script queries all official Season 2 raid reports for your guild from Warcraft Logs.
-3. In ~4 seconds, it generates/refreshes the **`Attendance & History`** tab with:
-   * **Leaderboard:** Raider Attendance %, Total Raids Attended, Preparation %, and Boss Kills.
-   * **Ledger:** Complete historical timeline of every raid night, bosses defeated, roster present, bench list, and direct Warcraft Logs links.
+1. In Google Sheets, click **`Guild Audit` → `6. Sync Warcraft Logs Attendance & History`** (or set up a [nightly trigger](#9--automatic-updates-triggers)).
+2. The script reads your guild's most recent Warcraft Logs reports and merges multiple uploaders of the same night into one raid night.
+3. It generates/refreshes the **`Attendance & History`** tab with:
+   * **Leaderboard:** Raider Attendance %, On-Time %, Raids Attended, Tardies, Boss Kills, and Reliability Tier.
+   * **Ledger:** Complete historical timeline of every raid night, bosses defeated (or progression wipes), roster present, bench list, and direct Warcraft Logs links.
 
-### 🪑 7.1 Mythic Bench & Standby Credit Manager:
-Because Warcraft Logs only records raiders inside the 20-player instance, bench raiders standing by in Discord are awarded full credit with a 1-click modal:
-1. In Google Sheets, click **`Guild Audit` $\rightarrow$ `8. 🪑 Mark Bench & Standby Raiders`**.
+### 🗄️ Season History is Permanent (Attendance Archive)
+* Warcraft Logs only returns the **40 most recent reports**. Every synced raid night is therefore also saved to a hidden **`Attendance Archive`** sheet, and attendance % is always calculated from the full archive — nights never "fall off" as the season goes on.
+* The archive stores the **character names from the logs**, so roster, alt, bench, and raid-day changes you make later are applied to past nights on the next sync.
+* Don't edit or delete the `Attendance Archive` sheet (it's hidden for that reason).
+
+### 📏 What Counts as an Official Raid Night
+* It's on a raid day checked in `Config`, **and**
+* enough guild mains were present (including bench): **15 for Mythic**, **10 for Heroic/Normal**.
+* Other nights are listed as `📦 [Optional / PUG]`: attendees still get boss kill credit, but nobody is marked absent.
+* **On-Time** = present for the **first boss pull of the night** (kill or wipe).
+
+### 🪑 Bench & Standby Credit Manager:
+Because Warcraft Logs only records raiders inside the instance, bench raiders standing by in Discord are awarded full credit with a 1-click modal:
+1. In Google Sheets, click **`Guild Audit` → `8. 🪑 Mark Bench & Standby Raiders`**.
 2. Select the raid date from the dropdown.
 3. Check the boxes for the raiders who were on standby in Discord (supports any number of bench players).
 4. Click **`💾 Save & Award Bench Credit`**.
-5. The system immediately awards them **100% Attendance & On-Time credit**, updates the Ledger column (`🪑 Bench / Standby`), and recalculates all Priority Scores on `Loot & Chase Items`!
+5. The system awards them **100% Attendance & On-Time credit** for that night, updates the Ledger column (`🪑 Bench / Standby`), and recalculates all Priority Scores on `Loot & Chase Items`.
+* Bench credit applies to **official** raid nights (Heroic or Mythic). If a night is classed as optional/PUG, the ledger shows `No credit (not an official night): …`.
+* You can mark bench for any past night in the dropdown — it's re-applied every sync.
 
 ---
 
-## 8. 🤖 Discord Bot & 24/7 PM2 Management
+## 9. ⏰ Automatic Updates (Triggers)
 
-The bot runs on **Discord.js v14** and allows raiders to paste **Raidbots** (DPS) and **QE Live** (Healers) sim links directly into Discord:
+You can have Google run updates on a schedule, so nobody has to click the menu:
+
+1. Open the spreadsheet → **Extensions → Apps Script** → **Triggers** (⏰ clock icon in the left sidebar) → **Add Trigger**.
+2. Recommended triggers:
+
+| Function | Event source | Schedule | Purpose |
+| :--- | :--- | :--- | :--- |
+| `updateAllCharacterDataWithBonuses` | Time-driven | Hour timer / every few hours | Gear audit, talents & loot sheet |
+| `syncWarcraftLogsSeasonAttendance` | Time-driven | Day timer, 11 PM–midnight | Attendance after raid |
+
+3. Save and click **Allow** on Google's permission prompt.
+
+* Triggers run as the officer who created them, using the shared credentials.
+* If a scheduled run fails, the trigger is marked **Failed** and Google emails the trigger's owner. See [the FAQ](#q-a-scheduled-trigger-failed--how-do-i-see-why) for how to see why.
+
+---
+
+## 10. 🤖 Discord Bot & 24/7 PM2 Management
+
+The bot runs on **Discord.js v14** and allows raiders to paste **Raidbots** (DPS) and **QE Live** (Healers) sim links directly into Discord. Setup details are in the [bot README](discord-bot/README.md).
 
 ### 🛠️ Updating the Bot on Your 24/7 PC (PM2):
 Whenever new updates are pushed:
@@ -229,15 +296,37 @@ git pull origin main
 pm2 restart wow-raid-bot
 ```
 
+### 🔐 Optional: Webhook Secret
+To make sure only your bot can write sims to the sheet, pick any long random string and set it in **both** places:
+* Apps Script → **Project Settings → Script Properties** → `WEBHOOK_SECRET`
+* The bot's `discord-bot/.env` → `WEBHOOK_SECRET=...` (then restart the bot)
+
+If only one side has it, sims will be rejected with `Unauthorized`.
+
 ---
 
-## 9. ❓ Officer FAQ & Troubleshooting
+## 11. ❓ Officer FAQ & Troubleshooting
+
+### Q: A scheduled trigger failed — how do I see why?
+**A:** Open **Extensions → Apps Script → Executions** (left sidebar). Click the failed run to see the error message and log. Common causes: missing API credentials (set them via menu 1 / 7), or Google timing out on a very large run (it will usually succeed on the next run).
+
+### Q: Warcraft Logs sync says "Authentication Failed".
+**A:** The credentials must be a Warcraft Logs **V2 client** (Client ID + Client Secret) from the [V2 clients page](https://www.warcraftlogs.com/api/clients/) — not the "V1 Client Key". Re-enter them with **`7. Set Warcraft Logs API Credentials`**.
+
+### Q: A raider's sim failed in Discord.
+**A:** The bot's error now shows the real reason. `Another Guild Audit update is still running` means an audit/sync was rebuilding the Loot sheet for more than 3 minutes — have them re-post the link. For Raidbots, the report must be finished and public.
 
 ### Q: Why do M+ Vault slots count runs in the same dungeon now?
 **A:** We integrated the **Raider.IO Hybrid Engine** (`mythic_plus_weekly_runs`). Blizzard's API only exposes 1 run per unique dungeon, but Raider.IO tracks every duplicate and untimed run. Raiders who farm the same key 8 times will now accurately receive credit for all 3 Vault slots (`GV M+ 1`, `GV M+ 2`, `GV M+ 3`)!
 
 ### Q: How do we live log raid night directly to the guild on Warcraft Logs?
-**A:** In the Archon / Warcraft Logs Uploader desktop app, look under *"Choose the guild you want to upload to"*, click the **`[ 🛡️ Personal Logs ▼ ]`** dropdown, and switch it to your Guild name (e.g. `<Prey>`). Make sure **Advanced Combat Logging** is enabled in WoW Options! However, the Loot Council sheet uses their **Assigned Main Spec** from the `Config` tab, so they will never be assigned off-spec gear.
+**A:** In the Archon / Warcraft Logs Uploader desktop app, look under *"Choose the guild you want to upload to"*, click the **`[ 🛡️ Personal Logs ▼ ]`** dropdown, and switch it to your Guild name (e.g. `<Prey>`). Make sure **Advanced Combat Logging** is enabled in WoW Options!
 
-#### Q: How do we change a raider's official raid spec?
-Go to the `Config` sheet, click the dropdown in Column B for that raider, and select their new spec. Then click `3. Run Full Audit & Talents`.
+### Q: A raider played an off-spec on raid night. Will they get off-spec loot?
+**A:** No. The Loot Council sheet uses their **Assigned Main Spec** from the `Config` tab, so they will never be assigned off-spec gear.
+
+### Q: How do we change a raider's official raid spec?
+**A:** Go to the `Config` sheet, click the dropdown in Column B for that raider, and select their new spec. Then click `3. Run Full Audit & Talents`.
+
+### Q: A new season started. What needs to change?
+**A:** A developer updates `src/Season.gs` (raid name, bosses, item levels, offline loot table) and deploys — see the [README](README.md#️-developing--deploying). Then click `4c. 🔄 Re-download Loot Table from Blizzard`.

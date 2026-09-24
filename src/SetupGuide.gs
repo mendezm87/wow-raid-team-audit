@@ -159,11 +159,11 @@ function showOfficerApiSetupGuide() {
             </div>
             <div class="step-item">
               <div class="step-num">3</div>
-              <div class="step-text">Set <b>Client Name</b> to <code>Guild Attendance Audit</code>, select <b>Client Type</b> as <code>Personal / User Client</code>, and set <b>Redirect URL</b> to <code>https://localhost</code>.</div>
+              <div class="step-text">Set <b>Client Name</b> to <code>Guild Attendance Audit</code>, set <b>Redirect URL</b> to <code>https://localhost</code>, and leave <b>Public Client</b> unchecked. <i>(This must be a <b>V2 client</b> — the single "V1 Client Key" on the Web API settings page will not work.)</i></div>
             </div>
             <div class="step-item">
               <div class="step-num">4</div>
-              <div class="step-text">Copy your <b>Client ID</b> and <b>Client Secret</b> into the boxes below:</div>
+              <div class="step-text">Copy your <b>Client ID</b> and <b>Client Secret</b> into the boxes below. They are shared with every officer and scheduled trigger, so this only needs to be done once for the whole guild.</div>
             </div>
           </div>
 

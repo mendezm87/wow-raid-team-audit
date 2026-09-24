@@ -7,7 +7,7 @@ function promptForWCLCredentials() {
 
   const clientIdResponse = ui.prompt(
     'Set Warcraft Logs API Client ID (Step 1/2)', 
-    'Step 1: Obtain your credentials from the Warcraft Logs API Portal:\n👉 https://www.warcraftlogs.com/api/clients/\n\n(Create a client with name "Guild Attendance Audit", type "Personal", redirect "https://localhost")\n\nPlease enter your Warcraft Logs Client ID:', 
+    'Step 1: Obtain your credentials from the Warcraft Logs API Portal:\n👉 https://www.warcraftlogs.com/api/clients/\n\n(Create a V2 client: name "Guild Attendance Audit", redirect "https://localhost", Public Client unchecked. The "V1 Client Key" will not work.)\n\nPlease enter your Warcraft Logs Client ID:', 
     ui.ButtonSet.OK_CANCEL
   );
   if (clientIdResponse.getSelectedButton() !== ui.Button.OK) return;
@@ -29,7 +29,7 @@ function promptForWCLCredentials() {
     });
     scriptProperties.deleteProperty('wcl_token'); // Force a fresh token with the new credentials
     scriptProperties.deleteProperty('wcl_token_expiry');
-    ui.alert('🎉 Success!', 'Your Warcraft Logs API credentials have been saved. You can now sync guild attendance and raid history!', ui.ButtonSet.OK);
+    ui.alert('🎉 Success!', 'Your Warcraft Logs API credentials have been saved for all officers and scheduled triggers. You can now sync guild attendance and raid history!', ui.ButtonSet.OK);
   } else {
     ui.alert('❌ Error', 'Both Client ID and Client Secret are required.', ui.ButtonSet.OK);
   }

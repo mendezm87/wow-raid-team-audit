@@ -26,7 +26,7 @@ function promptForCredentials() {
     });
     scriptProperties.deleteProperty('blizzard_token'); // Force a fresh token with the new credentials
     scriptProperties.deleteProperty('blizzard_token_expiry');
-    ui.alert('🎉 Success!', 'Your Blizzard API credentials have been saved. You can now run the audit and talent scans!', ui.ButtonSet.OK);
+    ui.alert('🎉 Success!', 'Your Blizzard API credentials have been saved for all officers and scheduled triggers. You can now run the audit and talent scans!', ui.ButtonSet.OK);
   } else {
     ui.alert('❌ Error', 'Both Client ID and Client Secret are required. Please try again.', ui.ButtonSet.OK);
   }

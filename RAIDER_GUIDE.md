@@ -47,10 +47,11 @@ Tracks official guild raid attendance and boss progression across the entire sea
 
 ### 🌟 Key Highlights:
 * 📈 **Attendance %**: Percentage of official guild raid nights you were present for.
-* ⏰ **On-Time %**: Percentage of raid nights you were ready and present for the **first pull of the night** (within the first 15 minutes of scheduled start time).
+* ⏰ **On-Time %**: Percentage of raid nights you were present for the **first boss pull of the night** (kill or wipe).
 * ⚔️ **Season Boss Kills**: Total number of unique raid boss encounters defeated across all difficulties.
 * 🔄 **Playing an Alt?**: If an officer has your alt linked to your main character on the `Config` tab, **all attendance, on-time percentage, and boss kill credits automatically combine onto your main character!**
-* 📜 **Historical Raid Night Ledger**: Section 2 at the bottom contains a permanent timeline of every raid night with direct clickable links to Warcraft Logs reports.
+* 📜 **Historical Raid Night Ledger**: Section 2 at the bottom contains a permanent timeline of every raid night with direct clickable links to Warcraft Logs reports. Every raid night of the season keeps counting toward your %, even old ones.
+* 🪑 **Benched?** Officers mark bench/standby raiders after raid, and you get full attendance and on-time credit for that night.
 
 ---
 
@@ -78,11 +79,12 @@ To ensure everyone is compared fairly on the exact same baseline, please use the
 
 #### ⚙️ Standard Guild Settings Checklist:
 1. Open [Raidbots Droptimizer](https://www.raidbots.com/simbot/droptimizer) (or click your 1-Click link on the *Talents & Builds* sheet).
-2. **Raid Difficulty:**
-   * Select **`Heroic (Hero)`**.
+2. **Raid Difficulty** — match what the officers have the loot sheet set to (check the `Difficulty` column on `Loot & Chase Items`):
+   * Heroic progression: select **`Heroic (Hero)`**.
+   * Mythic progression: select **`Mythic (Myth)`**.
 3. **Items to Sim:**
    * **Group By:** Select **`Boss`**.
-   * **Upgrade up to:** Select **`321 Hero 6/6`**.
+   * **Upgrade up to:** Heroic → **`321 Hero 6/6`**; Mythic → the **highest Myth upgrade level** in the dropdown.
    * **`☑ Upgrade All Equipped Gear to the Same Level`** *(CRITICAL: Check this box so all drops and equipped slots are compared at equal max upgrade track!)*
 4. **Simulation Options:**
    * **Fight Style:** `Patchwerk` (1 Boss, 5 minutes).
@@ -94,7 +96,7 @@ To ensure everyone is compared fairly on the exact same baseline, please use the
    https://www.raidbots.com/simbot/report/aM6qT1dQz2CPxVodxJDy5k
    ```
 7. **Paste the link directly into the `#sims` Discord channel** (or type `/sim report_url:<link>`).
-8. The bot will react with `✅` and confirm your DPS upgrades!
+8. The bot will react with `✅` and confirm your DPS upgrades! If it replies with an error, the message tells you why (for example, the report isn't finished yet) — fix that and post the link again.
 
 ---
 
@@ -106,7 +108,7 @@ Because Raidbots does not model healing throughput, healers use **Questionably E
 1. Open [QE Live (questionablyepic.com/live)](https://questionablyepic.com/live).
 2. Import your character using your in-game `/simc` string.
 3. **`☑ Upgrade ALL to Max Level`** *(CRITICAL: Check this box when importing your gear so all calculations reflect max-upgraded gear tracks!)*
-4. In the top navigation, click **Upgrade Finder** $\rightarrow$ **Raid** (*The Venomous Abyss*).
+4. In the top navigation, click **Upgrade Finder** $\rightarrow$ **Raid** (*The Venomous Abyss*) at the same difficulty the loot sheet uses (Heroic or Mythic).
 5. Click **Run Upgrade Finder**.
 6. Once complete, copy the report URL from your browser address bar:
    ```text
@@ -138,7 +140,7 @@ $$\text{Priority Score} = \text{Raw Upgrade Gain} \times \text{Reliability Index
    * 🟢 **`READY` ($1.00\times$)**: Full priority credit.
    * ⚠️ **Missing Enchants / Sockets ($0.90\times$)**: $-10\%$ modifier and `⚠️ Missing Enchants` badge until gear is enchanted.
 4. **🪑 Mythic Bench / Standby Credit**:
-   * If you are sitting on the bench / standby in Discord on a Mythic raid night, officers award you **full 100% Attendance & On-Time credit** so you are never penalized in loot priority for taking one for the team!
+   * If you are sitting on the bench / standby in Discord on a raid night (Heroic or Mythic), officers award you **full 100% Attendance & On-Time credit** so you are never penalized in loot priority for taking one for the team!
 
 ### 🎨 How Contenders are Displayed:
 * 🟢 **Mint Green (`Top Contender`)**: Evaluated via an active sim (**`+% DPS`** or **`+% HPS`**).

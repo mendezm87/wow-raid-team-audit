@@ -74,7 +74,7 @@ function saveBenchRaiders(dateKey, selectedPlayerNames) {
 }
 
 /**
- * Displays the modern, interactive Mythic Bench & Standby Raiders checkbox dialog.
+ * Displays the modern, interactive Bench & Standby Raiders checkbox dialog.
  */
 function showBenchRaidersDialog() {
   const html = `
@@ -205,7 +205,7 @@ function showBenchRaidersDialog() {
         </style>
       </head>
       <body>
-        <h3>🪑 Mythic Bench & Standby Credit Manager</h3>
+        <h3>🪑 Bench & Standby Credit Manager</h3>
         <div class="subtitle">Select the raid night and check all raiders on standby in Discord to award them 100% attendance & punctuality credit.</div>
 
         <label for="dateSelect">Select Raid Night:</label>
@@ -328,5 +328,5 @@ function showBenchRaidersDialog() {
   const htmlOutput = HtmlService.createHtmlOutput(html)
     .setWidth(520)
     .setHeight(480);
-  SpreadsheetApp.getUi().showModalDialog(htmlOutput, '🪑 Mythic Bench & Standby Credit Manager');
+  SpreadsheetApp.getUi().showModalDialog(htmlOutput, '🪑 Bench & Standby Credit Manager');
 }

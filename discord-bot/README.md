@@ -18,6 +18,8 @@ A lightweight Discord Bot that automatically catches Raidbots Droptimizer sim re
 6. Click **Deploy**.
 7. Copy your **Web App URL** (e.g. `https://script.google.com/macros/s/AKfycb.../exec`).
 
+> **Updating the sheet code later?** Don't create a *new* deployment — that gives a new URL and the bot stops working. Instead use **Deploy > Manage deployments > ✏️ Edit > Version: New version > Deploy** on the existing `Discord Sim Webhook` deployment (or `npx clasp update-deployment <deploymentId>`, see the main README). The URL stays the same.
+
 ---
 
 ### Step 2: Create Your Discord Bot Token (2 minutes)
@@ -64,7 +66,7 @@ Raiders can post either **Raidbots** (DPS/Tanks) or **QE Live** (Healers) links 
   ```text
   https://questionablyepic.com/live/upgradereport/iukuwubrwnfr
   ```
-The bot will react with `⏳` $\rightarrow$ `✅` and reply with an embed showing their mapped upgrades! *(Bonus roll personal loot items are automatically excluded)*
+The bot will react with `⏳` $\rightarrow$ `✅` and reply with an embed showing their mapped upgrades! *(Bonus roll personal loot items are automatically excluded)* If something goes wrong, the error embed shows the actual reason from the sheet.
 
 ### Method 2: Slash Command
 Raiders can also type:
