@@ -68,8 +68,7 @@ function getRosterContextMap(ss) {
             contextMap[lower] = { name: charName, role: '⚔️ Raider', attPct: null, onTimePct: null, isRaidReady: true, charClass: className };
           }
           if (className) contextMap[lower].charClass = className;
-          const isMissingEnchantOrGem = readyStatus.toLowerCase().includes('missing') || readyStatus.toLowerCase().includes('empty socket') || readyStatus.toLowerCase().includes('socket');
-          contextMap[lower].isRaidReady = !isMissingEnchantOrGem;
+          contextMap[lower].isRaidReady = readyStatus.toUpperCase().startsWith('READY');
           contextMap[lower].readyStatus = readyStatus;
         }
       }
@@ -146,7 +145,8 @@ function getGuildAuditCharacterList(ss) {
     const row = auditValues[r];
     const name = nameCol > -1 ? (row[nameCol] || '').toString().trim() : '';
 
-    if (!name || name.toLowerCase().includes('alt') || name.startsWith('───') || name.startsWith('═══')) {
+    if (!name || name.toLowerCase().includes('alt') || isAltsBandLabel(name) || name.startsWith('═══')) {
+      if (isAltsBandLabel(name)) reachedAltSection = true;
       if (!name && r > 2 && auditValues[r + 1] && !auditValues[r + 1][nameCol]) {
         reachedAltSection = true;
       }
@@ -310,9 +310,12 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
   const lootHeaders = [
     'Boss / Source', 'Chase Item / Drop', 'Slot', 'Difficulty', 'Drop ilvl',
     'Target Specs / Roles', 'Top Contender (Assigned)', 'Current Equipped Item',
-    'Equipped ilvl', 'Upgrade Delta (+ilvl / %DPS)', 'Priority / BiS Tier', 
-    'Sim Status / Last Updated', 'Loot Council Notes'
+    'Equipped ilvl', 'Upgrade Delta (+ilvl / %DPS)', 'Loot Priority',
+    'Sim Status / Last Updated', 'Loot Council Notes', 'Runners-Up'
   ];
+
+  const NOTES_COL = 13;   // Loot Council Notes (1-based)
+  const RUNNERS_COL = 14; // Runners-Up (1-based)
 
   // Live Blizzard loot table (cached for a week), falling back to the offline catalog
   const config = getConfigurationFromSheet();
@@ -324,6 +327,18 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
 
   const lootDifficulty = getLootDifficulty();
   chaseItemsCatalog = applyLootDifficultyToCatalog(chaseItemsCatalog, lootDifficulty);
+
+  // Catalog rows are authored 13 wide; pad them for the Runners-Up column and replace the
+  // placeholder "Raid Drop" priority with a band derived from the slot the item drops in.
+  chaseItemsCatalog = chaseItemsCatalog.map(row => {
+    const padded = row.slice();
+    while (padded.length < lootHeaders.length) padded.push('');
+    if (padded[1] && !padded[1].toString().startsWith('═══')) {
+      padded[10] = lootPriorityTier(padded[2]);
+      padded[4] = Number(padded[4]) || padded[4];
+    }
+    return padded;
+  });
 
   // Helper to extract numerical ilvl from formatted gear slot strings e.g. "[Tier] 298 (Hero 4/6) - Item"
   const extractIlvl = (slotText) => {
@@ -385,16 +400,36 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
   const existingSimDataByName = {};
   const existingSimDataById = {};
   if (sheet.getLastRow() > 1) {
-    const existingValues = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
-    existingValues.forEach(row => {
-      const rawName = (row[1] || '').toString().trim();
+    const existingRange = sheet.getRange(1, 1, sheet.getLastRow(), sheet.getLastColumn());
+    const existingAll = existingRange.getValues();
+    const existingNotes = existingRange.getNotes();
+    // Column positions are read from the sheet's own header row, so an older layout still parses
+    const oldHeaders = (existingAll[0] || []).map(headerLabel);
+    const oldIdx = (name, fallback) => {
+      const idx = oldHeaders.indexOf(name);
+      return idx > -1 ? idx : fallback;
+    };
+    const cName = oldIdx('Chase Item / Drop', 1);
+    const cTop = oldIdx('Top Contender (Assigned)', 6);
+    const cEquip = oldIdx('Current Equipped Item', 7);
+    const cEquipIlvl = oldIdx('Equipped ilvl', 8);
+    const cDelta = oldIdx('Upgrade Delta (+ilvl / %DPS)', 9);
+    const cStatus = oldIdx('Sim Status / Last Updated', 11);
+    const cNotes = oldIdx('Loot Council Notes', 12);
+    const cRunners = oldHeaders.indexOf('Runners-Up');
+
+    const existingValues = existingAll.slice(1);
+    existingValues.forEach((row, rowOffset) => {
+      const rawName = (row[cName] || '').toString().trim();
       const normName = normalizeItemKey(rawName);
-      const topContender = (row[6] || '').toString();
-      const currentEquipped = (row[7] || '').toString();
-      const equippedIlvl = row[8];
-      const upgradeDelta = (row[9] || '').toString();
-      const simStatus = (row[11] || '').toString();
-      let notes = (row[12] || '').toString();
+      const topContender = (row[cTop] || '').toString();
+      const equipNote = ((existingNotes[rowOffset + 1] || [])[cEquip] || '').toString();
+      const currentEquipped = equipNote || (row[cEquip] || '').toString();
+      const equippedIlvl = row[cEquipIlvl];
+      const upgradeDelta = (row[cDelta] || '').toString();
+      const simStatus = (row[cStatus] || '').toString();
+      const runnersUp = cRunners > -1 ? (row[cRunners] || '').toString() : '';
+      let notes = [(row[cNotes] || '').toString(), runnersUp].filter(Boolean).join(' | ');
 
       // Clean out any alt names that may have previously leaked into notes or topContenders
       const topContenderNameMatch = topContender.match(/([A-Za-z0-9\u00C0-\u024F]+)/);
@@ -424,9 +459,18 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
     });
   }
 
+  // Full equipped-item text per row; the cell shows a short badge and this goes in its note
+  const equippedFullText = new Array(chaseItemsCatalog.length).fill('');
+
+  // Splits a ranked contender list across the Notes and Runners-Up columns.
+  const writeContenderColumns = (row, leadIn, entries) => {
+    row[12] = [leadIn, entries[0] || ''].filter(Boolean).join(' · ').trim();
+    row[13] = entries.slice(1).join(' | ');
+  };
+
   // If character audit data is available, auto-calculate live equipped upgrades
   if (mainCharacterData && mainCharacterData.length > 0) {
-    chaseItemsCatalog.forEach(row => {
+    chaseItemsCatalog.forEach((row, rowIdx) => {
       // Skip separator rows
       if (row[0].startsWith('⚔️') || row[0].startsWith('🛡️') || row[0].startsWith('🧭') || row[0].startsWith('🧪') || row[0].startsWith('🐊') || row[0].startsWith('🏛️') || row[0].startsWith('👑') || row[0].startsWith('📦')) {
         return;
@@ -482,14 +526,15 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
                     ? preservedSim.simStatus 
                     : '✅ Simmed';
 
-          const prefix = preservedSim.notes.includes('Raidbots') ? 'Raidbots Sim Upgrades: ' : 'Sim / QE Live Upgrades: ';
+          const prefix = preservedSim.notes.includes('Raidbots') ? 'Raidbots Sim Upgrades:' : 'Sim / QE Live Upgrades:';
           const topList = simContenders.slice(0, 5).map((c, i) => {
             const pRole = c.priority.role ? ` | ${c.priority.role}` : '';
             const pAtt = c.priority.attPct ? ` | ${c.priority.attPct}` : '';
             const pPrep = (!c.priority.isRaidReady) ? ' | ⚠️ Unenchanted' : '';
             return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.pct}%${pRole}${pAtt}${pPrep})`;
           });
-          row[12] = prefix + topList.join(' | ');
+          const simLeadIn = [blizzardId ? `Blizzard ID: ${blizzardId}` : '', prefix].filter(Boolean).join(' ');
+          writeContenderColumns(row, simLeadIn, topList);
 
           // Update live equipped item & ilvl for the top contender
           const topNameMatch = (row[6] || '').match(/^([A-Za-z0-9\u00C0-\u024F]+)/);
@@ -497,7 +542,8 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
             const topChar = mainCharacterData.find(c => c['Name'] && c['Name'].toLowerCase() === topNameMatch[1].toLowerCase());
             if (topChar) {
               const eq = resolveEquippedItemForChar(topChar, slot);
-              row[7] = eq.text;
+              equippedFullText[rowIdx] = eq.text && eq.text !== '-' ? eq.text : '';
+              row[7] = compactGearText(eq.text);
               row[8] = eq.ilvl || '-';
             }
           }
@@ -537,19 +583,20 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
       if (contenders.length > 0) {
         const top = contenders[0];
         row[6] = formatContenderDisplay(top.name, top.delta, false, rosterContextMap, top.priority);
-        row[7] = top.equippedText;
+        equippedFullText[rowIdx] = top.equippedText && top.equippedText !== '-' ? top.equippedText : '';
+        row[7] = compactGearText(top.equippedText);
         row[8] = top.equippedIlvl;
         row[9] = `+${top.delta}`;
         row[11] = '⚡ Live Armory ilvl';
 
-        // Top 3 list in Notes with Priority Score, Role, and Attendance context
+        // Top pick in Notes, the rest in Runners-Up, each with Priority Score, Role and Attendance context
         const top3List = contenders.slice(0, 3).map((c, i) => {
           const cRole = c.priority.role ? ` | ${c.priority.role}` : '';
           const cAtt = c.priority.attPct ? ` | ${c.priority.attPct}` : '';
           const cPrep = (!c.priority.isRaidReady) ? ' | ⚠️ Unenchanted' : '';
           return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.delta}${cRole}${cAtt}${cPrep})`;
-        }).join(' | ');
-        row[12] = `${baseNotes} (Top Upgrades: ${top3List})`;
+        });
+        writeContenderColumns(row, baseNotes, top3List);
       }
     });
   }
@@ -558,7 +605,9 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
 
   sheet.clear();
   sheet.clearFormats();
+  sheet.clearNotes();
   sheet.clearConditionalFormatRules();
+  fitSheetColumns(sheet, lootHeaders.length);
   sheet.getRange(1, 1, fullData.length, fullData[0].length).setValues(fullData);
 
   // Formatting
@@ -567,12 +616,18 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
   fullRange.setVerticalAlignment('middle');
   fullRange.setFontFamily('Roboto');
   fullRange.setNumberFormat('@');
+  // ilvl columns stay numeric so they sort by value rather than alphabetically
+  if (sheet.getMaxRows() > 1) {
+    [lootHeaders.indexOf('Drop ilvl') + 1, lootHeaders.indexOf('Equipped ilvl') + 1].forEach(colIdx => {
+      if (colIdx > 0) sheet.getRange(2, colIdx, sheet.getMaxRows() - 1, 1).setNumberFormat('0');
+    });
+  }
   sheet.setFrozenColumns(2);
   sheet.setFrozenRows(1);
   applyTabColor(sheet);
 
   // Header styling
-  const headerRange = sheet.getRange(1, 1, 1, sheet.getMaxColumns());
+  const headerRange = sheet.getRange(1, 1, 1, lootHeaders.length);
   headerRange.setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
   sheet.setRowHeight(1, 40);
   stampHeaderCell(sheet, lootHeaders[0]);
@@ -583,24 +638,27 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
   // Alternating fills restart under each boss banner.
   if (fullData.length > 1) {
     const dataRows = fullData.length - 1;
-    const rowAlignments = ['left', 'left', 'center', 'center', 'right', 'left', 'center', 'center', 'right', 'center', 'center', 'center', 'left'];
+    const rowAlignments = ['left', 'left', 'center', 'center', 'right', 'left', 'left', 'left', 'right', 'center', 'center', 'center', 'left', 'left'];
     const rowWeights = lootHeaders.map((_, c) => (c === 1 ? 'bold' : 'normal'));
     sheet.setRowHeights(2, dataRows, 28);
-    sheet.getRange(2, 1, dataRows, sheet.getMaxColumns()).setFontSize(9);
+    sheet.getRange(2, 1, dataRows, lootHeaders.length).setFontSize(9);
     sheet.getRange(2, 1, dataRows, lootHeaders.length)
       .setHorizontalAlignments(Array.from({ length: dataRows }, () => rowAlignments))
       .setFontWeights(Array.from({ length: dataRows }, () => rowWeights))
       .setBackgrounds(zebraBackgrounds(dataRows, lootHeaders.length, i => isBossBannerRow(chaseItemsCatalog[i])));
+
+    sheet.getRange(2, 8, dataRows, 1).setNotes(equippedFullText.map(text => [text]));
   }
 
   // Priority Column Conditional Formatting (Soft Badges)
   const rules = [];
-  const prioColIdx = lootHeaders.indexOf('Priority / BiS Tier') + 1;
+  const prioColIdx = lootHeaders.indexOf('Loot Priority') + 1;
   const prioRange = [sheet.getRange(2, prioColIdx, sheet.getMaxRows(), 1)];
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('God-Tier').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges(prioRange).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('BiS').setBackground('#f3e8ff').setFontColor('#6b21a8').setRanges(prioRange).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Rare').setBackground('#ffedd5').setFontColor('#9a3412').setRanges(prioRange).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Tier').setBackground('#d1fae5').setFontColor('#065f46').setRanges(prioRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Trinket').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges(prioRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Weapon').setBackground('#ffedd5').setFontColor('#9a3412').setRanges(prioRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Tier Piece').setBackground('#f3e8ff').setFontColor('#6b21a8').setRanges(prioRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Secondary').setBackground('#e0f2fe').setFontColor('#075985').setRanges(prioRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Raid Drop').setBackground('#f1f5f9').setFontColor('#475569').setRanges(prioRange).build());
 
   // Top Contender Column (Column G) Conditional Formatting:
   // Green if simmed (% DPS / ✅ Simmed), Yellow if unsimmed / Live Armory ilvl (⚡)
@@ -636,7 +694,7 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
   for (let i = 0; i < chaseItemsCatalog.length; i++) {
     if (isBossBannerRow(chaseItemsCatalog[i])) {
       const rowIdx = i + 2;
-      sheet.getRange(rowIdx, 1, 1, sheet.getMaxColumns())
+      sheet.getRange(rowIdx, 1, 1, lootHeaders.length)
         .setBackground('#0f172a')
         .setFontColor('#f8fafc')
         .setFontWeight('bold')
@@ -653,14 +711,14 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
     sheet.setColumnWidth(c, Math.max(calculatedWidth + 16, 75));
   }
 
-  // Ensure Notes has guaranteed comfortable minimum width
-  if (sheet.getColumnWidth(13) < 650) sheet.setColumnWidth(13, 650);
+  sheet.setColumnWidth(8, 130);            // Current Equipped Item (short badge, full name in the note)
+  sheet.setColumnWidth(NOTES_COL, 330);    // Loot Council Notes: top pick only
+  sheet.setColumnWidth(RUNNERS_COL, 330);  // Runners-Up
 
-  // Align text: Keep Top Contender & Equipped centered for clean badge symmetry, Notes left-aligned for readability
+  // Align text: long text columns read left, badges stay centred
   if (fullData.length > 1) {
-    sheet.getRange(2, 7, fullData.length - 1, 1).setHorizontalAlignment('center');
-    sheet.getRange(2, 8, fullData.length - 1, 1).setHorizontalAlignment('center');
-    sheet.getRange(2, 13, fullData.length - 1, 1).setHorizontalAlignment('left');
+    sheet.getRange(2, 7, fullData.length - 1, 2).setHorizontalAlignment('left');
+    sheet.getRange(2, NOTES_COL, fullData.length - 1, 2).setHorizontalAlignment('left');
 
     // Apply Rich Text Class Colors to Top Contender (Col G) and Loot Council Notes (Col M)
     const richTopContenders = [];
@@ -671,7 +729,9 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
       richTopContenders.push([buildRichTextWithClassColors(topText, rosterContextMap)]);
       richNotes.push([buildRichTextWithClassColors(noteText, rosterContextMap)]);
     }
+    const richRunnersUp = chaseItemsCatalog.map(r => [buildRichTextWithClassColors((r[13] || '').toString(), rosterContextMap)]);
     sheet.getRange(2, 7, richTopContenders.length, 1).setRichTextValues(richTopContenders);
-    sheet.getRange(2, 13, richNotes.length, 1).setRichTextValues(richNotes);
+    sheet.getRange(2, NOTES_COL, richNotes.length, 1).setRichTextValues(richNotes);
+    sheet.getRange(2, RUNNERS_COL, richRunnersUp.length, 1).setRichTextValues(richRunnersUp);
   }
 }

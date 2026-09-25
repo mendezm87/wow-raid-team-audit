@@ -49,3 +49,55 @@ test('zebra fills alternate and restart after a blank row', () => {
   const fills = Array.from(context.zebraBackgrounds(6, 1, i => i === 2), r => r[0]);
   assert.deepEqual(fills, [white, grey, white, white, grey, white]);
 });
+
+test('Wowhead guide links are built from class and spec', () => {
+  const { context } = loadAppsScript();
+  assert.equal(
+    context.wowheadGuideUrl('Death Knight', 'Unholy'),
+    'https://www.wowhead.com/guide/classes/death-knight/unholy/overview'
+  );
+  assert.equal(
+    context.wowheadGuideUrl('Hunter', 'Beast Mastery'),
+    'https://www.wowhead.com/guide/classes/hunter/beast-mastery/overview'
+  );
+  assert.equal(context.wowheadGuideUrl('Druid', ''), '');
+  assert.equal(context.wowheadGuideUrl('', 'Balance'), '');
+});
+
+test('loot priority bands come from the slot the item drops in', () => {
+  const { context } = loadAppsScript();
+  assert.equal(context.lootPriorityTier('Trinket 1'), '🔥 Trinket');
+  assert.equal(context.lootPriorityTier('Two-Hand (2H)'), '🔥 Weapon');
+  assert.equal(context.lootPriorityTier('Off Hand (Shield)'), '🔥 Weapon');
+  assert.equal(context.lootPriorityTier('Legs'), '🎽 Tier Piece');
+  assert.equal(context.lootPriorityTier('Neck'), '💠 Secondary');
+  assert.equal(context.lootPriorityTier('Gear'), '📦 Raid Drop');
+  assert.equal(context.lootPriorityTier(''), '');
+});
+
+test('Raid Ready summaries stay short and keep the badge keywords', () => {
+  const { context } = loadAppsScript();
+  assert.equal(context.formatRaidReadySummary([]), 'READY');
+  assert.equal(
+    context.formatRaidReadySummary(['Off-Spec → Vengeance', '2/4 Tier', '1 Socket', '1 Enchant']),
+    'Off-Spec → Vengeance · 2/4 Tier · 1 Socket · 1 Enchant'
+  );
+});
+
+test('the labelled ALTS band starts the alt section on Guild Audit', () => {
+  const gas = loadAppsScript();
+  const band = gas.get('ALTS_BAND_LABEL');
+  assert.ok(gas.context.isAltsBandLabel(band));
+  assert.ok(!gas.context.isAltsBandLabel('Nimidk'));
+
+  const audit = gas.spreadsheet.insertSheet('Guild Audit');
+  audit.getRange(1, 1, 4, 3).setValues([
+    ['Name\n↻ Sep 25, 1:36 AM', 'Class', 'iLvl'],
+    ['Nimidk', 'Death Knight', 323],
+    [band, '', ''],
+    ['Sidekick', 'Mage', 300]
+  ]);
+
+  const mains = Array.from(gas.context.getGuildAuditCharacterList(gas.spreadsheet), c => c.Name);
+  assert.deepEqual(mains, ['Nimidk']);
+});

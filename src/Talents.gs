@@ -30,8 +30,11 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
 
     const archonHeroicFormula = `=HYPERLINK("https://www.archon.gg/wow/builds/" & ${specClassSlug} & "/raid/overview/heroic/" & ${bossSlugFormula}, "⚡ Heroic (" & F${rowNum} & ")")`;
     const archonMythicFormula = `=HYPERLINK("https://www.archon.gg/wow/builds/" & ${specClassSlug} & "/raid/overview/mythic/" & ${bossSlugFormula}, "⚔️ Mythic (" & F${rowNum} & ")")`;
-    const wowheadFormula = (obj['Wowhead Guide Link'] && obj['Wowhead Guide Link'] !== '-') 
-      ? `=HYPERLINK("${obj['Wowhead Guide Link']}", "📖 Wowhead Guide")`
+    const wowheadUrl = (obj['Wowhead Guide Link'] && obj['Wowhead Guide Link'] !== '-')
+      ? obj['Wowhead Guide Link']
+      : wowheadGuideUrl(obj['Class'], obj['Spec']);
+    const wowheadFormula = wowheadUrl
+      ? `=HYPERLINK("${wowheadUrl}", "📖 ${obj['Spec'] || 'Wowhead'} Guide")`
       : '-';
     const droptimizerFormula = (obj['Droptimizer Link'] && obj['Droptimizer Link'] !== '-')
       ? `=HYPERLINK("${obj['Droptimizer Link']}", "🎲 1-Click Sim")`
@@ -57,9 +60,10 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   finalRows.push(...mainCharacterData.map((c, i) => formatTalentRow(c, i)));
 
   if (altCharacterData && altCharacterData.length > 0) {
-    finalRows.push(Array(talentHeaders.length).fill(''));
-    finalRows.push(Array(talentHeaders.length).fill(''));
-    const startAltIdx = mainCharacterData.length + 2;
+    const bandRow = Array(talentHeaders.length).fill('');
+    bandRow[0] = ALTS_BAND_LABEL;
+    finalRows.push(bandRow);
+    const startAltIdx = mainCharacterData.length + 1;
     finalRows.push(...altCharacterData.map((c, i) => formatTalentRow(c, startAltIdx + i)));
   }
 
@@ -67,6 +71,7 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   sheet.clear();
   sheet.clearFormats();
   sheet.clearConditionalFormatRules();
+  fitSheetColumns(sheet, talentHeaders.length);
   sheet.getRange(1, 1, outputData.length, outputData[0].length).setValues(outputData);
 
   // Formatting
@@ -75,12 +80,16 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   fullRange.setVerticalAlignment('middle');
   fullRange.setFontFamily('Roboto');
   fullRange.setNumberFormat('@');
+  const ilvlColIdx = talentHeaders.indexOf('iLvl') + 1;
+  if (ilvlColIdx > 0 && sheet.getMaxRows() > 1) {
+    sheet.getRange(2, ilvlColIdx, sheet.getMaxRows() - 1, 1).setNumberFormat('0');
+  }
   sheet.setFrozenColumns(1);
   sheet.setFrozenRows(1);
   applyTabColor(sheet);
 
   // Header styling
-  const headerRange = sheet.getRange(1, 1, 1, sheet.getMaxColumns());
+  const headerRange = sheet.getRange(1, 1, 1, talentHeaders.length);
   headerRange.setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
   sheet.setRowHeight(1, 40);
   stampHeaderCell(sheet, talentHeaders[0]);
@@ -93,11 +102,22 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
     const rowAlignments = talentHeaders.map(h => (textCols.includes(h) ? 'left' : (h === 'iLvl' ? 'right' : 'center')));
     const rowWeights = talentHeaders.map(h => (h === 'Name' || h === 'Raid Ready' ? 'bold' : 'normal'));
     sheet.setRowHeights(2, dataRows, 28);
-    sheet.getRange(2, 1, dataRows, sheet.getMaxColumns()).setFontSize(9);
+    sheet.getRange(2, 1, dataRows, talentHeaders.length).setFontSize(9);
     sheet.getRange(2, 1, dataRows, talentHeaders.length)
       .setHorizontalAlignments(Array.from({ length: dataRows }, () => rowAlignments))
       .setFontWeights(Array.from({ length: dataRows }, () => rowWeights))
-      .setBackgrounds(zebraBackgrounds(dataRows, talentHeaders.length, i => !finalRows[i][0]));
+      .setBackgrounds(zebraBackgrounds(dataRows, talentHeaders.length, i => !finalRows[i][0] || isAltsBandLabel(finalRows[i][0])));
+
+    const bandIdx = finalRows.findIndex(r => isAltsBandLabel(r[0]));
+    if (bandIdx > -1) {
+      sheet.getRange(bandIdx + 2, 1, 1, talentHeaders.length)
+        .setBackground('#334155')
+        .setFontColor('#f8fafc')
+        .setFontWeight('bold')
+        .setFontSize(9)
+        .setHorizontalAlignment('left');
+      sheet.setRowHeight(bandIdx + 2, 24);
+    }
     // Set monospace styling for Talent String (Column 5)
     sheet.getRange(2, 5, dataRows, 1).setFontFamily('Consolas').setFontSize(8);
   }
@@ -134,7 +154,7 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   const raidReadyColIdx = talentHeaders.indexOf('Raid Ready') + 1;
   const rrRange = [sheet.getRange(2, raidReadyColIdx, sheet.getMaxRows(), 1)];
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('READY').setBackground('#d1fae5').setFontColor('#065f46').setRanges(rrRange).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Missing').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges(rrRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Enchant').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges(rrRange).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Socket').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges(rrRange).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Off-Spec').setBackground('#fef3c7').setFontColor('#92400e').setRanges(rrRange).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Tier').setBackground('#fef3c7').setFontColor('#92400e').setRanges(rrRange).build());
@@ -162,5 +182,5 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   sheet.setColumnWidth(9, 150); // Wowhead Guide
   sheet.setColumnWidth(10, 150); // Raidbots Droptimizer
   sheet.setColumnWidth(11, 80); // ilvl
-  sheet.setColumnWidth(12, 360);// Raid Ready
+  sheet.setColumnWidth(12, 240);// Raid Ready
 }

@@ -635,7 +635,7 @@ function syncWarcraftLogsSeasonAttendance() {
     raidLedger.push({
       dateKey: session.dateKey,
       date: session.formattedDate,
-      title: titlePrefix + (session.title || 'Guild Raid'),
+      title: isOfficial ? SEASON.raidName : titlePrefix + (session.title || 'Guild Raid'),
       bossesDefeated: bossesDefeatedText,
       killCount: session.allBossKills.length,
       rosterPresentCount: isOfficial ? (presentOnTime.length + presentLate.length + presentBench.length) : uniqueSessionMains.size,
@@ -779,7 +779,10 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
   sheet.setHiddenGridlines(true);
   applyTabColor(sheet);
   const archiveSheet = ss.getSheetByName(ATTENDANCE_ARCHIVE_SHEET_NAME);
-  if (archiveSheet) applyTabColor(archiveSheet);
+  if (archiveSheet) {
+    applyTabColor(archiveSheet);
+    archiveSheet.hideSheet(); // raw sync data, kept for the scripts rather than for reading
+  }
 
   // Banner formatting
   sheet.getRange('A1:J1').merge().setBackground('#0f172a').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(11).setHorizontalAlignment('center');
@@ -809,10 +812,17 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
   // Alternating Row Colors for Ledger Data (batched: one call per property instead of several per row)
   if (raidLedger.length > 0) {
     const ledgerRange = sheet.getRange(ledgerHeaderRow + 1, 1, raidLedger.length, 10);
-    const rowColors = raidLedger.map((_, rowIdx) => new Array(10).fill(rowIdx % 2 === 0 ? '#ffffff' : '#f8fafc'));
+    const rowColors = raidLedger.map((r, rowIdx) => new Array(10).fill(
+      r.isOfficial === false ? '#f1f5f9' : (rowIdx % 2 === 0 ? '#ffffff' : '#f8fafc')
+    ));
+    const fontColors = raidLedger.map(r => new Array(10).fill(r.isOfficial === false ? '#94a3b8' : '#0f172a'));
     // Center: Date (1), Kills (4), Guild Raiders (5), Link (9)
     const alignments = raidLedger.map(() => ['center', 'left', 'left', 'center', 'center', 'left', 'left', 'left', 'center', 'left']);
-    ledgerRange.setBackgrounds(rowColors).setFontSize(9).setVerticalAlignment('middle').setHorizontalAlignments(alignments);
+    ledgerRange.setBackgrounds(rowColors)
+      .setFontColors(fontColors)
+      .setFontSize(9)
+      .setVerticalAlignment('middle')
+      .setHorizontalAlignments(alignments);
   }
 
   // Column Widths

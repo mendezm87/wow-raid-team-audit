@@ -17,7 +17,7 @@ function calculateRaidReadyStatus(charRow) {
   // Check if character logged out in an unexpected off-spec
   if (charRow['Expected Spec'] && charRow['Spec']) {
     if (charRow['Expected Spec'].toLowerCase() !== charRow['Spec'].toLowerCase()) {
-      issues.push(`⚠️ Off-Spec: ${charRow['Spec']} (Need: ${charRow['Expected Spec']})`);
+      issues.push(`Off-Spec → ${charRow['Expected Spec']}`);
     }
   }
   
@@ -30,7 +30,7 @@ function calculateRaidReadyStatus(charRow) {
   }
   
   if (charRow['Empty Sockets'] > 0) {
-    issues.push(`${charRow['Empty Sockets']} Empty Socket${charRow['Empty Sockets'] > 1 ? 's' : ''}`);
+    issues.push(`${charRow['Empty Sockets']} Socket${charRow['Empty Sockets'] > 1 ? 's' : ''}`);
   }
   
   let missingEnchants = 0;
@@ -39,10 +39,10 @@ function calculateRaidReadyStatus(charRow) {
   });
   
   if (missingEnchants > 0) {
-    issues.push(`${missingEnchants} Missing Enchant${missingEnchants > 1 ? 's' : ''}`);
+    issues.push(`${missingEnchants} Enchant${missingEnchants > 1 ? 's' : ''}`);
   }
-  
-  return issues.length === 0 ? 'READY' : issues.join(', ');
+
+  return formatRaidReadySummary(issues);
 }
 
 /**
@@ -593,6 +593,9 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
       charRow['Raid Ready'] = ARMORY_LOOKUP_FAILED;
       charRow['Tier Set'] = '-';
       AUDIT_ENCHANT_COLUMNS.forEach(col => { charRow[col] = '-'; });
+      // Nothing was read, so leave the stat columns blank rather than showing a real-looking 0
+      ['iLvl', 'M+ Rating', 'Total Sockets', 'Empty Sockets', 'Imperfect Gems', 'Crafted Items', 'GV Slots Unlocked']
+        .forEach(col => { charRow[col] = ''; });
     } else {
       charRow['Raid Ready'] = calculateRaidReadyStatus(charRow);
     }
@@ -661,11 +664,12 @@ function updateAllCharacterDataWithBonuses() {
   finalDataRows.push(...mainCharacterData.map(toSheetRow));
   
   if (altCharacterData.length > 0) {
-      finalDataRows.push(Array(outputHeaders.length).fill(''));
-      finalDataRows.push(Array(outputHeaders.length).fill(''));
-      
+      const bandRow = Array(outputHeaders.length).fill('');
+      bandRow[0] = ALTS_BAND_LABEL;
+      finalDataRows.push(bandRow);
+
       finalDataRows.push(...altCharacterData.map(toSheetRow));
-      combinedDataObjects.push({}, {}, ...altCharacterData);
+      combinedDataObjects.push({ isAltsBand: true }, ...altCharacterData);
   }
   
   const finalData = [outputHeaders, ...finalDataRows];
@@ -679,8 +683,9 @@ function updateAllCharacterDataWithBonuses() {
   sheet.clear();
   sheet.clearFormats();
   sheet.clearNotes();
+  fitSheetColumns(sheet, outputHeaders.length);
   sheet.getRange(1, 1, finalData.length, finalData[0].length).setValues(finalData);
-  
+
   applyFormatting(sheet, outputHeaders, combinedDataObjects);
   
   // 4. Update Talents & Builds Companion Sheet
@@ -720,7 +725,8 @@ function updateAllCharacterDataWithBonuses() {
  */
 function applyFormatting(sheet, headers, characterDataObjects) {
   const lastRow = sheet.getLastRow();
-  const totalCols = sheet.getMaxColumns();
+  fitSheetColumns(sheet, headers.length);
+  const totalCols = headers.length;
   const colOf = name => headers.indexOf(name) + 1;
   const columnRanges = names => names
     .map(colOf)
@@ -738,7 +744,8 @@ function applyFormatting(sheet, headers, characterDataObjects) {
     .setFontFamily('Roboto');
 
   // Set integer number format for numeric stat columns in one batch
-  const numericCols = ['iLvl', 'M+ Rating', 'Total Sockets', 'Empty Sockets', 'Imperfect Gems', 'Crafted Items', 'GV Slots Unlocked'];
+  const numericCols = ['iLvl', 'M+ Rating', 'Total Sockets', 'Empty Sockets', 'Imperfect Gems', 'Crafted Items', 'GV Slots Unlocked']
+    .concat(AUDIT_VAULT_COLUMNS);
   numericCols.forEach(colName => {
     const colIdx = colOf(colName);
     if (colIdx > 0 && sheet.getMaxRows() > 1) {
@@ -774,6 +781,7 @@ function applyFormatting(sheet, headers, characterDataObjects) {
     const rowAlignments = headers.map(h => (textCols.includes(h) ? 'left' : (numericCols.includes(h) ? 'right' : 'center')));
     const rowWeights = headers.map(h => (h === 'Name' || h === 'Raid Ready' ? 'bold' : 'normal'));
     const isGapRow = i => !(characterDataObjects[i] && characterDataObjects[i]['Name']);
+    const altsBandRowIdx = characterDataObjects.findIndex(obj => obj && obj.isAltsBand);
     rowBackgrounds = zebraBackgrounds(dataRows, headers.length, isGapRow);
 
     sheet.setRowHeights(2, dataRows, 28);
@@ -782,6 +790,16 @@ function applyFormatting(sheet, headers, characterDataObjects) {
       .setHorizontalAlignments(Array.from({ length: dataRows }, () => rowAlignments))
       .setFontWeights(Array.from({ length: dataRows }, () => rowWeights))
       .setBackgrounds(rowBackgrounds);
+
+    if (altsBandRowIdx > -1) {
+      sheet.getRange(altsBandRowIdx + 2, 1, 1, totalCols)
+        .setBackground('#334155')
+        .setFontColor('#f8fafc')
+        .setFontWeight('bold')
+        .setFontSize(9)
+        .setHorizontalAlignment('left');
+      sheet.setRowHeight(altsBandRowIdx + 2, 24);
+    }
   }
 
   // 3. Full item and enchant names live in hover notes, so the cells can stay short
@@ -840,7 +858,7 @@ function applyFormatting(sheet, headers, characterDataObjects) {
   if (raidReadyCol > 0) {
     const rrRange = columnRanges(['Raid Ready']);
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("READY").setBackground("#d1fae5").setFontColor("#065f46").setRanges(rrRange).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Missing").setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(rrRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Enchant").setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(rrRange).build());
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Socket").setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(rrRange).build());
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Off-Spec").setBackground("#fef3c7").setFontColor("#92400e").setRanges(rrRange).build());
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Tier").setBackground("#fef3c7").setFontColor("#92400e").setRanges(rrRange).build());
@@ -906,10 +924,10 @@ function applyFormatting(sheet, headers, characterDataObjects) {
 
   const gvRaidRanges = columnRanges(['GV Raid 1', 'GV Raid 2', 'GV Raid 3']);
   if (gvRaidRanges.length > 0) {
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(VAULT_MAPPING.raid.mythic.toString()).setBackground("#ffedd5").setFontColor("#9a3412").setRanges(gvRaidRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(VAULT_MAPPING.raid.heroic.toString()).setBackground("#f3e8ff").setFontColor("#6b21a8").setRanges(gvRaidRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(VAULT_MAPPING.raid.normal.toString()).setBackground("#e0f2fe").setFontColor("#075985").setRanges(gvRaidRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(VAULT_MAPPING.raid.lfr.toString()).setBackground("#dcfce7").setFontColor("#166534").setRanges(gvRaidRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(VAULT_MAPPING.raid.mythic).setBackground("#ffedd5").setFontColor("#9a3412").setRanges(gvRaidRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(VAULT_MAPPING.raid.heroic).setBackground("#f3e8ff").setFontColor("#6b21a8").setRanges(gvRaidRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(VAULT_MAPPING.raid.normal).setBackground("#e0f2fe").setFontColor("#075985").setRanges(gvRaidRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(VAULT_MAPPING.raid.lfr).setBackground("#dcfce7").setFontColor("#166534").setRanges(gvRaidRanges).build());
   }
 
   const gvMplusRanges = columnRanges(['GV M+ 1', 'GV M+ 2', 'GV M+ 3']);
@@ -938,7 +956,7 @@ function applyFormatting(sheet, headers, characterDataObjects) {
   // Column widths: gear and enchant cells hold short badges now (full names are in the notes)
   const columnWidths = {
     'Name': 120, 'Class': 100, 'Spec': 110, 'iLvl': 55,
-    'Raid Ready': 360, 'M+ Rating': 75, 'Tier Set': 95,
+    'Raid Ready': 240, 'M+ Rating': 75, 'Tier Set': 95,
     'Total Sockets': 75, 'Empty Sockets': 75, 'Imperfect Gems': 80, 'Crafted Items': 75,
     'Embellishment 1': 165, 'Embellishment 2': 165,
     'GV Slots Unlocked': 80

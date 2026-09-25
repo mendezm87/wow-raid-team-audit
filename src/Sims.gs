@@ -159,6 +159,8 @@ function ingestRaidbotsSims_(input) {
     createLootAndChaseItemsSheet();
   }
   const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  const hasRunnersColumn = lootRowHasRunnersColumn_(values);
+  const equippedNotes = new Array(values.length).fill('');
 
   // Only raiders listed as mains on the Config sheet count for loot
   const rosterNames = getRosterMainNamesSet(ss);
@@ -171,7 +173,7 @@ function ingestRaidbotsSims_(input) {
       return;
     }
     // Keep everyone's earlier sims (roster mains only) so this import merges instead of replacing them
-    itemUpgradeMap[itemName] = parseSimUpgradeNotes_(row[12], rosterNames);
+    itemUpgradeMap[itemName] = parseSimUpgradeNotes_(lootRowContenderText_(row), rosterNames);
   });
 
   const now = Date.now();
@@ -447,7 +449,7 @@ function ingestRaidbotsSims_(input) {
 
   // Re-write merged rankings onto the sheet
   let totalMatches = 0;
-  values.forEach(row => {
+  values.forEach((row, rowIndex) => {
     const sheetItemName = (row[1] || '').toString().trim();
     if (!sheetItemName) return;
 
@@ -486,8 +488,8 @@ function ingestRaidbotsSims_(input) {
           const cAtt = c.priority.attPct ? ` | ${c.priority.attPct}` : '';
           const cPrep = (!c.priority.isRaidReady) ? ' | ⚠️ Unenchanted' : '';
           return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.pct}%${cCat}${cRole}${cAtt}${cPrep})`;
-        }).join(' | ');
-        row[12] = `Raidbots Sim Upgrades: ${topList}`;
+        });
+        writeLootContenderColumns_(row, hasRunnersColumn, 'Raidbots Sim Upgrades:', topList);
 
         // Populate live equipped item and ilvl for the top contender!
         const topChar = charMap[top.name.toLowerCase()];
@@ -512,8 +514,9 @@ function ingestRaidbotsSims_(input) {
           } else {
             currentSlotText = topChar[slot] || '-';
           }
-          row[7] = currentSlotText;
+          row[7] = compactGearText(currentSlotText);
           row[8] = extractIlvl(currentSlotText) || '-';
+          equippedNotes[rowIndex] = currentSlotText && currentSlotText !== '-' ? currentSlotText : '';
         }
         totalMatches++;
       }
@@ -522,9 +525,9 @@ function ingestRaidbotsSims_(input) {
 
   // Save back all updated and newly registered items
   sheet.getRange(2, 1, values.length, values[0].length).setValues(values);
-  sheet.getRange(2, 7, values.length, 1).setHorizontalAlignment('center');
-  sheet.getRange(2, 8, values.length, 1).setHorizontalAlignment('center');
-  sheet.getRange(2, 13, values.length, 1).setHorizontalAlignment('left');
+  sheet.getRange(2, 7, values.length, 2).setHorizontalAlignment('left');
+  sheet.getRange(2, 13, values.length, hasRunnersColumn ? 2 : 1).setHorizontalAlignment('left');
+  sheet.getRange(2, 8, values.length, 1).setNotes(equippedNotes.map(text => [text || '']));
 
   // Apply Rich Text Class Colors to Top Contender and Notes
   const richTopContenders = [];
@@ -537,6 +540,10 @@ function ingestRaidbotsSims_(input) {
   }
   sheet.getRange(2, 7, richTopContenders.length, 1).setRichTextValues(richTopContenders);
   sheet.getRange(2, 13, richNotes.length, 1).setRichTextValues(richNotes);
+  if (hasRunnersColumn) {
+    const richRunnersUp = values.map(row => [buildRichTextWithClassColors((row[13] || '').toString(), rosterContextMap)]);
+    sheet.getRange(2, 14, richRunnersUp.length, 1).setRichTextValues(richRunnersUp);
+  }
 
   // Set clean dynamic column widths (Unmerged flat layout)
   sheet.setColumnWidth(1, 230); // Boss / Source header
@@ -545,7 +552,9 @@ function ingestRaidbotsSims_(input) {
     const calculatedWidth = sheet.getColumnWidth(c);
     sheet.setColumnWidth(c, Math.max(calculatedWidth + 16, 75));
   }
-  if (sheet.getColumnWidth(13) < 650) sheet.setColumnWidth(13, 650);
+  sheet.setColumnWidth(8, 130);
+  sheet.setColumnWidth(13, 330);
+  if (hasRunnersColumn) sheet.setColumnWidth(14, 330);
 
   return {
     success: true,
@@ -627,14 +636,16 @@ function ingestQELiveReport_(reportUrlOrId) {
   if (lastRow <= 1) return { success: false, error: 'Loot & Chase Items sheet is empty.' };
 
   const values = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  const hasRunnersColumn = lootRowHasRunnersColumn_(values);
+  const equippedNotes = new Array(values.length).fill('');
 
   // Read itemUpgradeMap from existing sheet rows
   const itemUpgradeMap = {};
-  values.forEach(row => {
+  values.forEach((row, rowIndex) => {
     const itemName = (row[1] || '').toString().trim();
     if (itemName && !itemName.startsWith('═══')) {
       // Keep everyone else's earlier sims (roster mains only); this healer's newest report replaces their old one
-      itemUpgradeMap[itemName] = parseSimUpgradeNotes_(row[12], rosterNames)
+      itemUpgradeMap[itemName] = parseSimUpgradeNotes_(lootRowContenderText_(row), rosterNames)
         .filter(e => e.name.toLowerCase() !== playerName.toLowerCase());
     }
   });
@@ -702,7 +713,7 @@ function ingestQELiveReport_(reportUrlOrId) {
   const rosterContextMap = getRosterContextMap(sheet.getParent());
 
   // Re-write merged rankings onto the sheet
-  values.forEach(row => {
+  values.forEach((row, rowIndex) => {
     const sheetItemName = (row[1] || '').toString().trim();
     if (!sheetItemName) return;
 
@@ -740,8 +751,8 @@ function ingestQELiveReport_(reportUrlOrId) {
           const cAtt = c.priority.attPct ? ` | ${c.priority.attPct}` : '';
           const cPrep = (!c.priority.isRaidReady) ? ' | ⚠️ Unenchanted' : '';
           return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.pct}%${cRole}${cAtt}${cPrep})`;
-        }).join(' | ');
-        row[12] = `Sim / QE Live Upgrades: ${topList}`;
+        });
+        writeLootContenderColumns_(row, hasRunnersColumn, 'Sim / QE Live Upgrades:', topList);
 
         const topChar = charMap[top.name.toLowerCase()];
         if (topChar) {
@@ -765,8 +776,9 @@ function ingestQELiveReport_(reportUrlOrId) {
           } else {
             currentSlotText = topChar[slot] || '-';
           }
-          row[7] = currentSlotText;
+          row[7] = compactGearText(currentSlotText);
           row[8] = extractIlvl(currentSlotText) || '-';
+          equippedNotes[rowIndex] = currentSlotText && currentSlotText !== '-' ? currentSlotText : '';
         }
 
         totalMatches++;
@@ -776,9 +788,9 @@ function ingestQELiveReport_(reportUrlOrId) {
 
   // Save back all updated values
   sheet.getRange(2, 1, values.length, values[0].length).setValues(values);
-  sheet.getRange(2, 7, values.length, 1).setHorizontalAlignment('center');
-  sheet.getRange(2, 8, values.length, 1).setHorizontalAlignment('center');
-  sheet.getRange(2, 13, values.length, 1).setHorizontalAlignment('left');
+  sheet.getRange(2, 7, values.length, 2).setHorizontalAlignment('left');
+  sheet.getRange(2, 13, values.length, hasRunnersColumn ? 2 : 1).setHorizontalAlignment('left');
+  sheet.getRange(2, 8, values.length, 1).setNotes(equippedNotes.map(text => [text || '']));
 
   // Apply Rich Text Class Colors to Top Contender and Notes
   const richTopContenders = [];
@@ -791,6 +803,10 @@ function ingestQELiveReport_(reportUrlOrId) {
   }
   sheet.getRange(2, 7, richTopContenders.length, 1).setRichTextValues(richTopContenders);
   sheet.getRange(2, 13, richNotes.length, 1).setRichTextValues(richNotes);
+  if (hasRunnersColumn) {
+    const richRunnersUp = values.map(row => [buildRichTextWithClassColors((row[13] || '').toString(), rosterContextMap)]);
+    sheet.getRange(2, 14, richRunnersUp.length, 1).setRichTextValues(richRunnersUp);
+  }
 
   // Set clean dynamic column widths (Unmerged flat layout)
   sheet.setColumnWidth(1, 230); // Boss / Source header
@@ -799,7 +815,9 @@ function ingestQELiveReport_(reportUrlOrId) {
     const calculatedWidth = sheet.getColumnWidth(c);
     sheet.setColumnWidth(c, Math.max(calculatedWidth + 16, 75));
   }
-  if (sheet.getColumnWidth(13) < 650) sheet.setColumnWidth(13, 650);
+  sheet.setColumnWidth(8, 130);
+  sheet.setColumnWidth(13, 330);
+  if (hasRunnersColumn) sheet.setColumnWidth(14, 330);
 
   return {
     success: true,
@@ -946,5 +964,30 @@ function syncLatestSimsFromDiscord() {
     }
   } catch (err) {
     ui.alert('❌ Sync Error', `Failed to sync sims from Discord: ${err.message}`, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * The Loot sheet keeps the top pick in "Loot Council Notes" and the rest in "Runners-Up".
+ * Older sheets have no Runners-Up column, so the whole list stays in the notes column there.
+ */
+function lootRowHasRunnersColumn_(values) {
+  return values.length > 0 && values[0].length > 13;
+}
+
+/** Full ranked contender list for a row, however it is split across the two columns. */
+function lootRowContenderText_(row) {
+  return [(row[12] || '').toString(), (row[13] || '').toString()].filter(Boolean).join(' | ');
+}
+
+/** Writes a ranked list back across Notes / Runners-Up, keeping any "Blizzard ID:" lead-in. */
+function writeLootContenderColumns_(row, hasRunners, prefix, entries) {
+  const idMatch = (row[12] || '').toString().match(/Blizzard ID:\s*\d+/i);
+  const leadIn = [idMatch ? idMatch[0] : '', prefix].filter(Boolean).join(' \u00b7 ');
+  if (hasRunners) {
+    row[12] = [leadIn, entries[0] || ''].filter(Boolean).join(' ').trim();
+    row[13] = entries.slice(1).join(' | ');
+  } else {
+    row[12] = [leadIn, entries.join(' | ')].filter(Boolean).join(' ').trim();
   }
 }

@@ -137,9 +137,10 @@ Tracks equipped item levels, tier set bonuses, gems, enchants, and weekly Great 
 
 ### 🏷️ Badge Breakdown (`Raid Ready` Column):
 * 🟢 **`READY`**: Fully enchanted, all sockets filled with current gems, and has at least 4pc current season tier.
-* 🔴 **`Missing Enchant` / `Empty Socket`**: Identifies specific missing items and un-socketed slots.
+* 🔴 **`1 Enchant` / `2 Sockets`**: Counts the missing enchants and un-socketed slots.
 * 🟡 **`0-3/4 Tier`**: Raider is missing their 4pc active tier set bonus.
-* ⚠️ **`Off-Spec Logout: Holy (Assigned: Protection)`**: Warns officers if a raider logged out in an off-spec or PvP gear.
+* ⚠️ **`Off-Spec → Protection`**: Warns officers if a raider logged out in a spec other than the one assigned on `Config`. The arrow points at the **assigned** spec.
+* Issues are joined with ` · `, e.g. `Off-Spec → Vengeance · 2/4 Tier · 1 Enchant`.
 * ⚪ **`⚠️ Armory lookup failed`** (whole row greyed out): Blizzard's Armory didn't return the character — usually they left the guild, renamed, or transferred. Check the name on `Config`, or remove them.
 
 ### 🧭 Reading the Sheet:
@@ -148,6 +149,7 @@ Tracks equipped item levels, tier set bonuses, gems, enchants, and weekly Great 
 * **Short gear cells**: each gear slot shows `◆ 334 Myth 6/6` (item level + upgrade track). **◆** = current-season tier piece, **◇** = previous-season tier. **Hover the cell** to see the full item name.
 * **Short enchant cells**: `✓ Rank 2` (green), `✓ Rank 1` (amber), `✓` for Death Knight runes, `Missing` (red), `N/A` (grey, e.g. shields and off-hands). Hover for the enchant name.
 * **Last refreshed**: the small `↻` time under the `Name` header shows when the audit last ran (same on `Talents & Builds` and `Loot & Chase Items`).
+* **Alts band**: mains and alts are separated by a single dark `───── ALTS ─────` row. Everything below it is an alt and is excluded from loot scoring.
 * **Formatting lives in the code**: every refresh rebuilds colours, widths and layout, so changes made by hand in Sheets are wiped on the next run.
 
 ### 🏛️ Upgrade Track & Vault Formatting:
@@ -168,7 +170,7 @@ Provides an instant overview of your raid team's talent selections and quick acc
 3. **Meta Guides**:
    * **Archon (Heroic)**: Live statistical meta builds for Heroic raid bosses.
    * **Archon (Mythic)**: Live statistical meta builds for Mythic progression.
-   * **Wowhead Guide**: Direct link to the class/spec comprehensive overview.
+   * **Wowhead Guide**: Direct link to the class/spec overview, built automatically from the raider's class and active spec (e.g. `📖 Unholy Guide`).
 4. **1-Click Sim Link**: Preloaded Raidbots Droptimizer link with the raider's exact name, region, and realm slug.
 
 ---
@@ -215,7 +217,18 @@ $$\text{Priority Score} = \text{Raw Upgrade Gain} \times \text{Reliability Index
 ### 👑 Contender Display Badges:
 * **Prepared Raider (Column G):** `Summzr [Score: 4.62] (+4.20% DPS • 👑 Veteran • 100% Att)`
 * **Un-enchanted Raider (Column G):** `Summzr [Score: 4.16] (+4.20% DPS • 👑 Veteran • 100% Att • ⚠️ Missing Enchants)`
-* **Loot Council Notes (Column M):** `Rankings: 1. Summzr [Score: 4.62] (+4.20% | 👑 Veteran | 100%) | 2. Unready [Score: 3.60] (+4.00% | ⚔️ Raider | 100% | ⚠️ Unenchanted)`
+* **Loot Council Notes (Column M):** the **top pick only** — `Blizzard ID: 268230 · Sim Upgrades: 1. Summzr [Score: 4.62] (+4.20% | 👑 Veteran | 100%)`
+* **Runners-Up (Column N):** everyone behind them — `2. Unready [Score: 3.60] (+4.00% | ⚔️ Raider | 100% | ⚠️ Unenchanted) | 3. …`
+* **Current Equipped Item (Column H):** the short `◆ 321 Hero 6/6` badge, same as Guild Audit. **Hover the cell** for the full item name.
+
+### 🎯 Loot Priority (Column K):
+The band an item falls into, taken from the slot it drops in — the slots that move throughput most, first:
+* 🔥 **`🔥 Trinket`** / 🔥 **`🔥 Weapon`**: biggest single-item throughput swing.
+* 🟣 **`🎽 Tier Piece`**: head, shoulders, chest, hands, legs — counts toward the 4pc set bonus.
+* 🔵 **`💠 Secondary`**: neck, back, wrist, waist, feet, rings.
+* ⚪ **`📦 Raid Drop`**: anything else.
+
+This is a **slot** ranking, not a per-spec BiS list. For a true BiS ordering, import a sim — the Top Contender and score columns are driven by that.
 
 ### 🎨 Top Contender Color-Coding (Column G):
 * 🟢 **Mint Green (`#d1fae5`)**: Item is evaluated via an active sim (**Raidbots `% DPS`** or **QE Live `% HPS`**).

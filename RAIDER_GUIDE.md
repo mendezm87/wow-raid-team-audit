@@ -35,7 +35,7 @@ This tab automatically synchronizes with Blizzard's live Armory to check your ch
 
 ### 🏷️ What to Look For:
 * 🟢 **`READY`**: You are 100% prepared! All enchants and gems are active, and you have your 4-piece tier set.
-* 🔴 **`Missing Enchant` / `Empty Socket`**: Shows the exact gear slot missing an enchant or gem. Please enchant/gem these before raid time!
+* 🔴 **`1 Enchant` / `2 Sockets`**: Counts how many of your slots are missing an enchant or a gem. Hover the enchant columns to see which ones. Please enchant/gem these before raid time!
 * 🟡 **`0/4`, `1/4`, `2/4`, `3/4 Tier`**: Tracks your active current-season tier set pieces.
 * 🏛️ **Weekly Great Vault Progress**: Columns on the far right track how many raid and Mythic+ vault slots you have unlocked for the week.
 * 🔎 **Gear & enchant cells are short**: a gear slot reads like `◆ 334 Myth 6/6` (**◆** = tier piece) and an enchant reads `✓ Rank 2` or `Missing`. **Hover over a cell** to see the full item or enchant name.

@@ -16,7 +16,7 @@ const ATTENDANCE_SHEET_NAME = 'Attendance & History';
 const CLASS_COLORS = {
   'Warrior': '#C79C6E', 'Mage': '#3FC7EB', 'Rogue': '#FFF569', 'Paladin': '#F58CBA',
   'Warlock': '#8787ED', 'Shaman': '#0070DE', 'Hunter': '#ABD473', 'Druid': '#FF7D0A',
-  'Priest': '#FFFFFF', 'Death Knight': '#C41F3B', 'Monk': '#00FF96',
+  'Priest': '#DCE3EC', 'Death Knight': '#C41F3B', 'Monk': '#00FF96',
   'Demon Hunter': '#A330C9', 'Evoker': '#33937F',
 };
 
@@ -210,4 +210,55 @@ function enchantNoteText(full) {
   const text = (full || '').toString();
   if (!text || text === '-' || text === 'Missing' || text === 'N/A') return '';
   return text.replace(/^Enchanted:\s*/, '').replace(/\s*\|A:[^|]*\|a/g, '').trim();
+}
+
+/** Label for the row that separates mains from alts on Guild Audit and Talents & Builds. */
+const ALTS_BAND_LABEL = '─────  ALTS  ─────';
+
+/** True for the labelled band row that separates mains from alts. */
+function isAltsBandLabel(value) {
+  return (value || '').toString().trim().startsWith('─');
+}
+
+/**
+ * Makes a sheet exactly keepCols wide: adds columns when the layout grew, and drops the trailing
+ * empty ones so header styling can't run past the data. Call it before writing the values.
+ */
+function fitSheetColumns(sheet, keepCols) {
+  if (keepCols < 1) return;
+  const diff = sheet.getMaxColumns() - keepCols;
+  if (diff > 0) sheet.deleteColumns(keepCols + 1, diff);
+  else if (diff < 0) sheet.insertColumnsAfter(sheet.getMaxColumns(), -diff);
+}
+
+/** Wowhead class guide URL built from the character's class and spec, e.g. .../death-knight/unholy/overview. */
+function wowheadGuideUrl(className, spec) {
+  const slug = v => (v || '').toString().trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const classSlug = slug(className);
+  const specSlug = slug(spec);
+  if (!classSlug || !specSlug) return '';
+  return `https://www.wowhead.com/guide/classes/${classSlug}/${specSlug}/overview`;
+}
+
+/**
+ * Loot priority band for an item, from the slot it drops in. Weapons and trinkets carry the
+ * biggest throughput swing, then tier pieces, then the secondary slots.
+ */
+const TIER_SET_SLOTS = ['Head', 'Shoulders', 'Shoulder', 'Chest', 'Hands', 'Legs'];
+
+const SECONDARY_SLOTS = ['Neck', 'Back', 'Wrist', 'Waist', 'Feet', 'Ring 1', 'Ring 2', 'Ring', 'Finger'];
+
+function lootPriorityTier(slot) {
+  const text = (slot || '').toString().trim();
+  if (!text) return '';
+  if (/trinket/i.test(text)) return '🔥 Trinket';
+  if (/hand \(|two-hand|one-hand|weapon|ranged|shield|off hand|main hand/i.test(text)) return '🔥 Weapon';
+  if (TIER_SET_SLOTS.some(s => s.toLowerCase() === text.toLowerCase())) return '🎽 Tier Piece';
+  if (SECONDARY_SLOTS.some(s => s.toLowerCase() === text.toLowerCase())) return '💠 Secondary';
+  return '📦 Raid Drop';
+}
+
+/** Short Raid Ready summary, e.g. "Off-Spec → Vengeance · 2/4 Tier · 1 Enchant". */
+function formatRaidReadySummary(issues) {
+  return issues.length === 0 ? 'READY' : issues.join(' · ');
 }
