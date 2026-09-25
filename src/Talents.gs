@@ -1,6 +1,29 @@
 const ARCHON_BOSS_ENTRIES = SEASON.bosses.concat(SEASON.archonExtraBosses);
 
-const ARCHON_BOSS_OPTIONS = ['All Bosses (Overview)'].concat(ARCHON_BOSS_ENTRIES.map(b => b.short));
+// Default boss-build pick (sheets before this change used "All Bosses (Overview)")
+const ARCHON_ALL_BOSSES = 'All Bosses';
+
+const ARCHON_BOSS_OPTIONS = [ARCHON_ALL_BOSSES].concat(ARCHON_BOSS_ENTRIES.map(b => b.short));
+
+/**
+ * Each raider's current Archon boss pick on the Talents sheet, keyed by lowercased name,
+ * so a refresh keeps the boss an officer chose instead of resetting every row.
+ */
+function readArchonBossPicks_(sheet) {
+  const picks = {};
+  if (!sheet || sheet.getLastRow() < 2) return picks;
+  const values = sheet.getRange(1, 1, sheet.getLastRow(), sheet.getLastColumn()).getValues();
+  const headers = values[0].map(headerLabel);
+  const nameIdx = headers.indexOf('Name');
+  const bossIdx = headers.indexOf('Archon Boss Build (Dropdown)');
+  if (nameIdx < 0 || bossIdx < 0) return picks;
+  values.slice(1).forEach(row => {
+    const name = (row[nameIdx] || '').toString().trim().toLowerCase();
+    const pick = (row[bossIdx] || '').toString().trim();
+    if (name && ARCHON_BOSS_OPTIONS.includes(pick)) picks[name] = pick;
+  });
+  return picks;
+}
 
 /**
  * Creates and formats the Talents & Builds companion sheet.
@@ -11,11 +34,12 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   if (!sheet) {
     sheet = ss.insertSheet(TALENTS_SHEET_NAME);
   }
+  const bossPicks = readArchonBossPicks_(sheet);
 
   const talentHeaders = [
-    'Name', 'Class', 'Active Spec', 'Hero Talents', 
-    'Talent Loadout Code (Import String)', 'Archon Boss Build (Dropdown)',
-    'Archon (Heroic Link)', 'Archon (Mythic Link)', 'Wowhead Guide', 
+    'Name', 'Class', 'Active Spec', 'Hero Talents',
+    'Loadout Code', 'Archon Boss Build (Dropdown)',
+    'Archon (Heroic Link)', 'Archon (Mythic Link)', 'Wowhead Guide',
     'Raidbots Droptimizer', 'iLvl', 'Raid Ready'
   ];
 
@@ -27,9 +51,11 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
       (elseExpr, b) => `IF(F${rowNum}="${b.short}", "${b.archonSlug}", ${elseExpr})`,
       '"all-bosses"'
     );
+    // "⚡ Heroic" for the all-bosses overview, "⚡ Heroic · <boss>" once a boss is picked
+    const archonLabel = prefix => `"${prefix}" & IF(OR(F${rowNum}="", F${rowNum}="${ARCHON_ALL_BOSSES}"), "", " · " & F${rowNum})`;
 
-    const archonHeroicFormula = `=HYPERLINK("https://www.archon.gg/wow/builds/" & ${specClassSlug} & "/raid/overview/heroic/" & ${bossSlugFormula}, "⚡ Heroic (" & F${rowNum} & ")")`;
-    const archonMythicFormula = `=HYPERLINK("https://www.archon.gg/wow/builds/" & ${specClassSlug} & "/raid/overview/mythic/" & ${bossSlugFormula}, "⚔️ Mythic (" & F${rowNum} & ")")`;
+    const archonHeroicFormula = `=HYPERLINK("https://www.archon.gg/wow/builds/" & ${specClassSlug} & "/raid/overview/heroic/" & ${bossSlugFormula}, ${archonLabel('⚡ Heroic')})`;
+    const archonMythicFormula = `=HYPERLINK("https://www.archon.gg/wow/builds/" & ${specClassSlug} & "/raid/overview/mythic/" & ${bossSlugFormula}, ${archonLabel('⚔️ Mythic')})`;
     const wowheadUrl = (obj['Wowhead Guide Link'] && obj['Wowhead Guide Link'] !== '-')
       ? obj['Wowhead Guide Link']
       : wowheadGuideUrl(obj['Class'], obj['Spec']);
@@ -46,12 +72,12 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
       obj['Spec'] || '',
       obj['Hero Talents'] || '-',
       obj['Talent Code'] || '-',
-      'All Bosses (Overview)',
+      bossPicks[(obj['Name'] || '').toString().trim().toLowerCase()] || ARCHON_ALL_BOSSES,
       archonHeroicFormula,
       archonMythicFormula,
       wowheadFormula,
       droptimizerFormula,
-      obj['iLvl'] || 0,
+      obj['iLvl'] || '', // blank rather than 0 when the Armory lookup failed
       obj['Raid Ready'] || '-'
     ];
   };
@@ -70,8 +96,11 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   const outputData = [talentHeaders, ...finalRows];
   sheet.clear();
   sheet.clearFormats();
+  sheet.clearNotes();
   sheet.clearConditionalFormatRules();
   fitSheetColumns(sheet, talentHeaders.length);
+  // Dropdowns survive clear(), so remove them everywhere before adding them back on the character rows
+  sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).clearDataValidations();
   sheet.getRange(1, 1, outputData.length, outputData[0].length).setValues(outputData);
 
   // Formatting
@@ -94,11 +123,13 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   sheet.setRowHeight(1, 40);
   stampHeaderCell(sheet, talentHeaders[0]);
 
+  const loadoutColIdx = talentHeaders.indexOf('Loadout Code') + 1;
+
   // Rows: regular weight with Name and Raid Ready bold; text left, iLvl right, links centred.
   // Alternating fills, with the blank gap between mains and alts left white.
   if (outputData.length > 1) {
     const dataRows = outputData.length - 1;
-    const textCols = ['Name', 'Class', 'Active Spec', 'Hero Talents', 'Talent Loadout Code (Import String)', 'Raid Ready'];
+    const textCols = ['Name', 'Class', 'Active Spec', 'Hero Talents', 'Loadout Code', 'Raid Ready'];
     const rowAlignments = talentHeaders.map(h => (textCols.includes(h) ? 'left' : (h === 'iLvl' ? 'right' : 'center')));
     const rowWeights = talentHeaders.map(h => (h === 'Name' || h === 'Raid Ready' ? 'bold' : 'normal'));
     sheet.setRowHeights(2, dataRows, 28);
@@ -118,17 +149,17 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
         .setHorizontalAlignment('left');
       sheet.setRowHeight(bandIdx + 2, 24);
     }
-    // Set monospace styling for Talent String (Column 5)
-    sheet.getRange(2, 5, dataRows, 1).setFontFamily('Consolas').setFontSize(8);
+    // Loadout code: a narrow, muted column. The cell still holds the whole string, so copying the cell copies all of it.
+    sheet.getRange(2, loadoutColIdx, dataRows, 1)
+      .setFontFamily('Consolas')
+      .setFontSize(8)
+      .setFontColor('#94a3b8')
+      .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
   }
+  sheet.getRange(1, loadoutColIdx).setNote('Click a cell and copy it (Ctrl/Cmd+C). The whole import string is copied, even though the column only shows the start of it.');
 
-  // Class colors for Name, Class, Spec
-  const classAndSpecRanges = [
-    sheet.getRange(2, 1, sheet.getMaxRows(), 1), // Name
-    sheet.getRange(2, 2, sheet.getMaxRows(), 1), // Class
-    sheet.getRange(2, 3, sheet.getMaxRows(), 1)  // Spec
-  ];
   const rules = [];
+  const dataRowCount = Math.max(sheet.getMaxRows() - 1, 1);
 
   // Armory lookup failed: grey out the whole row (first, so it wins over the class colours)
   rules.push(SpreadsheetApp.newConditionalFormatRule()
@@ -136,23 +167,15 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
     .setBackground('#f1f5f9')
     .setFontColor('#94a3b8')
     .setItalic(true)
-    .setRanges([sheet.getRange(2, 1, sheet.getMaxRows(), talentHeaders.length)])
+    .setRanges([sheet.getRange(2, 1, dataRowCount, talentHeaders.length)])
     .build());
 
-  const darkBgClasses = ['Death Knight', 'Demon Hunter', 'Shaman', 'Warlock'];
-  for (const className in CLASS_COLORS) {
-    const fontColor = darkBgClasses.includes(className) ? '#ffffff' : '#0f172a';
-    rules.push(SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied(`=$B2="${className}"`)
-      .setBackground(CLASS_COLORS[className])
-      .setFontColor(fontColor)
-      .setRanges(classAndSpecRanges)
-      .build());
-  }
+  // Class colour: a solid fill on Name, class-coloured text on Class and Active Spec
+  rules.push(...classColorRules('B', [sheet.getRange(2, 1, dataRowCount, 1)], [sheet.getRange(2, 2, dataRowCount, 2)]));
 
   // Raid Ready column formatting (Soft Modern Badges)
   const raidReadyColIdx = talentHeaders.indexOf('Raid Ready') + 1;
-  const rrRange = [sheet.getRange(2, raidReadyColIdx, sheet.getMaxRows(), 1)];
+  const rrRange = [sheet.getRange(2, raidReadyColIdx, dataRowCount, 1)];
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('READY').setBackground('#d1fae5').setFontColor('#065f46').setRanges(rrRange).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Enchant').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges(rrRange).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Socket').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges(rrRange).build());
@@ -161,13 +184,16 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
 
   sheet.setConditionalFormatRules(rules);
 
-  // Add Data Validation Dropdown for Boss Build Selector (Column F) ONLY on populated character rows
-  if (outputData.length > 1) {
-    const bossRule = SpreadsheetApp.newDataValidation()
-      .requireValueInList(ARCHON_BOSS_OPTIONS, true)
-      .setAllowInvalid(true)
-      .build();
-    sheet.getRange(2, 6, outputData.length - 1, 1).setDataValidation(bossRule);
+  // Boss Build dropdown (Column F) on character rows only: not the ALTS band, not the empty rows below
+  const bossRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(ARCHON_BOSS_OPTIONS, true)
+    .setAllowInvalid(true)
+    .build();
+  if (mainCharacterData.length > 0) {
+    sheet.getRange(2, 6, mainCharacterData.length, 1).setDataValidation(bossRule);
+  }
+  if (altCharacterData && altCharacterData.length > 0) {
+    sheet.getRange(mainCharacterData.length + 3, 6, altCharacterData.length, 1).setDataValidation(bossRule);
   }
 
   // Set widths
@@ -175,12 +201,12 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   sheet.setColumnWidth(2, 110); // Class
   sheet.setColumnWidth(3, 130); // Spec
   sheet.setColumnWidth(4, 210); // Hero Talents
-  sheet.setColumnWidth(5, 300); // Talent String (clipped; the full string is still copied from the cell)
-  sheet.setColumnWidth(6, 210); // Archon Boss Dropdown
-  sheet.setColumnWidth(7, 165); // Archon Heroic
-  sheet.setColumnWidth(8, 165); // Archon Mythic
+  sheet.setColumnWidth(5, 110); // Loadout Code (clipped; copying the cell copies the whole string)
+  sheet.setColumnWidth(6, 190); // Archon Boss Dropdown
+  sheet.setColumnWidth(7, 150); // Archon Heroic
+  sheet.setColumnWidth(8, 150); // Archon Mythic
   sheet.setColumnWidth(9, 150); // Wowhead Guide
   sheet.setColumnWidth(10, 150); // Raidbots Droptimizer
   sheet.setColumnWidth(11, 80); // ilvl
-  sheet.setColumnWidth(12, 240);// Raid Ready
+  sheet.setColumnWidth(12, 260);// Raid Ready
 }

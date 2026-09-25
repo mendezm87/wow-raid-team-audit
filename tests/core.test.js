@@ -29,7 +29,7 @@ test('Mythic loot difficulty relabels rows and shifts ilvl by the same offset', 
 test('season config drives the Archon dropdown and fallback catalog', () => {
   const { get } = loadAppsScript();
   const options = get('ARCHON_BOSS_OPTIONS');
-  assert.equal(options[0], 'All Bosses (Overview)');
+  assert.equal(options[0], 'All Bosses');
   assert.equal(options.length, 1 + get('SEASON.bosses.length') + get('SEASON.archonExtraBosses.length'));
   assert.ok(get('FALLBACK_LOOT_CATALOG.length') > 50);
 });

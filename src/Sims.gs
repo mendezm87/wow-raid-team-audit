@@ -545,16 +545,7 @@ function ingestRaidbotsSims_(input) {
     sheet.getRange(2, 14, richRunnersUp.length, 1).setRichTextValues(richRunnersUp);
   }
 
-  // Set clean dynamic column widths (Unmerged flat layout)
-  sheet.setColumnWidth(1, 230); // Boss / Source header
-  sheet.autoResizeColumns(2, values[0].length - 1);
-  for (let c = 2; c <= values[0].length; c++) {
-    const calculatedWidth = sheet.getColumnWidth(c);
-    sheet.setColumnWidth(c, Math.max(calculatedWidth + 16, 75));
-  }
-  sheet.setColumnWidth(8, 130);
-  sheet.setColumnWidth(13, 330);
-  if (hasRunnersColumn) sheet.setColumnWidth(14, 330);
+  applyLootColumnLayout_(sheet);
 
   return {
     success: true,
@@ -808,16 +799,7 @@ function ingestQELiveReport_(reportUrlOrId) {
     sheet.getRange(2, 14, richRunnersUp.length, 1).setRichTextValues(richRunnersUp);
   }
 
-  // Set clean dynamic column widths (Unmerged flat layout)
-  sheet.setColumnWidth(1, 230); // Boss / Source header
-  sheet.autoResizeColumns(2, values[0].length - 1);
-  for (let c = 2; c <= values[0].length; c++) {
-    const calculatedWidth = sheet.getColumnWidth(c);
-    sheet.setColumnWidth(c, Math.max(calculatedWidth + 16, 75));
-  }
-  sheet.setColumnWidth(8, 130);
-  sheet.setColumnWidth(13, 330);
-  if (hasRunnersColumn) sheet.setColumnWidth(14, 330);
+  applyLootColumnLayout_(sheet);
 
   return {
     success: true,

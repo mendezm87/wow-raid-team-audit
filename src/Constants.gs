@@ -151,10 +151,11 @@ function formatRefreshedAt(ss) {
 
 /**
  * Writes the first header cell as its label with a small grey "↻ <time>" refresh stamp on a second line.
+ * An optional extra note (e.g. the Loot sheet's difficulty) follows the time on the stamp line.
  * Code that finds columns by header name must read headers through headerLabel() so the stamp is ignored.
  */
-function stampHeaderCell(sheet, label) {
-  const text = `${label}\n↻ ${formatRefreshedAt(sheet.getParent())}`;
+function stampHeaderCell(sheet, label, extra) {
+  const text = `${label}\n↻ ${formatRefreshedAt(sheet.getParent())}${extra ? ` · ${extra}` : ''}`;
   const stampStyle = SpreadsheetApp.newTextStyle().setFontSize(7).setBold(false).setForegroundColor('#94a3b8').build();
   const richText = SpreadsheetApp.newRichTextValue()
     .setText(text)
@@ -261,4 +262,64 @@ function lootPriorityTier(slot) {
 /** Short Raid Ready summary, e.g. "Off-Spec → Vengeance · 2/4 Tier · 1 Enchant". */
 function formatRaidReadySummary(issues) {
   return issues.length === 0 ? 'READY' : issues.join(' · ');
+}
+
+/** Mixes a hex colour toward white: amount 0 keeps it, 1 is white. Used for pale badge fills. */
+function tintColor(hex, amount) {
+  const m = (hex || '').toString().match(/^#?([0-9a-f]{6})$/i);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const mix = c => Math.round(c + (255 - c) * amount).toString(16).padStart(2, '0');
+  return `#${mix((n >> 16) & 255)}${mix((n >> 8) & 255)}${mix(n & 255)}`;
+}
+
+/**
+ * Class colour rules keyed off the Class column: a solid class fill on the name cells, and class-coloured
+ * text with no fill on textRanges (Class, Spec), so each row carries one block of colour instead of three.
+ */
+function classColorRules(classColumnLetter, nameRanges, textRanges) {
+  const darkBgClasses = ['Death Knight', 'Demon Hunter', 'Shaman', 'Warlock'];
+  const rules = [];
+  Object.keys(CLASS_COLORS).forEach(className => {
+    const formula = `=$${classColumnLetter}2="${className}"`;
+    rules.push(SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(formula)
+      .setBackground(CLASS_COLORS[className])
+      .setFontColor(darkBgClasses.includes(className) ? '#ffffff' : '#0f172a')
+      .setRanges(nameRanges)
+      .build());
+    if (textRanges && textRanges.length > 0) {
+      rules.push(SpreadsheetApp.newConditionalFormatRule()
+        .whenFormulaSatisfied(formula)
+        .setFontColor(CLASS_ACCESSIBLE_COLORS[className] || CLASS_COLORS[className])
+        .setRanges(textRanges)
+        .build());
+    }
+  });
+  return rules;
+}
+
+/**
+ * Loot sheet columns that hold one value on every item row (Difficulty, Drop ilvl). They are hidden and
+ * the value is shown once in the header stamp instead, e.g. "Mythic · 334 ilvl". rows are the rows under
+ * the header; boss banners (a ═══ rule or nothing in the item column) are skipped.
+ */
+function lootUniformColumns(headers, rows) {
+  const items = rows.filter(r => {
+    const item = (r[1] || '').toString().trim();
+    return item && !item.startsWith('═');
+  });
+  const hidden = [];
+  const labels = [];
+  [['Difficulty', v => v], ['Drop ilvl', v => `${v} ilvl`]].forEach(([name, describe]) => {
+    const idx = headers.indexOf(name);
+    if (idx < 0 || items.length === 0) return;
+    const values = new Set(items.map(r => (r[idx] === undefined || r[idx] === null ? '' : r[idx]).toString().trim()));
+    const only = values.size === 1 ? Array.from(values)[0] : '';
+    if (only) {
+      hidden.push(idx);
+      labels.push(describe(only));
+    }
+  });
+  return { hidden: hidden, label: labels.join(' · ') };
 }

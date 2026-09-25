@@ -35,8 +35,8 @@ This tab automatically synchronizes with Blizzard's live Armory to check your ch
 
 ### 🏷️ What to Look For:
 * 🟢 **`READY`**: You are 100% prepared! All enchants and gems are active, and you have your 4-piece tier set.
-* 🔴 **`1 Enchant` / `2 Sockets`**: Counts how many of your slots are missing an enchant or a gem. Hover the enchant columns to see which ones. Please enchant/gem these before raid time!
-* 🟡 **`0/4`, `1/4`, `2/4`, `3/4 Tier`**: Tracks your active current-season tier set pieces.
+* 🔴 **`1 Enchant missing` / `2 Sockets empty`**: Counts how many of your slots are missing an enchant or a gem. Hover the enchant columns to see which ones. Please enchant/gem these before raid time!
+* 🟡 **`Tier 0/5` – `Tier 3/5`**: You have fewer than 4 of the 5 current-season tier pieces, so no 4-piece bonus yet.
 * 🏛️ **Weekly Great Vault Progress**: Columns on the far right track how many raid and Mythic+ vault slots you have unlocked for the week.
 * 🔎 **Gear & enchant cells are short**: a gear slot reads like `◆ 334 Myth 6/6` (**◆** = tier piece) and an enchant reads `✓ Rank 2` or `Missing`. **Hover over a cell** to see the full item or enchant name.
 * ➕ **Hidden columns?** Enchants, Gear and Great Vault can be folded away — click the **+** above the header to open a section.
@@ -62,7 +62,7 @@ Tracks official guild raid attendance and boss progression across the entire sea
 Looking for optimal talent builds for heroic progression or mythic boss encounters?
 
 ### 💡 Features on this Tab:
-* **Talent Loadout Code**: Copy the string in Column E and paste it directly into WoW's in-game talent loadout UI.
+* **Loadout Code**: Click your cell in Column E, copy it, and paste it directly into WoW's in-game talent loadout UI. The column only shows the start of the string, but copying the cell copies all of it.
 * **Archon.gg Meta Builds**: 1-click direct links to top-performing statistical builds for both **Heroic** and **Mythic** raid encounters.
 * **Wowhead Class Guides**: Direct link to your spec's full rotation, stat priority, and boss tips.
 * **1-Click Sim Link**: Preloaded link for your character on Raidbots.
@@ -83,7 +83,7 @@ To ensure everyone is compared fairly on the exact same baseline, please use the
 
 #### ⚙️ Standard Guild Settings Checklist:
 1. Open [Raidbots Droptimizer](https://www.raidbots.com/simbot/droptimizer) (or click your 1-Click link on the *Talents & Builds* sheet).
-2. **Raid Difficulty** — match what the officers have the loot sheet set to (check the `Difficulty` column on `Loot & Chase Items`):
+2. **Raid Difficulty** — match what the officers have the loot sheet set to (shown under the `Boss / Source` header on `Loot & Chase Items`, e.g. `Mythic · 334 ilvl`):
    * Heroic progression: select **`Heroic (Hero)`**.
    * Mythic progression: select **`Mythic (Myth)`**.
 3. **Items to Sim:**

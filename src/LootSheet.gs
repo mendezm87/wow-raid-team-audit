@@ -630,7 +630,8 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
   const headerRange = sheet.getRange(1, 1, 1, lootHeaders.length);
   headerRange.setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
   sheet.setRowHeight(1, 40);
-  stampHeaderCell(sheet, lootHeaders[0]);
+  // Difficulty and Drop ilvl are usually the same on every item; they are hidden and said once in the stamp
+  stampHeaderCell(sheet, lootHeaders[0], lootUniformColumns(lootHeaders, chaseItemsCatalog).label);
 
   const isBossBannerRow = row => ['⚔️', '🛡️', '🧭', '🧪', '🐊', '🏛️', '👑', '📦'].some(icon => (row[0] || '').toString().startsWith(icon));
 
@@ -646,6 +647,9 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
       .setHorizontalAlignments(Array.from({ length: dataRows }, () => rowAlignments))
       .setFontWeights(Array.from({ length: dataRows }, () => rowWeights))
       .setBackgrounds(zebraBackgrounds(dataRows, lootHeaders.length, i => isBossBannerRow(chaseItemsCatalog[i])));
+
+    // Boss / Source repeats the banner above it: kept for filtering and sorting, but in grey
+    sheet.getRange(2, 1, dataRows, 1).setFontColor('#94a3b8');
 
     sheet.getRange(2, 8, dataRows, 1).setNotes(equippedFullText.map(text => [text]));
   }
@@ -703,17 +707,7 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
     }
   }
 
-  // Set clean dynamic column widths (Unmerged flat layout)
-  sheet.setColumnWidth(1, 230); // Boss / Source header
-  sheet.autoResizeColumns(2, lootHeaders.length - 1);
-  for (let c = 2; c <= lootHeaders.length; c++) {
-    const calculatedWidth = sheet.getColumnWidth(c);
-    sheet.setColumnWidth(c, Math.max(calculatedWidth + 16, 75));
-  }
-
-  sheet.setColumnWidth(8, 130);            // Current Equipped Item (short badge, full name in the note)
-  sheet.setColumnWidth(NOTES_COL, 330);    // Loot Council Notes: top pick only
-  sheet.setColumnWidth(RUNNERS_COL, 330);  // Runners-Up
+  applyLootColumnLayout_(sheet);
 
   // Align text: long text columns read left, badges stay centred
   if (fullData.length > 1) {
@@ -734,4 +728,31 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
     sheet.getRange(2, NOTES_COL, richNotes.length, 1).setRichTextValues(richNotes);
     sheet.getRange(2, RUNNERS_COL, richRunnersUp.length, 1).setRichTextValues(richRunnersUp);
   }
+}
+
+/**
+ * Column widths for Loot & Chase Items, shared by the sheet rebuild and the sim imports. Columns holding one
+ * value on every item (see lootUniformColumns) are hidden; the rebuild shows that value in the header stamp.
+ */
+function applyLootColumnLayout_(sheet) {
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < 2 || lastCol < 2) return;
+  const values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+  const headers = values[0].map(headerLabel);
+
+  sheet.showColumns(1, lastCol);
+  sheet.setColumnWidth(1, 230); // Boss / Source (the boss banners need the room)
+  sheet.autoResizeColumns(2, lastCol - 1);
+  for (let c = 2; c <= lastCol; c++) {
+    sheet.setColumnWidth(c, Math.max(sheet.getColumnWidth(c) + 16, 75));
+  }
+  // Short equipped badge (full name in the note); top pick and runners-up get fixed room
+  const fixedWidths = { 'Current Equipped Item': 130, 'Loot Council Notes': 330, 'Runners-Up': 330 };
+  Object.keys(fixedWidths).forEach(name => {
+    const idx = headers.indexOf(name);
+    if (idx > -1) sheet.setColumnWidth(idx + 1, fixedWidths[name]);
+  });
+
+  lootUniformColumns(headers, values.slice(1)).hidden.forEach(idx => sheet.hideColumns(idx + 1));
 }

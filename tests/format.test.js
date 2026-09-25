@@ -79,9 +79,59 @@ test('Raid Ready summaries stay short and keep the badge keywords', () => {
   const { context } = loadAppsScript();
   assert.equal(context.formatRaidReadySummary([]), 'READY');
   assert.equal(
-    context.formatRaidReadySummary(['Off-Spec → Vengeance', '2/4 Tier', '1 Socket', '1 Enchant']),
-    'Off-Spec → Vengeance · 2/4 Tier · 1 Socket · 1 Enchant'
+    context.formatRaidReadySummary(['Off-Spec → Vengeance', 'Tier 2/5', '1 Socket empty', '1 Enchant missing']),
+    'Off-Spec → Vengeance · Tier 2/5 · 1 Socket empty · 1 Enchant missing'
   );
+});
+
+test('Raid Ready counts tier out of 5 like the Tier Set column, and every issue reads as a phrase', () => {
+  const { context } = loadAppsScript();
+  const row = { 'Spec': 'Havoc', 'Expected Spec': 'Vengeance', 'Tier Set': '2/5 (+1 Prev)', 'Empty Sockets': 2 };
+  ['Enchant Head', 'Enchant Chest'].forEach(col => { row[col] = 'Missing'; });
+  assert.equal(context.calculateRaidReadyStatus(row), 'Off-Spec → Vengeance · Tier 2/5 · 2 Sockets empty · 2 Enchants missing');
+  assert.equal(context.calculateRaidReadyStatus({ 'Tier Set': '4/5', 'Empty Sockets': 1, 'Enchant Feet': 'Missing' }), '1 Socket empty · 1 Enchant missing');
+  assert.equal(context.calculateRaidReadyStatus({ 'Tier Set': '5/5', 'Empty Sockets': 0 }), 'READY');
+});
+
+test('M+ rating fills are a pale tint of the rating colour', () => {
+  const { context } = loadAppsScript();
+  assert.equal(context.tintColor('#ff8000', 0), '#ff8000');
+  assert.equal(context.tintColor('#ff8000', 1), '#ffffff');
+  assert.equal(context.tintColor('#a335ee', 0.7), '#e3c2fa');
+  assert.equal(context.tintColor('not a colour', 0.7), 'not a colour');
+});
+
+test('uniform Difficulty and Drop ilvl columns are hidden and summarised once', () => {
+  const { context } = loadAppsScript();
+  const headers = ['Boss / Source', 'Chase Item / Drop', 'Slot', 'Difficulty', 'Drop ilvl'];
+  const rows = [
+    ["⚔️ BOSS 1: NEK'ZALI", '═══════', '', '', ''],
+    ["Boss 1: Nek'zali", 'Fang of the Coil', 'Trinket', 'Mythic', 334],
+    ["Boss 1: Nek'zali", 'Venom Spire', 'Two-Hand (2H)', 'Mythic', 334]
+  ];
+  const same = context.lootUniformColumns(headers, rows);
+  assert.deepEqual(Array.from(same.hidden), [3, 4]);
+  assert.equal(same.label, 'Mythic · 334 ilvl');
+
+  rows.push(['Boss 8: Queen', 'Crown of Scales', 'Head', 'Mythic', 337]);
+  const mixed = context.lootUniformColumns(headers, rows);
+  assert.deepEqual(Array.from(mixed.hidden), [3]);
+  assert.equal(mixed.label, 'Mythic');
+});
+
+test('a refresh keeps each raider\'s Archon boss pick and drops the old overview label', () => {
+  const gas = loadAppsScript();
+  const talents = gas.spreadsheet.insertSheet('Talents & Builds');
+  const boss = gas.get('ARCHON_BOSS_OPTIONS')[1];
+  talents.getRange(1, 1, 4, 6).setValues([
+    ['Name\n↻ Sep 25, 3:02 AM', 'Class', 'Active Spec', 'Hero Talents', 'Loadout Code', 'Archon Boss Build (Dropdown)'],
+    ['Nimidk', 'Death Knight', 'Unholy', '-', '-', boss],
+    ['Rawria', 'Demon Hunter', 'Vengeance', '-', '-', 'All Bosses (Overview)'],
+    ['Mnxlol', 'Druid', 'Balance', '-', '-', 'Not A Boss']
+  ]);
+  const picks = gas.context.readArchonBossPicks_(talents);
+  assert.deepEqual(Array.from(Object.keys(picks)), ['nimidk']);
+  assert.equal(picks.nimidk, boss);
 });
 
 test('the labelled ALTS band starts the alt section on Guild Audit', () => {

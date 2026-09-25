@@ -26,11 +26,11 @@ function calculateRaidReadyStatus(charRow) {
   const tierMatch = tierSetText.match(/^(\d+)\/5/);
   const currentCount = tierMatch ? parseInt(tierMatch[1], 10) : 0;
   if (currentCount < 4) {
-    issues.push(`${currentCount}/4 Tier`);
+    issues.push(`Tier ${currentCount}/5`);
   }
   
   if (charRow['Empty Sockets'] > 0) {
-    issues.push(`${charRow['Empty Sockets']} Socket${charRow['Empty Sockets'] > 1 ? 's' : ''}`);
+    issues.push(`${charRow['Empty Sockets']} Socket${charRow['Empty Sockets'] > 1 ? 's' : ''} empty`);
   }
   
   let missingEnchants = 0;
@@ -39,7 +39,7 @@ function calculateRaidReadyStatus(charRow) {
   });
   
   if (missingEnchants > 0) {
-    issues.push(`${missingEnchants} Enchant${missingEnchants > 1 ? 's' : ''}`);
+    issues.push(`${missingEnchants} Enchant${missingEnchants > 1 ? 's' : ''} missing`);
   }
 
   return formatRaidReadySummary(issues);
@@ -839,19 +839,10 @@ function applyFormatting(sheet, headers, characterDataObjects) {
       .build());
   }
 
-  // 6. Class Colors with high-contrast text
-  const classAndSpecRanges = columnRanges(['Name', 'Class', 'Spec']);
-  if (classAndSpecRanges.length > 0) {
-    const darkBgClasses = ['Death Knight', 'Demon Hunter', 'Shaman', 'Warlock'];
-    for (const className in CLASS_COLORS) {
-      const fontColor = darkBgClasses.includes(className) ? '#ffffff' : '#0f172a';
-      rules.push(SpreadsheetApp.newConditionalFormatRule()
-        .whenFormulaSatisfied(`=$B2="${className}"`)
-        .setBackground(CLASS_COLORS[className])
-        .setFontColor(fontColor)
-        .setRanges(classAndSpecRanges)
-        .build());
-    }
+  // 6. Class colour: a solid fill on Name only, class-coloured text on Class and Spec
+  const nameRanges = columnRanges(['Name']);
+  if (nameRanges.length > 0) {
+    rules.push(...classColorRules('B', nameRanges, columnRanges(['Class', 'Spec'])));
   }
 
   // 7. Raid Ready Column Rules (Soft Modern Pills)
@@ -938,16 +929,14 @@ function applyFormatting(sheet, headers, characterDataObjects) {
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(292).setBackground("#dcfce7").setFontColor("#166534").setRanges(gvMplusRanges).build());
   }
 
-  // 13. M+ Rating Color (Batch updated in 1 single call with high-contrast text); unrated rows keep their zebra fill
+  // 13. M+ Rating: a pale tint of the Raider.IO rating colour, so it reads as a badge rather than a solid block.
+  // Unrated rows keep their zebra fill.
   const mPlusRatingColIdx = colOf('M+ Rating');
   if (mPlusRatingColIdx > 0 && characterDataObjects && characterDataObjects.length > 0) {
     const backgrounds = characterDataObjects.map((charData, i) => [
-      (charData && charData['M+ Rating Color']) ? charData['M+ Rating Color'] : ((rowBackgrounds[i] || [])[0] || '#ffffff')
+      (charData && charData['M+ Rating Color']) ? tintColor(charData['M+ Rating Color'], 0.7) : ((rowBackgrounds[i] || [])[0] || '#ffffff')
     ]);
-    const fontColors = characterDataObjects.map(charData => {
-      const col = (charData && charData['M+ Rating Color']) ? charData['M+ Rating Color'].toLowerCase() : '';
-      return [(col.includes('ff8000') || col.includes('a335ee') || col.includes('0070dd')) ? '#ffffff' : '#0f172a'];
-    });
+    const fontColors = characterDataObjects.map(() => ['#0f172a']);
     sheet.getRange(2, mPlusRatingColIdx, backgrounds.length, 1).setBackgrounds(backgrounds).setFontColors(fontColors);
   }
 
@@ -956,7 +945,7 @@ function applyFormatting(sheet, headers, characterDataObjects) {
   // Column widths: gear and enchant cells hold short badges now (full names are in the notes)
   const columnWidths = {
     'Name': 120, 'Class': 100, 'Spec': 110, 'iLvl': 55,
-    'Raid Ready': 240, 'M+ Rating': 75, 'Tier Set': 95,
+    'Raid Ready': 260, 'M+ Rating': 75, 'Tier Set': 95,
     'Total Sockets': 75, 'Empty Sockets': 75, 'Imperfect Gems': 80, 'Crafted Items': 75,
     'Embellishment 1': 165, 'Embellishment 2': 165,
     'GV Slots Unlocked': 80

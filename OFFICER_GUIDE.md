@@ -137,10 +137,10 @@ Tracks equipped item levels, tier set bonuses, gems, enchants, and weekly Great 
 
 ### 🏷️ Badge Breakdown (`Raid Ready` Column):
 * 🟢 **`READY`**: Fully enchanted, all sockets filled with current gems, and has at least 4pc current season tier.
-* 🔴 **`1 Enchant` / `2 Sockets`**: Counts the missing enchants and un-socketed slots.
-* 🟡 **`0-3/4 Tier`**: Raider is missing their 4pc active tier set bonus.
+* 🔴 **`1 Enchant missing` / `2 Sockets empty`**: Counts the missing enchants and un-socketed slots.
+* 🟡 **`Tier 0/5` – `Tier 3/5`**: Raider has fewer than 4 of the 5 current-season tier pieces, so no 4pc bonus. Counted out of 5, the same as the `Tier Set` column.
 * ⚠️ **`Off-Spec → Protection`**: Warns officers if a raider logged out in a spec other than the one assigned on `Config`. The arrow points at the **assigned** spec.
-* Issues are joined with ` · `, e.g. `Off-Spec → Vengeance · 2/4 Tier · 1 Enchant`.
+* Issues are joined with ` · `, e.g. `Off-Spec → Vengeance · Tier 2/5 · 1 Enchant missing`.
 * ⚪ **`⚠️ Armory lookup failed`** (whole row greyed out): Blizzard's Armory didn't return the character — usually they left the guild, renamed, or transferred. Check the name on `Config`, or remove them.
 
 ### 🧭 Reading the Sheet:
@@ -148,6 +148,7 @@ Tracks equipped item levels, tier set bonuses, gems, enchants, and weekly Great 
 * **Collapsible sections**: Enchants, Gear and Great Vault are column groups — click the **−** / **+** above the header to fold a section away. The next audit refresh opens them all again.
 * **Short gear cells**: each gear slot shows `◆ 334 Myth 6/6` (item level + upgrade track). **◆** = current-season tier piece, **◇** = previous-season tier. **Hover the cell** to see the full item name.
 * **Short enchant cells**: `✓ Rank 2` (green), `✓ Rank 1` (amber), `✓` for Death Knight runes, `Missing` (red), `N/A` (grey, e.g. shields and off-hands). Hover for the enchant name.
+* **Class colours**: the `Name` cell carries the class colour; `Class` and `Spec` use class-coloured text. `M+ Rating` is a pale tint of the Raider.IO rating colour.
 * **Last refreshed**: the small `↻` time under the `Name` header shows when the audit last ran (same on `Talents & Builds` and `Loot & Chase Items`).
 * **Alts band**: mains and alts are separated by a single dark `───── ALTS ─────` row. Everything below it is an alt and is excluded from loot scoring.
 * **Formatting lives in the code**: every refresh rebuilds colours, widths and layout, so changes made by hand in Sheets are wiped on the next run.
@@ -166,10 +167,11 @@ Provides an instant overview of your raid team's talent selections and quick acc
 
 ### 🔗 What is on this sheet:
 1. **Hero Talent Tree**: Shows active tree choice (*e.g. Rider of the Apocalypse, Spellslinger, Sunfury, Deathbringer*).
-2. **Talent Code**: The exact export string that can be imported directly into the WoW talent UI.
+2. **Loadout Code**: The exact export string that can be imported directly into the WoW talent UI. The column is narrow and only shows the start of the string; click the cell and copy it to get the whole thing.
 3. **Meta Guides**:
    * **Archon (Heroic)**: Live statistical meta builds for Heroic raid bosses.
    * **Archon (Mythic)**: Live statistical meta builds for Mythic progression.
+   * **Archon Boss Build dropdown**: pick a boss to point both Archon links at that fight (`⚡ Heroic · <boss>`); `All Bosses` is the overview. Each raider's pick is kept when the sheet refreshes.
    * **Wowhead Guide**: Direct link to the class/spec overview, built automatically from the raider's class and active spec (e.g. `📖 Unholy Guide`).
 4. **1-Click Sim Link**: Preloaded Raidbots Droptimizer link with the raider's exact name, region, and realm slug.
 
@@ -181,6 +183,7 @@ An intelligent **Loot Council Assistant** configured with all 8 bosses of **The 
 
 ### ⚔️ Heroic vs. Mythic Loot
 * Click **`Guild Audit` → `4b. ⚔️ Toggle Loot Difficulty (Heroic ↔ Mythic)`** to switch the whole table between **Heroic (318)** and **Mythic (334)** boss drops. The choice is remembered.
+* The current difficulty and drop item level are shown under the `Boss / Source` header (e.g. `↻ Sep 25, 3:02 AM · Mythic · 334 ilvl`). The `Difficulty` and `Drop ilvl` columns are hidden while every item shares one value, and come back if they differ.
 * Upgrade deltas are recalculated at the new item level. **Sims imported before switching were run at the old difficulty** — ask raiders to re-sim with the matching Droptimizer difficulty (see the [Raider Guide](RAIDER_GUIDE.md)).
 * *(344 items are personal loot / bonus rolls, not boss drops, so they are not on this sheet.)*
 
