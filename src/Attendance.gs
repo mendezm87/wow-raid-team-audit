@@ -721,7 +721,7 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
   // 1. Executive Summary Banner
   output.push(['🏛️ GUILD RAID ATTENDANCE, PUNCTUALITY & SEASON 2 HISTORY', '', '', '', '', '', '', '', '', '']);
   output.push([
-    `Total Official Guild Raid Nights: ${totalRaids} (Tue & Wed 7:00 - 10:00 PM Pacific)   |   Total Boss Encounters Defeated: ${raidLedger.reduce((sum, r) => sum + r.killCount, 0)}`,
+    `Total Official Guild Raid Nights: ${totalRaids} (Tue & Wed 7:00 - 10:00 PM Pacific)   |   Total Boss Encounters Defeated: ${raidLedger.reduce((sum, r) => sum + r.killCount, 0)}   |   ↻ Refreshed ${formatRefreshedAt(ss)}`,
     '', '', '', '', '', '', '', '', ''
   ]);
   output.push(['', '', '', '', '', '', '', '', '', '']);
@@ -776,6 +776,10 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
   // Formatting & Widths
   sheet.getDataRange().setFontFamily('Roboto');
   sheet.setFrozenRows(1);
+  sheet.setHiddenGridlines(true);
+  applyTabColor(sheet);
+  const archiveSheet = ss.getSheetByName(ATTENDANCE_ARCHIVE_SHEET_NAME);
+  if (archiveSheet) applyTabColor(archiveSheet);
 
   // Banner formatting
   sheet.getRange('A1:J1').merge().setBackground('#0f172a').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(11).setHorizontalAlignment('center');
@@ -784,6 +788,17 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
   // Table Headers
   sheet.getRange('A4:J4').setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
   sheet.getRange('A5:J5').setBackground('#334155').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(9).setHorizontalAlignment('center');
+
+  // Leaderboard rows: alternating fills, names bold, figures centred
+  if (leaderboard.length > 0) {
+    const boardAlignments = leaderboard.map(() => ['center', 'left', 'left', 'center', 'center', 'center', 'center', 'center', 'left', 'left']);
+    sheet.getRange(6, 1, leaderboard.length, 10)
+      .setBackgrounds(zebraBackgrounds(leaderboard.length, 10))
+      .setFontSize(9)
+      .setVerticalAlignment('middle')
+      .setHorizontalAlignments(boardAlignments);
+    sheet.getRange(6, 2, leaderboard.length, 1).setFontWeight('bold');
+  }
 
   // Section 2: Historical Ledger Headers
   const ledgerTitleRow = leaderboard.length + 8;
@@ -812,15 +827,15 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
   sheet.setColumnWidth(9, 180); // WCL Link
   sheet.setColumnWidth(10, 160); // Reliability Tier
 
-  // Attendance & On-Time Soft Conditional Formatting
+  // Attendance % and On-Time % (columns D:E) coloured by value: 90%+ green, 75-89% amber, under 75% red.
+  // A cell holds "93%" text or, once Sheets parses it, the number 0.93, so both are turned into 0-100 first.
   const rules = [];
-  const attRange = [sheet.getRange(6, 4, leaderboard.length, 1)];
-  const onTimeRange = [sheet.getRange(6, 5, leaderboard.length, 1)];
-
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('100%').setBackground('#d1fae5').setFontColor('#065f46').setRanges([...attRange, ...onTimeRange]).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('9').setBackground('#d1fae5').setFontColor('#065f46').setRanges([...attRange, ...onTimeRange]).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('8').setBackground('#fef3c7').setFontColor('#92400e').setRanges([...attRange, ...onTimeRange]).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('7').setBackground('#fef3c7').setFontColor('#92400e').setRanges([...attRange, ...onTimeRange]).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('0%').setBackground('#fee2e2').setFontColor('#991b1b').setRanges([...attRange, ...onTimeRange]).build());
+  if (leaderboard.length > 0) {
+    const pctRange = [sheet.getRange(6, 4, leaderboard.length, 2)];
+    const pct = 'IF(ISNUMBER(D6), D6 * 100, IFERROR(VALUE(SUBSTITUTE(D6, "%", "")), -1))';
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied(`=${pct} >= 90`).setBackground('#d1fae5').setFontColor('#065f46').setRanges(pctRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied(`=AND(${pct} >= 75, ${pct} < 90)`).setBackground('#fef3c7').setFontColor('#92400e').setRanges(pctRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied(`=AND(${pct} >= 0, ${pct} < 75)`).setBackground('#fee2e2').setFontColor('#991b1b').setRanges(pctRange).build());
+  }
   sheet.setConditionalFormatRules(rules);
 }

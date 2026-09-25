@@ -53,7 +53,7 @@ function getRosterContextMap(ss) {
   const auditSheet = ss.getSheetByName(AUDIT_SHEET_NAME);
   if (auditSheet && auditSheet.getLastRow() >= 2) {
     const auditValues = auditSheet.getDataRange().getValues();
-    const headers = auditValues[0].map(h => (h || '').toString().trim());
+    const headers = auditValues[0].map(headerLabel);
     const nameCol = headers.indexOf('Name');
     const classCol = headers.indexOf('Class');
     const readyCol = headers.indexOf('Raid Ready');
@@ -127,8 +127,11 @@ function getGuildAuditCharacterList(ss) {
   if (!auditSheet || auditSheet.getLastRow() < 2) return [];
 
   const altNamesSet = getAltNamesSet(ss);
-  const auditValues = auditSheet.getDataRange().getValues();
-  const headers = auditValues[0].map(h => (h || '').toString().trim());
+  const auditRange = auditSheet.getDataRange();
+  const auditValues = auditRange.getValues();
+  // Gear cells show a short "◆ 334 Myth 6/6"; the full "[Tier] 334 (Myth 6/6) - Item" text is in the cell's note
+  const auditNotes = auditRange.getNotes();
+  const headers = auditValues[0].map(headerLabel);
 
   const nameCol = headers.indexOf('Name');
   const classCol = headers.indexOf('Class');
@@ -164,7 +167,8 @@ function getGuildAuditCharacterList(ss) {
 
     headers.forEach((h, colIdx) => {
       if (h && !charObj[h]) {
-        charObj[h] = (row[colIdx] || '').toString().trim();
+        const note = AUDIT_GEAR_COLUMNS.includes(h) ? ((auditNotes[r] || [])[colIdx] || '') : '';
+        charObj[h] = (note || row[colIdx] || '').toString().trim();
       }
     });
 
@@ -565,16 +569,28 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
   fullRange.setNumberFormat('@');
   sheet.setFrozenColumns(2);
   sheet.setFrozenRows(1);
+  applyTabColor(sheet);
 
   // Header styling
   const headerRange = sheet.getRange(1, 1, 1, sheet.getMaxColumns());
   headerRange.setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
-  sheet.setRowHeight(1, 34);
+  sheet.setRowHeight(1, 40);
+  stampHeaderCell(sheet, lootHeaders[0]);
 
-  // Data rows
+  const isBossBannerRow = row => ['⚔️', '🛡️', '🧭', '🧪', '🐊', '🏛️', '👑', '📦'].some(icon => (row[0] || '').toString().startsWith(icon));
+
+  // Data rows: regular weight with the item name bold; text left, ilvls right, badges centred.
+  // Alternating fills restart under each boss banner.
   if (fullData.length > 1) {
-    sheet.setRowHeights(2, fullData.length - 1, 28);
-    sheet.getRange(2, 1, fullData.length - 1, sheet.getMaxColumns()).setFontSize(9).setFontWeight('bold');
+    const dataRows = fullData.length - 1;
+    const rowAlignments = ['left', 'left', 'center', 'center', 'right', 'left', 'center', 'center', 'right', 'center', 'center', 'center', 'left'];
+    const rowWeights = lootHeaders.map((_, c) => (c === 1 ? 'bold' : 'normal'));
+    sheet.setRowHeights(2, dataRows, 28);
+    sheet.getRange(2, 1, dataRows, sheet.getMaxColumns()).setFontSize(9);
+    sheet.getRange(2, 1, dataRows, lootHeaders.length)
+      .setHorizontalAlignments(Array.from({ length: dataRows }, () => rowAlignments))
+      .setFontWeights(Array.from({ length: dataRows }, () => rowWeights))
+      .setBackgrounds(zebraBackgrounds(dataRows, lootHeaders.length, i => isBossBannerRow(chaseItemsCatalog[i])));
   }
 
   // Priority Column Conditional Formatting (Soft Badges)
@@ -618,8 +634,7 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
 
   // Style Boss Separator Rows with distinctive Dark Slate / Indigo Banners (Unmerged flat rows)
   for (let i = 0; i < chaseItemsCatalog.length; i++) {
-    const rowTitle = (chaseItemsCatalog[i][0] || '').toString();
-    if (rowTitle.startsWith('⚔️') || rowTitle.startsWith('🛡️') || rowTitle.startsWith('🧭') || rowTitle.startsWith('🧪') || rowTitle.startsWith('🐊') || rowTitle.startsWith('🏛️') || rowTitle.startsWith('👑') || rowTitle.startsWith('📦')) {
+    if (isBossBannerRow(chaseItemsCatalog[i])) {
       const rowIdx = i + 2;
       sheet.getRange(rowIdx, 1, 1, sheet.getMaxColumns())
         .setBackground('#0f172a')

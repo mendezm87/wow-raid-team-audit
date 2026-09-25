@@ -38,6 +38,8 @@ This tab automatically synchronizes with Blizzard's live Armory to check your ch
 * 🔴 **`Missing Enchant` / `Empty Socket`**: Shows the exact gear slot missing an enchant or gem. Please enchant/gem these before raid time!
 * 🟡 **`0/4`, `1/4`, `2/4`, `3/4 Tier`**: Tracks your active current-season tier set pieces.
 * 🏛️ **Weekly Great Vault Progress**: Columns on the far right track how many raid and Mythic+ vault slots you have unlocked for the week.
+* 🔎 **Gear & enchant cells are short**: a gear slot reads like `◆ 334 Myth 6/6` (**◆** = tier piece) and an enchant reads `✓ Rank 2` or `Missing`. **Hover over a cell** to see the full item or enchant name.
+* ➕ **Hidden columns?** Enchants, Gear and Great Vault can be folded away — click the **+** above the header to open a section.
 
 ---
 
@@ -46,7 +48,7 @@ This tab automatically synchronizes with Blizzard's live Armory to check your ch
 Tracks official guild raid attendance and boss progression across the entire season using live **Warcraft Logs** data.
 
 ### 🌟 Key Highlights:
-* 📈 **Attendance %**: Percentage of official guild raid nights you were present for.
+* 📈 **Attendance %**: Percentage of official guild raid nights you were present for (🟢 90%+, 🟡 75–89%, 🔴 under 75%; same colours for On-Time %).
 * ⏰ **On-Time %**: Percentage of raid nights you were present for the **first boss pull of the night** (kill or wipe).
 * ⚔️ **Season Boss Kills**: Total number of unique raid boss encounters defeated across all difficulties.
 * 🔄 **Playing an Alt?**: If an officer has your alt linked to your main character on the `Config` tab, **all attendance, on-time percentage, and boss kill credits automatically combine onto your main character!**

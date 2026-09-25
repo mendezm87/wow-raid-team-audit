@@ -106,3 +106,108 @@ const ROSTER_ROLES = [
   '⚔️ Raider',
   '🛡️ Trial'
 ];
+
+// ═════════════════════════════════════════════════════════════════════════════════════
+// 🎨 SHARED SHEET STYLING
+// ═════════════════════════════════════════════════════════════════════════════════════
+
+// Guild Audit columns (in sheet order within each group). The groups are collapsible on the sheet.
+const AUDIT_GEAR_COLUMNS = [
+  'Head', 'Shoulders', 'Chest', 'Hands', 'Legs',
+  'Main Hand', 'Off Hand', 'Trinket 1', 'Trinket 2',
+  'Neck', 'Back', 'Wrist', 'Waist', 'Feet', 'Ring 1', 'Ring 2'
+];
+const AUDIT_ENCHANT_COLUMNS = [
+  'Enchant Main Hand', 'Enchant Off Hand', 'Enchant Head', 'Enchant Shoulder',
+  'Enchant Chest', 'Enchant Legs', 'Enchant Feet', 'Enchant Ring 1', 'Enchant Ring 2'
+];
+const AUDIT_VAULT_COLUMNS = ['GV Raid 1', 'GV Raid 2', 'GV Raid 3', 'GV M+ 1', 'GV M+ 2', 'GV M+ 3'];
+
+// Raid Ready text for a character the Blizzard Armory didn't return (left the guild, renamed, transferred)
+const ARMORY_LOOKUP_FAILED = '⚠️ Armory lookup failed';
+
+// Related tabs share a colour: gear (Audit + Talents), attendance, loot, setup
+const TAB_COLORS = {
+  [SHEET_NAME]: '#6366f1',
+  [TALENTS_SHEET_NAME]: '#6366f1',
+  [ATTENDANCE_SHEET_NAME]: '#10b981',
+  'Attendance Archive': '#10b981',
+  [LOOT_SHEET_NAME]: '#f59e0b',
+  'Config': '#64748b'
+};
+
+// Alternating data-row fills
+const ZEBRA_COLORS = ['#ffffff', '#f8fafc'];
+
+function applyTabColor(sheet) {
+  const color = TAB_COLORS[sheet.getName()];
+  if (color) sheet.setTabColor(color);
+}
+
+/** "Sep 25, 1:36 AM" in the spreadsheet's time zone, for "last refreshed" stamps. */
+function formatRefreshedAt(ss) {
+  return Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), 'MMM d, h:mm a');
+}
+
+/**
+ * Writes the first header cell as its label with a small grey "↻ <time>" refresh stamp on a second line.
+ * Code that finds columns by header name must read headers through headerLabel() so the stamp is ignored.
+ */
+function stampHeaderCell(sheet, label) {
+  const text = `${label}\n↻ ${formatRefreshedAt(sheet.getParent())}`;
+  const stampStyle = SpreadsheetApp.newTextStyle().setFontSize(7).setBold(false).setForegroundColor('#94a3b8').build();
+  const richText = SpreadsheetApp.newRichTextValue()
+    .setText(text)
+    .setTextStyle(label.length + 1, text.length, stampStyle)
+    .build();
+  sheet.getRange(1, 1).setRichTextValue(richText).setWrap(true);
+}
+
+/** A header cell's label without the refresh stamp stampHeaderCell() adds to the first column. */
+function headerLabel(value) {
+  return (value || '').toString().split('\n')[0].trim();
+}
+
+/** Alternating row fills for a block of rows. Rows where isBlankRow(i) is true stay white and restart the pattern. */
+function zebraBackgrounds(numRows, numCols, isBlankRow) {
+  const out = [];
+  let stripe = 0;
+  for (let i = 0; i < numRows; i++) {
+    if (isBlankRow && isBlankRow(i)) {
+      out.push(new Array(numCols).fill(ZEBRA_COLORS[0]));
+      stripe = 0;
+      continue;
+    }
+    out.push(new Array(numCols).fill(ZEBRA_COLORS[stripe % 2]));
+    stripe++;
+  }
+  return out;
+}
+
+/**
+ * Short Guild Audit gear cell: "[Tier] 334 (Myth 6/6) - Item Name" -> "◆ 334 Myth 6/6".
+ * ◆ marks current-season tier, ◇ previous-season tier. The full text goes in the cell's note.
+ */
+function compactGearText(full) {
+  const text = (full || '').toString();
+  const m = text.match(/^(\[Tier\] |\[Prev Tier\] )?(\d*) \(([^)]*)\)/);
+  if (!m) return text;
+  const mark = m[1] === '[Tier] ' ? '◆ ' : (m[1] ? '◇ ' : '');
+  const track = m[3] && m[3] !== '-' ? ` ${m[3]}` : '';
+  return `${mark}${m[2]}${track}`.trim();
+}
+
+/** Short Guild Audit enchant cell: "✓ Rank 2" / "✓" / "Missing" / "N/A". The enchant name goes in the note. */
+function compactEnchantText(full) {
+  const text = (full || '').toString();
+  if (!text || text === '-' || text === 'Missing' || text === 'N/A') return text;
+  const rank = text.match(/Tier(\d)/);
+  return rank ? `✓ Rank ${rank[1]}` : '✓';
+}
+
+/** Readable enchant name for a note: drops the "Enchanted: " prefix and the |A:...|a quality-icon markup. */
+function enchantNoteText(full) {
+  const text = (full || '').toString();
+  if (!text || text === '-' || text === 'Missing' || text === 'N/A') return '';
+  return text.replace(/^Enchanted:\s*/, '').replace(/\s*\|A:[^|]*\|a/g, '').trim();
+}

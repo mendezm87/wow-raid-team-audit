@@ -33,12 +33,8 @@ function calculateRaidReadyStatus(charRow) {
     issues.push(`${charRow['Empty Sockets']} Empty Socket${charRow['Empty Sockets'] > 1 ? 's' : ''}`);
   }
   
-  const enchantCols = [
-    'Enchant Main Hand', 'Enchant Off Hand', 'Enchant Head', 'Enchant Shoulder',
-    'Enchant Chest', 'Enchant Legs', 'Enchant Feet', 'Enchant Ring 1', 'Enchant Ring 2'
-  ];
   let missingEnchants = 0;
-  enchantCols.forEach(col => {
+  AUDIT_ENCHANT_COLUMNS.forEach(col => {
     if (charRow[col] === 'Missing') missingEnchants++;
   });
   
@@ -592,7 +588,14 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
     }
 
     // --- 4. Calculate Raid Ready Summary ---
-    charRow['Raid Ready'] = calculateRaidReadyStatus(charRow);
+    if (!profileData) {
+      // No Armory profile (left the guild, renamed, transferred): one quiet row instead of nine "Missing" enchants
+      charRow['Raid Ready'] = ARMORY_LOOKUP_FAILED;
+      charRow['Tier Set'] = '-';
+      AUDIT_ENCHANT_COLUMNS.forEach(col => { charRow[col] = '-'; });
+    } else {
+      charRow['Raid Ready'] = calculateRaidReadyStatus(charRow);
+    }
 
     characterDataObjects.push(charRow);
     Logger.log(`Processed ${charName}`);
@@ -620,18 +623,25 @@ function updateAllCharacterDataWithBonuses() {
     return;
   }
   
+  // Readiness first (sockets, gems, enchants), then crafted gear, then the per-slot gear and Great Vault detail.
+  // Enchants, Gear and Great Vault are collapsible groups, so each needs an ungrouped column between it and the next.
   const outputHeaders = [
-    'Name', 'Class', 'Spec', 'iLvl', 'Raid Ready', 'M+ Rating', 
-    'Tier Set', 'Total Sockets', 'Empty Sockets', 'Imperfect Gems', 'Crafted Items',
-    'Embellishment 1', 'Embellishment 2',
-    'Head', 'Shoulders', 'Chest', 'Hands', 'Legs',
-    'Main Hand', 'Off Hand', 'Trinket 1', 'Trinket 2', 
-    'Neck', 'Back', 'Wrist', 'Waist', 'Feet', 'Ring 1', 'Ring 2',
-    'Enchant Main Hand', 'Enchant Off Hand', 'Enchant Head', 'Enchant Shoulder', 'Enchant Chest', 'Enchant Legs', 'Enchant Feet', 'Enchant Ring 1', 'Enchant Ring 2',
-    'GV Slots Unlocked', 
-    'GV Raid 1', 'GV Raid 2', 'GV Raid 3',
-    'GV M+ 1', 'GV M+ 2', 'GV M+ 3'
+    'Name', 'Class', 'Spec', 'iLvl', 'Raid Ready', 'M+ Rating',
+    'Tier Set', 'Total Sockets', 'Empty Sockets', 'Imperfect Gems',
+    ...AUDIT_ENCHANT_COLUMNS,
+    'Crafted Items', 'Embellishment 1', 'Embellishment 2',
+    ...AUDIT_GEAR_COLUMNS,
+    'GV Slots Unlocked',
+    ...AUDIT_VAULT_COLUMNS
   ];
+
+  // Gear and enchant cells get a short badge; applyFormatting puts the full text in each cell's note
+  const toSheetRow = obj => outputHeaders.map(header => {
+    const value = obj[header] !== undefined ? obj[header] : '';
+    if (AUDIT_GEAR_COLUMNS.includes(header)) return compactGearText(value);
+    if (AUDIT_ENCHANT_COLUMNS.includes(header)) return compactEnchantText(value);
+    return value;
+  });
 
   // 1. Process Mains
   const mainCharacterData = processCharacterSet(config.MEMBERS_TO_TRACK, rosterData.members, config, token, enchantAndGemData, bonusData);
@@ -648,13 +658,13 @@ function updateAllCharacterDataWithBonuses() {
   const combinedDataObjects = [...mainCharacterData];
   const finalDataRows = [];
 
-  finalDataRows.push(...mainCharacterData.map(obj => outputHeaders.map(header => obj[header] !== undefined ? obj[header] : '')));
+  finalDataRows.push(...mainCharacterData.map(toSheetRow));
   
   if (altCharacterData.length > 0) {
       finalDataRows.push(Array(outputHeaders.length).fill(''));
       finalDataRows.push(Array(outputHeaders.length).fill(''));
       
-      finalDataRows.push(...altCharacterData.map(obj => outputHeaders.map(header => obj[header] !== undefined ? obj[header] : '')));
+      finalDataRows.push(...altCharacterData.map(toSheetRow));
       combinedDataObjects.push({}, {}, ...altCharacterData);
   }
   
@@ -668,6 +678,7 @@ function updateAllCharacterDataWithBonuses() {
 
   sheet.clear();
   sheet.clearFormats();
+  sheet.clearNotes();
   sheet.getRange(1, 1, finalData.length, finalData[0].length).setValues(finalData);
   
   applyFormatting(sheet, outputHeaders, combinedDataObjects);
@@ -708,60 +719,110 @@ function updateAllCharacterDataWithBonuses() {
  * Applies all conditional formatting and cosmetic styling.
  */
 function applyFormatting(sheet, headers, characterDataObjects) {
-  const fullRange = sheet.getDataRange();
-  fullRange.setHorizontalAlignment('center');
-  
-  // Reset all number formats so legacy percentage formatting from older sheets is cleared
-  fullRange.setNumberFormat('@');
-  
-  // Set integer number format for numeric stat columns in one batch
-  ['iLvl', 'M+ Rating', 'Total Sockets', 'Empty Sockets', 'Imperfect Gems', 'Crafted Items', 'GV Slots Unlocked'].forEach(colName => {
-    const colIdx = headers.indexOf(colName) + 1;
-    if (colIdx > 0 && sheet.getMaxRows() > 1) {
-      sheet.getRange(2, colIdx, sheet.getMaxRows() - 1, 1).setNumberFormat('0');
-    }
-  });
-  
-  sheet.setFrozenColumns(1);
-  sheet.setFrozenRows(1);
-
-  // Header styling
   const lastRow = sheet.getLastRow();
   const totalCols = sheet.getMaxColumns();
+  const colOf = name => headers.indexOf(name) + 1;
+  const columnRanges = names => names
+    .map(colOf)
+    .filter(idx => idx > 0)
+    .map(idx => sheet.getRange(2, idx, sheet.getMaxRows(), 1));
 
   // Clear previous conditional formatting rules
   sheet.clearConditionalFormatRules();
 
-  // 1. Executive Grid & Row Alignment
-  const fullDataRange = sheet.getDataRange();
-  fullDataRange.setVerticalAlignment('middle');
-  fullDataRange.setFontFamily('Roboto');
+  // Reset all number formats so legacy percentage formatting from older sheets is cleared
+  sheet.getDataRange()
+    .setNumberFormat('@')
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle')
+    .setFontFamily('Roboto');
 
-  // Header styling (Tailwind Slate 800)
-  const headerRange = sheet.getRange(1, 1, 1, totalCols);
-  headerRange.setBackground('#1e293b')
+  // Set integer number format for numeric stat columns in one batch
+  const numericCols = ['iLvl', 'M+ Rating', 'Total Sockets', 'Empty Sockets', 'Imperfect Gems', 'Crafted Items', 'GV Slots Unlocked'];
+  numericCols.forEach(colName => {
+    const colIdx = colOf(colName);
+    if (colIdx > 0 && sheet.getMaxRows() > 1) {
+      sheet.getRange(2, colIdx, sheet.getMaxRows() - 1, 1).setNumberFormat('0');
+    }
+  });
+
+  sheet.setFrozenColumns(1);
+  sheet.setFrozenRows(1);
+  applyTabColor(sheet);
+
+  // 1. Header (Tailwind Slate 800), with the Enchants / Gear / Great Vault sections tinted so they read apart
+  sheet.getRange(1, 1, 1, totalCols)
+    .setBackground('#1e293b')
     .setFontColor('#f8fafc')
     .setFontWeight('bold')
     .setFontSize(10)
-    .setHorizontalAlignment('center');
-  sheet.setRowHeight(1, 34);
+    .setHorizontalAlignment('center')
+    .setWrap(true);
+  [[AUDIT_ENCHANT_COLUMNS, '#134e4a'], [AUDIT_GEAR_COLUMNS, '#312e81'], [AUDIT_VAULT_COLUMNS, '#581c87']].forEach(([group, color]) => {
+    const first = colOf(group[0]);
+    if (first > 0) sheet.getRange(1, first, 1, group.length).setBackground(color);
+  });
+  sheet.setRowHeight(1, 40);
+  stampHeaderCell(sheet, headers[0]);
 
+  // 2. Body: regular weight with Name and Raid Ready bold; text left, numbers right, badges centred.
+  // Alternating row fills, with the blank gap between mains and alts left white.
+  let rowBackgrounds = [];
   if (lastRow > 1) {
-    sheet.setRowHeights(2, lastRow - 1, 28);
-    sheet.getRange(2, 1, lastRow - 1, totalCols).setFontSize(9).setFontWeight('bold');
+    const dataRows = lastRow - 1;
+    const textCols = ['Name', 'Class', 'Spec', 'Raid Ready', 'Embellishment 1', 'Embellishment 2'];
+    const rowAlignments = headers.map(h => (textCols.includes(h) ? 'left' : (numericCols.includes(h) ? 'right' : 'center')));
+    const rowWeights = headers.map(h => (h === 'Name' || h === 'Raid Ready' ? 'bold' : 'normal'));
+    const isGapRow = i => !(characterDataObjects[i] && characterDataObjects[i]['Name']);
+    rowBackgrounds = zebraBackgrounds(dataRows, headers.length, isGapRow);
+
+    sheet.setRowHeights(2, dataRows, 28);
+    sheet.getRange(2, 1, dataRows, totalCols).setFontSize(9);
+    sheet.getRange(2, 1, dataRows, headers.length)
+      .setHorizontalAlignments(Array.from({ length: dataRows }, () => rowAlignments))
+      .setFontWeights(Array.from({ length: dataRows }, () => rowWeights))
+      .setBackgrounds(rowBackgrounds);
   }
+
+  // 3. Full item and enchant names live in hover notes, so the cells can stay short
+  if (characterDataObjects && characterDataObjects.length > 0) {
+    const gearNote = value => (value && value !== '-' ? value : '');
+    [[AUDIT_GEAR_COLUMNS, gearNote], [AUDIT_ENCHANT_COLUMNS, enchantNoteText]].forEach(([group, noteFor]) => {
+      const first = colOf(group[0]);
+      if (first < 1) return;
+      const notes = characterDataObjects.map(obj => group.map(col => noteFor(obj && obj[col])));
+      sheet.getRange(2, first, notes.length, group.length).setNotes(notes);
+    });
+  }
+
+  // 4. Collapsible Enchants / Gear / Great Vault column groups. Groups survive sheet.clear(), so drop the old ones first.
+  try {
+    sheet.getRange(1, 1, 1, totalCols).shiftColumnGroupDepth(-1);
+  } catch (err) {
+    Logger.log('No existing column groups to reset: ' + err);
+  }
+  [AUDIT_ENCHANT_COLUMNS, AUDIT_GEAR_COLUMNS, AUDIT_VAULT_COLUMNS].forEach(group => {
+    const first = colOf(group[0]);
+    if (first > 0) sheet.getRange(1, first, 1, group.length).shiftColumnGroupDepth(1);
+  });
 
   const rules = [];
 
-  // 2. Class Colors with high-contrast text
-  const nameColIndex = headers.indexOf('Name') + 1;
-  const classColIndex = headers.indexOf('Class') + 1;
-  const specColIndex = headers.indexOf('Spec') + 1;
-  const classAndSpecRanges = [];
-  if (nameColIndex > 0) classAndSpecRanges.push(sheet.getRange(2, nameColIndex, sheet.getMaxRows(), 1));
-  if (classColIndex > 0) classAndSpecRanges.push(sheet.getRange(2, classColIndex, sheet.getMaxRows(), 1));
-  if (specColIndex > 0) classAndSpecRanges.push(sheet.getRange(2, specColIndex, sheet.getMaxRows(), 1));
+  // 5. Armory lookup failed: one quiet grey row instead of a wall of red. First in the list, so it wins over every rule below.
+  const raidReadyCol = colOf('Raid Ready');
+  if (raidReadyCol > 0) {
+    const raidReadyLetter = sheet.getRange(1, raidReadyCol).getA1Notation().replace(/\d+/g, '');
+    rules.push(SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(`=$${raidReadyLetter}2="${ARMORY_LOOKUP_FAILED}"`)
+      .setBackground('#f1f5f9')
+      .setFontColor('#94a3b8')
+      .setItalic(true)
+      .setRanges([sheet.getRange(2, 1, sheet.getMaxRows(), headers.length)])
+      .build());
+  }
 
+  // 6. Class Colors with high-contrast text
+  const classAndSpecRanges = columnRanges(['Name', 'Class', 'Spec']);
   if (classAndSpecRanges.length > 0) {
     const darkBgClasses = ['Death Knight', 'Demon Hunter', 'Shaman', 'Warlock'];
     for (const className in CLASS_COLORS) {
@@ -775,10 +836,9 @@ function applyFormatting(sheet, headers, characterDataObjects) {
     }
   }
 
-  // 3. Raid Ready Column Rules (Soft Modern Pills)
-  const raidReadyColIdx = headers.indexOf('Raid Ready');
-  if (raidReadyColIdx > -1) {
-    const rrRange = [sheet.getRange(2, raidReadyColIdx + 1, sheet.getMaxRows(), 1)];
+  // 7. Raid Ready Column Rules (Soft Modern Pills)
+  if (raidReadyCol > 0) {
+    const rrRange = columnRanges(['Raid Ready']);
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("READY").setBackground("#d1fae5").setFontColor("#065f46").setRanges(rrRange).build());
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Missing").setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(rrRange).build());
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Socket").setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(rrRange).build());
@@ -786,17 +846,8 @@ function applyFormatting(sheet, headers, characterDataObjects) {
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Tier").setBackground("#fef3c7").setFontColor("#92400e").setRanges(rrRange).build());
   }
 
-  // 4. Upgrade Tracks & Gear Slots (Modern Tailwind Badges)
-  const gearCols = [
-    'Head', 'Shoulders', 'Chest', 'Hands', 'Legs',
-    'Main Hand', 'Off Hand', 'Trinket 1', 'Trinket 2',
-    'Neck', 'Back', 'Wrist', 'Waist', 'Feet', 'Ring 1', 'Ring 2'
-  ];
-  const gearRanges = gearCols
-    .map(name => headers.indexOf(name) + 1)
-    .filter(idx => idx > 0)
-    .map(idx => sheet.getRange(2, idx, sheet.getMaxRows(), 1));
-
+  // 8. Upgrade Tracks & Gear Slots (Modern Tailwind Badges)
+  const gearRanges = columnRanges(AUDIT_GEAR_COLUMNS);
   if (gearRanges.length > 0) {
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Myth").setBackground("#ffedd5").setFontColor("#9a3412").setRanges(gearRanges).build());
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Hero").setBackground("#f3e8ff").setFontColor("#6b21a8").setRanges(gearRanges).build());
@@ -807,10 +858,9 @@ function applyFormatting(sheet, headers, characterDataObjects) {
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Crafted").setBackground("#fce7f3").setFontColor("#831843").setRanges(gearRanges).build());
   }
 
-  // 5. Tier Set Progress Rules (Soft Badges)
-  const tierSetColIdx = headers.indexOf('Tier Set');
-  if (tierSetColIdx > -1) {
-    const tsRange = [sheet.getRange(2, tierSetColIdx + 1, sheet.getMaxRows(), 1)];
+  // 9. Tier Set Progress Rules (Soft Badges)
+  const tsRange = columnRanges(['Tier Set']);
+  if (tsRange.length > 0) {
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("5/5").setBackground("#d1fae5").setFontColor("#065f46").setRanges(tsRange).build());
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("4/5").setBackground("#d1fae5").setFontColor("#065f46").setRanges(tsRange).build());
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("3/5").setBackground("#fef3c7").setFontColor("#92400e").setRanges(tsRange).build());
@@ -819,42 +869,31 @@ function applyFormatting(sheet, headers, characterDataObjects) {
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("0/5").setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(tsRange).build());
   }
 
-  // 6. Sockets & Imperfect Gems Rules
-  const emptySocketsColIdx = headers.indexOf('Empty Sockets');
-  if (emptySocketsColIdx > -1) {
-    const esRange = [sheet.getRange(2, emptySocketsColIdx + 1, sheet.getMaxRows(), 1)];
+  // 10. Sockets & Imperfect Gems Rules
+  const esRange = columnRanges(['Empty Sockets']);
+  if (esRange.length > 0) {
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThan(0).setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(esRange).build());
   }
 
-  const imperfectGemsColIdx = headers.indexOf('Imperfect Gems');
-  if (imperfectGemsColIdx > -1) {
-    const igRange = [sheet.getRange(2, imperfectGemsColIdx + 1, sheet.getMaxRows(), 1)];
+  const igRange = columnRanges(['Imperfect Gems']);
+  if (igRange.length > 0) {
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThan(0).setBackground("#fef3c7").setFontColor("#92400e").setRanges(igRange).build());
   }
 
-  // 7. Enchants Rules (Multi-range consolidation)
-  const enchantCols = [
-    'Enchant Main Hand', 'Enchant Off Hand', 'Enchant Head', 'Enchant Shoulder',
-    'Enchant Chest', 'Enchant Legs', 'Enchant Feet', 'Enchant Ring 1', 'Enchant Ring 2'
-  ];
-  const enchantRanges = enchantCols
-    .map(name => headers.indexOf(name) + 1)
-    .filter(idx => idx > 0)
-    .map(idx => sheet.getRange(2, idx, sheet.getMaxRows(), 1));
-
+  // 11. Enchant badges ("✓ Rank 2" / "✓ Rank 1" / "✓" / "Missing" / "N/A", see compactEnchantText)
+  const enchantRanges = columnRanges(AUDIT_ENCHANT_COLUMNS);
   if (enchantRanges.length > 0) {
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Tier2").setBackground("#d1fae5").setFontColor("#065f46").setRanges(enchantRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Rune of").setBackground("#d1fae5").setFontColor("#065f46").setRanges(enchantRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Tier1").setBackground("#fef3c7").setFontColor("#92400e").setRanges(enchantRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("N/A").setBackground("#f8fafc").setFontColor("#94a3b8").setRanges(enchantRanges).build());
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Missing").setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(enchantRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("✓ Rank 1").setBackground("#fef3c7").setFontColor("#92400e").setRanges(enchantRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextStartsWith("✓").setBackground("#d1fae5").setFontColor("#065f46").setRanges(enchantRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("N/A").setBackground("#f8fafc").setFontColor("#94a3b8").setRanges(enchantRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("Missing").setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(enchantRanges).build());
   }
-  
-  // 8. Great Vault Styling & Borders
-  const gvRaid1_idx = headers.indexOf('GV Raid 1') + 1;
-  const gvRaid3_idx = headers.indexOf('GV Raid 3') + 1;
-  const gvMplus1_idx = headers.indexOf('GV M+ 1') + 1;
-  const gvMplus3_idx = headers.indexOf('GV M+ 3') + 1;
+
+  // 12. Great Vault Styling & Borders
+  const gvRaid1_idx = colOf('GV Raid 1');
+  const gvRaid3_idx = colOf('GV Raid 3');
+  const gvMplus1_idx = colOf('GV M+ 1');
+  const gvMplus3_idx = colOf('GV M+ 3');
   const thin_border = SpreadsheetApp.BorderStyle.SOLID;
 
   if (gvRaid1_idx > 0 && gvRaid3_idx > 0 && lastRow > 1) {
@@ -865,12 +904,7 @@ function applyFormatting(sheet, headers, characterDataObjects) {
     sheet.getRange(1, gvMplus1_idx, lastRow, 3).setBorder(true, true, true, true, false, false, '#94a3b8', thin_border);
   }
 
-  const gvRaidCols = ['GV Raid 1', 'GV Raid 2', 'GV Raid 3'];
-  const gvRaidRanges = gvRaidCols
-    .map(name => headers.indexOf(name) + 1)
-    .filter(idx => idx > 0)
-    .map(idx => sheet.getRange(2, idx, sheet.getMaxRows(), 1));
-
+  const gvRaidRanges = columnRanges(['GV Raid 1', 'GV Raid 2', 'GV Raid 3']);
   if (gvRaidRanges.length > 0) {
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(VAULT_MAPPING.raid.mythic.toString()).setBackground("#ffedd5").setFontColor("#9a3412").setRanges(gvRaidRanges).build());
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(VAULT_MAPPING.raid.heroic.toString()).setBackground("#f3e8ff").setFontColor("#6b21a8").setRanges(gvRaidRanges).build());
@@ -878,12 +912,7 @@ function applyFormatting(sheet, headers, characterDataObjects) {
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(VAULT_MAPPING.raid.lfr.toString()).setBackground("#dcfce7").setFontColor("#166534").setRanges(gvRaidRanges).build());
   }
 
-  const gvMplusCols = ['GV M+ 1', 'GV M+ 2', 'GV M+ 3'];
-  const gvMplusRanges = gvMplusCols
-    .map(name => headers.indexOf(name) + 1)
-    .filter(idx => idx > 0)
-    .map(idx => sheet.getRange(2, idx, sheet.getMaxRows(), 1));
-
+  const gvMplusRanges = columnRanges(['GV M+ 1', 'GV M+ 2', 'GV M+ 3']);
   if (gvMplusRanges.length > 0) {
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(331).setBackground("#ffedd5").setFontColor("#9a3412").setRanges(gvMplusRanges).build());
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(312).setBackground("#f3e8ff").setFontColor("#6b21a8").setRanges(gvMplusRanges).build());
@@ -891,10 +920,12 @@ function applyFormatting(sheet, headers, characterDataObjects) {
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThanOrEqualTo(292).setBackground("#dcfce7").setFontColor("#166534").setRanges(gvMplusRanges).build());
   }
 
-  // 9. M+ Rating Color (Batch updated in 1 single call with high-contrast text)
-  const mPlusRatingColIdx = headers.indexOf('M+ Rating') + 1;
+  // 13. M+ Rating Color (Batch updated in 1 single call with high-contrast text); unrated rows keep their zebra fill
+  const mPlusRatingColIdx = colOf('M+ Rating');
   if (mPlusRatingColIdx > 0 && characterDataObjects && characterDataObjects.length > 0) {
-    const backgrounds = characterDataObjects.map(charData => [(charData && charData['M+ Rating Color']) ? charData['M+ Rating Color'] : '#ffffff']);
+    const backgrounds = characterDataObjects.map((charData, i) => [
+      (charData && charData['M+ Rating Color']) ? charData['M+ Rating Color'] : ((rowBackgrounds[i] || [])[0] || '#ffffff')
+    ]);
     const fontColors = characterDataObjects.map(charData => {
       const col = (charData && charData['M+ Rating Color']) ? charData['M+ Rating Color'].toLowerCase() : '';
       return [(col.includes('ff8000') || col.includes('a335ee') || col.includes('0070dd')) ? '#ffffff' : '#0f172a'];
@@ -904,23 +935,19 @@ function applyFormatting(sheet, headers, characterDataObjects) {
 
   sheet.setConditionalFormatRules(rules);
 
-  // Set column widths directly
-  const minWidths = {
-    'Name': 130, 'Class': 110, 'Spec': 130, 'iLvl': 70,
-    'Raid Ready': 460, 'M+ Rating': 95, 'Tier Set': 140,
-    'Total Sockets': 110, 'Empty Sockets': 110, 'Imperfect Gems': 120, 'Crafted Items': 110,
-    'Embellishment 1': 240, 'Embellishment 2': 240,
-    'Head': 360, 'Shoulders': 360, 'Chest': 360, 'Hands': 360, 'Legs': 360,
-    'Main Hand': 360, 'Off Hand': 360, 'Trinket 1': 360, 'Trinket 2': 360,
-    'Neck': 360, 'Back': 360, 'Wrist': 360, 'Waist': 360, 'Feet': 360,
-    'Ring 1': 360, 'Ring 2': 360,
-    'Enchant Main Hand': 220, 'Enchant Off Hand': 220, 'Enchant Head': 220, 'Enchant Shoulder': 220,
-    'Enchant Chest': 220, 'Enchant Legs': 220, 'Enchant Feet': 220, 'Enchant Ring 1': 220, 'Enchant Ring 2': 220,
-    'GV Slots Unlocked': 130, 'GV Raid 1': 100, 'GV Raid 2': 100, 'GV Raid 3': 100,
-    'GV M+ 1': 100, 'GV M+ 2': 100, 'GV M+ 3': 100
+  // Column widths: gear and enchant cells hold short badges now (full names are in the notes)
+  const columnWidths = {
+    'Name': 120, 'Class': 100, 'Spec': 110, 'iLvl': 55,
+    'Raid Ready': 360, 'M+ Rating': 75, 'Tier Set': 95,
+    'Total Sockets': 75, 'Empty Sockets': 75, 'Imperfect Gems': 80, 'Crafted Items': 75,
+    'Embellishment 1': 165, 'Embellishment 2': 165,
+    'GV Slots Unlocked': 80
   };
+  AUDIT_ENCHANT_COLUMNS.forEach(h => { columnWidths[h] = 82; });
+  AUDIT_GEAR_COLUMNS.forEach(h => { columnWidths[h] = 118; });
+  AUDIT_VAULT_COLUMNS.forEach(h => { columnWidths[h] = 62; });
 
   headers.forEach((header, idx) => {
-    sheet.setColumnWidth(idx + 1, minWidths[header] || 130);
+    sheet.setColumnWidth(idx + 1, columnWidths[header] || 100);
   });
 }

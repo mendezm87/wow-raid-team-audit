@@ -140,6 +140,15 @@ Tracks equipped item levels, tier set bonuses, gems, enchants, and weekly Great 
 * 🔴 **`Missing Enchant` / `Empty Socket`**: Identifies specific missing items and un-socketed slots.
 * 🟡 **`0-3/4 Tier`**: Raider is missing their 4pc active tier set bonus.
 * ⚠️ **`Off-Spec Logout: Holy (Assigned: Protection)`**: Warns officers if a raider logged out in an off-spec or PvP gear.
+* ⚪ **`⚠️ Armory lookup failed`** (whole row greyed out): Blizzard's Armory didn't return the character — usually they left the guild, renamed, or transferred. Check the name on `Config`, or remove them.
+
+### 🧭 Reading the Sheet:
+* **Column order**: readiness first (tier, sockets, gems, enchants), then crafted items and embellishments, then per-slot gear, then the Great Vault.
+* **Collapsible sections**: Enchants, Gear and Great Vault are column groups — click the **−** / **+** above the header to fold a section away. The next audit refresh opens them all again.
+* **Short gear cells**: each gear slot shows `◆ 334 Myth 6/6` (item level + upgrade track). **◆** = current-season tier piece, **◇** = previous-season tier. **Hover the cell** to see the full item name.
+* **Short enchant cells**: `✓ Rank 2` (green), `✓ Rank 1` (amber), `✓` for Death Knight runes, `Missing` (red), `N/A` (grey, e.g. shields and off-hands). Hover for the enchant name.
+* **Last refreshed**: the small `↻` time under the `Name` header shows when the audit last ran (same on `Talents & Builds` and `Loot & Chase Items`).
+* **Formatting lives in the code**: every refresh rebuilds colours, widths and layout, so changes made by hand in Sheets are wiped on the next run.
 
 ### 🏛️ Upgrade Track & Vault Formatting:
 * 🟠 **Myth** (ilvl 321–344)
@@ -245,7 +254,7 @@ The spreadsheet features full **Warcraft Logs v2 GraphQL API integration** to au
 1. In Google Sheets, click **`Guild Audit` → `6. Sync Warcraft Logs Attendance & History`** (or set up a [nightly trigger](#9--automatic-updates-triggers)).
 2. The script reads your guild's most recent Warcraft Logs reports and merges multiple uploaders of the same night into one raid night.
 3. It generates/refreshes the **`Attendance & History`** tab with:
-   * **Leaderboard:** Raider Attendance %, On-Time %, Raids Attended, Tardies, Boss Kills, and Reliability Tier.
+   * **Leaderboard:** Raider Attendance %, On-Time %, Raids Attended, Tardies, Boss Kills, and Reliability Tier. Attendance % and On-Time % are coloured 🟢 90%+, 🟡 75–89%, 🔴 under 75%.
    * **Ledger:** Complete historical timeline of every raid night, bosses defeated (or progression wipes), roster present, bench list, and direct Warcraft Logs links.
 
 ### 🗄️ Season History is Permanent (Attendance Archive)

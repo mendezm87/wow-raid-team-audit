@@ -69,6 +69,9 @@ function parseCharacterAndRealm(nameRaw, realmRaw) {
 function applyConfigDropdowns(sheet) {
   if (!sheet) return;
 
+  sheet.setHiddenGridlines(true);
+  applyTabColor(sheet);
+
   const data = sheet.getDataRange().getValues();
   const mainCharacterNames = [];
 

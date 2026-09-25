@@ -77,18 +77,29 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   fullRange.setNumberFormat('@');
   sheet.setFrozenColumns(1);
   sheet.setFrozenRows(1);
+  applyTabColor(sheet);
 
   // Header styling
   const headerRange = sheet.getRange(1, 1, 1, sheet.getMaxColumns());
   headerRange.setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
-  sheet.setRowHeight(1, 34);
+  sheet.setRowHeight(1, 40);
+  stampHeaderCell(sheet, talentHeaders[0]);
 
-  // Row heights & fonts
+  // Rows: regular weight with Name and Raid Ready bold; text left, iLvl right, links centred.
+  // Alternating fills, with the blank gap between mains and alts left white.
   if (outputData.length > 1) {
-    sheet.setRowHeights(2, outputData.length - 1, 28);
-    sheet.getRange(2, 1, outputData.length - 1, sheet.getMaxColumns()).setFontSize(9).setFontWeight('bold');
+    const dataRows = outputData.length - 1;
+    const textCols = ['Name', 'Class', 'Active Spec', 'Hero Talents', 'Talent Loadout Code (Import String)', 'Raid Ready'];
+    const rowAlignments = talentHeaders.map(h => (textCols.includes(h) ? 'left' : (h === 'iLvl' ? 'right' : 'center')));
+    const rowWeights = talentHeaders.map(h => (h === 'Name' || h === 'Raid Ready' ? 'bold' : 'normal'));
+    sheet.setRowHeights(2, dataRows, 28);
+    sheet.getRange(2, 1, dataRows, sheet.getMaxColumns()).setFontSize(9);
+    sheet.getRange(2, 1, dataRows, talentHeaders.length)
+      .setHorizontalAlignments(Array.from({ length: dataRows }, () => rowAlignments))
+      .setFontWeights(Array.from({ length: dataRows }, () => rowWeights))
+      .setBackgrounds(zebraBackgrounds(dataRows, talentHeaders.length, i => !finalRows[i][0]));
     // Set monospace styling for Talent String (Column 5)
-    sheet.getRange(2, 5, outputData.length - 1, 1).setFontFamily('Consolas').setFontSize(8).setFontWeight('normal');
+    sheet.getRange(2, 5, dataRows, 1).setFontFamily('Consolas').setFontSize(8);
   }
 
   // Class colors for Name, Class, Spec
@@ -98,6 +109,16 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
     sheet.getRange(2, 3, sheet.getMaxRows(), 1)  // Spec
   ];
   const rules = [];
+
+  // Armory lookup failed: grey out the whole row (first, so it wins over the class colours)
+  rules.push(SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied(`=$L2="${ARMORY_LOOKUP_FAILED}"`)
+    .setBackground('#f1f5f9')
+    .setFontColor('#94a3b8')
+    .setItalic(true)
+    .setRanges([sheet.getRange(2, 1, sheet.getMaxRows(), talentHeaders.length)])
+    .build());
+
   const darkBgClasses = ['Death Knight', 'Demon Hunter', 'Shaman', 'Warlock'];
   for (const className in CLASS_COLORS) {
     const fontColor = darkBgClasses.includes(className) ? '#ffffff' : '#0f172a';
@@ -114,6 +135,8 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   const rrRange = [sheet.getRange(2, raidReadyColIdx, sheet.getMaxRows(), 1)];
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('READY').setBackground('#d1fae5').setFontColor('#065f46').setRanges(rrRange).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Missing').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges(rrRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Socket').setBackground('#ffe4e6').setFontColor('#9f1239').setRanges(rrRange).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Off-Spec').setBackground('#fef3c7').setFontColor('#92400e').setRanges(rrRange).build());
   rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Tier').setBackground('#fef3c7').setFontColor('#92400e').setRanges(rrRange).build());
 
   sheet.setConditionalFormatRules(rules);
@@ -132,12 +155,12 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   sheet.setColumnWidth(2, 110); // Class
   sheet.setColumnWidth(3, 130); // Spec
   sheet.setColumnWidth(4, 210); // Hero Talents
-  sheet.setColumnWidth(5, 480); // Talent String
+  sheet.setColumnWidth(5, 300); // Talent String (clipped; the full string is still copied from the cell)
   sheet.setColumnWidth(6, 210); // Archon Boss Dropdown
   sheet.setColumnWidth(7, 165); // Archon Heroic
   sheet.setColumnWidth(8, 165); // Archon Mythic
   sheet.setColumnWidth(9, 150); // Wowhead Guide
   sheet.setColumnWidth(10, 150); // Raidbots Droptimizer
   sheet.setColumnWidth(11, 80); // ilvl
-  sheet.setColumnWidth(12, 460);// Raid Ready
+  sheet.setColumnWidth(12, 360);// Raid Ready
 }

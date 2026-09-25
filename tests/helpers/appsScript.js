@@ -21,6 +21,7 @@ function readConcatenatedSource() {
 
 function createSheet(name) {
   let data = [];
+  let notes = [];
   let hidden = false;
   const sheet = {
     name,
@@ -52,7 +53,18 @@ function createSheet(name) {
           }
           return out;
         },
-        getDisplayValues() { return range.getValues().map(r => r.map(v => String(v))); }
+        getDisplayValues() { return range.getValues().map(r => r.map(v => String(v))); },
+        setNotes(values) {
+          for (let i = 0; i < numRows; i++) {
+            notes[row - 1 + i] = notes[row - 1 + i] || [];
+            for (let j = 0; j < numCols; j++) notes[row - 1 + i][col - 1 + j] = values[i][j];
+          }
+          return range;
+        },
+        getNotes() {
+          return Array.from({ length: numRows }, (_, i) =>
+            Array.from({ length: numCols }, (_, j) => ((notes[row - 1 + i] || [])[col - 1 + j]) ?? ''));
+        }
       };
       return range;
     }
