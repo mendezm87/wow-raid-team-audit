@@ -144,31 +144,48 @@ test('webhook failures include an `error` field so the Discord bot shows the rea
   assert.match(post({}).error, /No Raidbots or QE Live URL/);
 });
 
-test('Great Vault ilvls match wowaudit\'s live Season 2 table', () => {
+test('Great Vault ilvls line up with the season upgrade tracks', () => {
   const { get } = loadAppsScript();
 
-  // Raid vault
-  assert.equal(get('VAULT_MAPPING.raid.mythic'), 334);
-  assert.equal(get('VAULT_MAPPING.raid.heroic'), 318);
-  assert.equal(get('VAULT_MAPPING.raid.normal'), 305);
+  // The tracks the vault rewards sit on. Every vault ilvl must be a step on one of these,
+  // which is what caught keys 7-9 being published as 311 (Hero 3/6) while labelled Hero 4/6.
+  const HERO = [305, 308, 311, 315, 318, 321];
+  const MYTH = [318, 321, 325, 328, 331, 334];
+  const VETERAN = [279, 282, 285, 289, 292, 295];
+  const onTrack = ilvl => HERO.includes(ilvl) || MYTH.includes(ilvl) || VETERAN.includes(ilvl) || ilvl === 292 || ilvl === 298 || ilvl === 302;
+
+  // Raid row
+  assert.equal(get('VAULT_MAPPING.raid.mythic'), MYTH[5]);
+  assert.equal(get('VAULT_MAPPING.raid.heroic'), MYTH[0]);
+  assert.equal(get('VAULT_MAPPING.raid.normal'), HERO[0]);
   assert.equal(get('VAULT_MAPPING.raid.lfr'), 292);
 
-  // Dungeon vault: 318 at 10+, then 311 / 308 / 305 / 302 / 289 stepping down
+  // Dungeon row
   const mplus = get('VAULT_MAPPING.mplus');
-  assert.equal(mplus[10], 318);
-  [9, 8, 7, 6].forEach(k => assert.equal(mplus[k], 311, `keystone ${k}`));
-  [5, 4].forEach(k => assert.equal(mplus[k], 308, `keystone ${k}`));
-  [3, 2].forEach(k => assert.equal(mplus[k], 305, `keystone ${k}`));
-  assert.equal(mplus[1], 302);
-  assert.equal(mplus[0], 289);
+  [10, 11, 12, 20].forEach(k => assert.equal(mplus[k], MYTH[0], `keystone ${k} should be Myth 1/6`));
+  [9, 8, 7].forEach(k => assert.equal(mplus[k], HERO[3], `keystone ${k} should be Hero 4/6`));
+  assert.equal(mplus[6], HERO[2]);
+  [5, 4].forEach(k => assert.equal(mplus[k], HERO[1], `keystone ${k} should be Hero 2/6`));
+  [3, 2].forEach(k => assert.equal(mplus[k], HERO[0], `keystone ${k} should be Hero 1/6`));
+  assert.equal(mplus[0], VETERAN[3], 'Mythic 0 should be Veteran 4/6');
 
-  // Every keystone from 0 to 20 resolves, so no slot falls through to a guessed value
-  for (let k = 0; k <= 20; k++) assert.equal(typeof mplus[k], 'number', `keystone ${k} missing`);
+  // Season 2 has no +1 bracket, so nothing should claim a reward for one
+  assert.equal(mplus[1], undefined);
 
-  // Delve vault reward ilvls are recorded even though nothing populates them yet
+  // Every keystone from 2 to 20 resolves, so no slot falls through to a guessed value
+  for (let k = 2; k <= 20; k++) assert.equal(typeof mplus[k], 'number', `keystone ${k} missing`);
+
+  // Every value in the whole table is a real step on a real track
   const delve = get('VAULT_MAPPING.delve');
-  assert.equal(delve[11], 305);
-  assert.equal(delve[1], 272);
+  Object.values(mplus).concat(Object.values(delve)).forEach(ilvl => {
+    assert.ok(onTrack(ilvl), `${ilvl} is not a step on any upgrade track`);
+  });
+
+  // World row: tiers 1-11, capped at Hero 1/6 because it cannot give Myth-track loot
+  assert.equal(delve[1], VETERAN[0]);
+  assert.equal(delve[8], HERO[0]);
+  assert.equal(delve[11], HERO[0]);
+  for (let t = 1; t <= 11; t++) assert.ok(delve[t] <= HERO[0], `delve tier ${t} above Hero 1/6`);
 });
 
 test('simStatusText_ reports fresh, stale and missing sims', () => {

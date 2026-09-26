@@ -1,31 +1,43 @@
 // --- VAULT & SEASON CONFIGURATION (Midnight Season 2 - Patch 12.1) ---
-// Great Vault reward ilvls, cross-checked against wowaudit's live season table
-// (https://wowaudit.com/, `page_info.currentSeason.great_vault`) on 2026-09-26.
-// These are the VAULT reward ilvls, not the end-of-dungeon / end-of-boss drop ilvls,
-// which are lower. Verify this block against wowaudit at the start of every season.
+// GREAT VAULT reward ilvls, not end-of-dungeon / end-of-boss drop ilvls (which are lower:
+// the dungeon chest caps at 311 from +10, where the vault gives 318).
+//
+// Cross-checked 2026-09-26 against method.gg, timesaver.gg, mythic-store.com and
+// wowaudit's live season JSON (https://wowaudit.com/, page_info.currentSeason.great_vault).
+// Those sources disagree on the raw ilvl for keys 7-9, so the tiebreaker is the upgrade
+// TRACK STEP they all agree on, which pins the number exactly:
+//   Hero track runs 305 / 308 / 311 / 315 / 318 / 321 (1/6 -> 6/6, base and cap from wowaudit)
+//   Myth track runs 318 / 321 / 325 / 328 / 331 / 334
+//   Veteran track runs 279 / 282 / 285 / 289 / 292 / 295
+// Keys 7-9 award "Hero 4/6" in every source, and Hero 4/6 is 315 - so 315 it is. The three
+// sources printing 311 there contradict their own track label (311 is Hero 3/6, the +6 reward).
+// When updating this block for a new season, check the track label as well as the ilvl.
 const VAULT_MAPPING = {
   raid: {
-      mythic: 334, // Mythic raid vault (344 is personal loot only, not boss/raid loot)
-      heroic: 318, // Heroic raid vault
-      normal: 305, // Normal raid vault
-      lfr: 292     // LFR raid vault
+      mythic: 334, // Mythic raid vault, Myth 6/6 (344 is personal loot / Very Rare only)
+      heroic: 318, // Heroic raid vault, Myth 1/6 - a full track above the direct drop
+      normal: 305, // Normal raid vault, Hero 1/6
+      lfr: 292     // LFR raid vault, Champion 1/6
   },
+  // Dungeon row. Slots come from the 1st / 4th / 8th highest keys of the week.
   mplus: {
       20: 318, 19: 318, 18: 318, 17: 318, 16: 318, 15: 318, 14: 318,
-      13: 318, 12: 318, 11: 318, 10: 318, // Caps at 318 for keystone 10 and above
-      9: 311, 8: 311, 7: 311, 6: 311,     // 311 for keystones 6-9
-      5: 308, 4: 308,                     // 308 for keystones 4-5
-      3: 305, 2: 305,                     // 305 for keystones 2-3
-      1: 302,                             // 302 for keystone 1
-      0: 289                              // 289 for Mythic 0
+      13: 318, 12: 318, 11: 318, 10: 318, // Myth 1/6. Caps here; a +15 gives the same as a +10
+      9: 315, 8: 315, 7: 315,             // Hero 4/6
+      6: 311,                             // Hero 3/6
+      5: 308, 4: 308,                     // Hero 2/6
+      3: 305, 2: 305,                     // Hero 1/6
+      0: 289                              // Veteran 4/6. Mythic 0 counts toward the dungeon row;
+                                          // there is no +1 bracket in Season 2, so no key 1 entry.
   },
-  // Delve vault slots (tiers 1-11). Not populated today: the Blizzard character API
-  // exposes no delve progress, so nothing fills these. Kept here so the reward ilvls
-  // are recorded in one place if a source ever appears.
+  // World row (Delves and Prey hunts), tiers 1-11. Capped at Hero 1/6: the world row cannot
+  // give Myth-track loot this season. NOT POPULATED TODAY - the Blizzard character API exposes
+  // no delve progress, so nothing fills these. Kept here so the ilvls live in one place if a
+  // source ever appears, and because officers ask what the world row is worth.
   delve: {
-      11: 305, 10: 305, 9: 305, 8: 305,
-      7: 302, 6: 298, 5: 292,
-      4: 289, 3: 285, 2: 282, 1: 272
+      11: 305, 10: 305, 9: 305, 8: 305,   // Hero 1/6
+      7: 302, 6: 298, 5: 292,             // Champion 4/6, 3/6, 1/6
+      4: 289, 3: 285, 2: 282, 1: 279      // Veteran 4/6, 3/6, 2/6, 1/6
   }
 };
 
