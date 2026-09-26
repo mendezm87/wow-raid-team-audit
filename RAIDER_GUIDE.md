@@ -39,6 +39,7 @@ This tab automatically synchronizes with Blizzard's live Armory to check your ch
 * 🟡 **`Tier 0/5` – `Tier 3/5`**: You have fewer than 4 of the 5 current-season tier pieces, so no 4-piece bonus yet.
 * 🏛️ **Weekly Great Vault Progress**: Columns on the far right track how many raid and Mythic+ vault slots you have unlocked for the week.
 * 🧪 **`Sim Status`**: `✅ Sim 3d old` means your Droptimizer is current, `⚠️ Sim 12d old` means it is over a week old, and `❌ No sim` means none has ever been imported for you — **and while it says that you never show up as a contender on `Loot & Chase Items`**. Post a Droptimizer (or QE Live) link in the Discord sim channel to fix it.
+* 💎 **`Sockets`**: one cell. Just a number (`5`) means every socket is filled with a current gem. `5 · 1 empty` (red) or `5 · 1 empty · 2 imperfect` (amber) means there is something to fix.
 * 🔎 **Gear & enchant cells are short**: a gear slot reads like `◆ 334 Myth 6/6` (**◆** = tier piece) and an enchant reads `✓ Rank 2` or `Missing`. **Hover over a cell** to see the full item or enchant name.
 * ➕ **Hidden columns?** Enchants, Gear and Great Vault can be folded away — click the **+** above the header to open a section.
 
@@ -141,6 +142,7 @@ $$\text{Priority Score} = \text{Raw Upgrade Gain} \times \text{Reliability Index
    * 🛡️ **`🛡️ Trial` ($0.80\times$)**: $-20\%$ modifier until trial graduation.
 2. **Reliability Index**:
    * Combines **$85\%$ Season Attendance** $+ \mathbf{15\%}$ **On-Time Punctuality** (being ready for the first pull).
+   * Floored at $0.40$ — showing up matters, but missing raids never zeroes you out. Your percentages are the ones on the `Attendance & History` leaderboard, so if they look wrong there, they are wrong here too.
 3. **Raid Preparation (Gems & Enchants)**:
    * 🟢 **`READY` ($1.00\times$)**: Full priority credit.
    * ⚠️ **Missing Enchants / Sockets ($0.90\times$)**: $-10\%$ modifier and `⚠️ Missing Enchants` badge until gear is enchanted.

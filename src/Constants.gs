@@ -347,3 +347,46 @@ function stripLootItemId_(text) {
 function lootItemIdNote_(id) {
   return id ? `Blizzard ID: ${id}` : '';
 }
+
+/**
+ * A percentage that may come back from a sheet as text ("83%", "83") or, because Sheets coerces a
+ * percent-formatted string on write, as the number it stores (0.83 for 83%, 1 for 100%).
+ * Returns a 0-1 fraction, or null when there is no usable value.
+ */
+function parsePercentFraction_(value) {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') {
+    if (!isFinite(value)) return null;
+    // Sheets stores a percent-formatted cell as a fraction, so anything <= 1 is already one.
+    return value <= 1 ? value : value / 100;
+  }
+  const text = value.toString().trim();
+  if (!text || text.toUpperCase() === 'N/A') return null;
+  const match = text.match(/-?\d+(\.\d+)?/);
+  if (!match) return null;
+  const num = parseFloat(match[0]);
+  if (isNaN(num)) return null;
+  if (text.indexOf('%') > -1) return num / 100;
+  return num <= 1 ? num : num / 100;
+}
+
+/** "83%" for anything parsePercentFraction_ understands, or null. */
+function formatPercentLabel_(value) {
+  const frac = parsePercentFraction_(value);
+  if (frac === null) return null;
+  return `${Math.round(frac * 100)}%`;
+}
+
+/**
+ * One socket cell instead of three columns: the total on its own when everything is filled with
+ * current gems, with only the problems spelled out.
+ */
+function formatSocketSummary_(total, empty, imperfect) {
+  const t = Number(total) || 0;
+  const e = Number(empty) || 0;
+  const i = Number(imperfect) || 0;
+  const parts = [];
+  if (e > 0) parts.push(`${e} empty`);
+  if (i > 0) parts.push(`${i} imperfect`);
+  return parts.length ? `${t} · ${parts.join(' · ')}` : `${t}`;
+}

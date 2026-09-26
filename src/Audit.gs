@@ -605,10 +605,13 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
       charRow['Tier Set'] = '-';
       AUDIT_ENCHANT_COLUMNS.forEach(col => { charRow[col] = '-'; });
       // Nothing was read, so leave the stat columns blank rather than showing a real-looking 0
-      ['iLvl', 'M+ Rating', 'Total Sockets', 'Empty Sockets', 'Imperfect Gems', 'Crafted Items', 'GV Slots Unlocked']
+      ['iLvl', 'M+ Rating', 'Sockets', 'Crafted Items', 'GV Slots Unlocked']
         .forEach(col => { charRow[col] = ''; });
     } else {
       charRow['Raid Ready'] = calculateRaidReadyStatus(charRow);
+      // Three counters, one cell: the total alone when every socket is filled with a current gem.
+      charRow['Sockets'] = formatSocketSummary_(
+        charRow['Total Sockets'], charRow['Empty Sockets'], charRow['Imperfect Gems']);
     }
 
     // Sim freshness, so a raider with no sim isn't silently absent from every contender list.
@@ -654,7 +657,7 @@ function updateAllCharacterDataWithBonuses() {
   // Enchants, Gear and Great Vault are collapsible groups, so each needs an ungrouped column between it and the next.
   const outputHeaders = [
     'Name', 'Class', 'Spec', 'iLvl', 'Raid Ready', 'M+ Rating', 'Sim Status',
-    'Tier Set', 'Total Sockets', 'Empty Sockets', 'Imperfect Gems',
+    'Tier Set', 'Sockets',
     ...AUDIT_ENCHANT_COLUMNS,
     'Crafted Items', 'Embellishment 1', 'Embellishment 2',
     ...AUDIT_GEAR_COLUMNS,
@@ -768,7 +771,7 @@ function applyFormatting(sheet, headers, characterDataObjects) {
     .setFontFamily('Roboto');
 
   // Set integer number format for numeric stat columns in one batch
-  const numericCols = ['iLvl', 'M+ Rating', 'Total Sockets', 'Empty Sockets', 'Imperfect Gems', 'Crafted Items', 'GV Slots Unlocked']
+  const numericCols = ['iLvl', 'M+ Rating', 'Crafted Items', 'GV Slots Unlocked']
     .concat(AUDIT_VAULT_COLUMNS);
   numericCols.forEach(colName => {
     const colIdx = colOf(colName);
@@ -911,15 +914,11 @@ function applyFormatting(sheet, headers, characterDataObjects) {
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("0/5").setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(tsRange).build());
   }
 
-  // 10. Sockets & Imperfect Gems Rules
-  const esRange = columnRanges(['Empty Sockets']);
-  if (esRange.length > 0) {
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThan(0).setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(esRange).build());
-  }
-
-  const igRange = columnRanges(['Imperfect Gems']);
-  if (igRange.length > 0) {
-    rules.push(SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThan(0).setBackground("#fef3c7").setFontColor("#92400e").setRanges(igRange).build());
+  // 10. Sockets (one cell: "5" when clean, "5 · 1 empty · 2 imperfect" when not)
+  const socketRange = columnRanges(['Sockets']);
+  if (socketRange.length > 0) {
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("empty").setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(socketRange).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("imperfect").setBackground("#fef3c7").setFontColor("#92400e").setRanges(socketRange).build());
   }
 
   // 11. Enchant badges ("✓ Rank 2" / "✓ Rank 1" / "✓" / "Missing" / "N/A", see compactEnchantText)
@@ -979,7 +978,7 @@ function applyFormatting(sheet, headers, characterDataObjects) {
   const columnWidths = {
     'Name': 120, 'Class': 100, 'Spec': 110, 'iLvl': 55,
     'Raid Ready': 260, 'M+ Rating': 75, 'Sim Status': 100, 'Tier Set': 95,
-    'Total Sockets': 75, 'Empty Sockets': 75, 'Imperfect Gems': 80, 'Crafted Items': 75,
+    'Sockets': 130, 'Crafted Items': 75,
     'Embellishment 1': 165, 'Embellishment 2': 165,
     'GV Slots Unlocked': 80
   };

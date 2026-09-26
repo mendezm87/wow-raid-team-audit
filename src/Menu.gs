@@ -18,6 +18,7 @@ function onOpen() {
       .addItem('8. 🪑 Mark Bench & Standby Raiders', 'showBenchRaidersDialog')
       .addSeparator()
       .addItem('9. 📄 Publish Guides to Google Docs', 'publishGuidesToGoogleDocs')
+      .addItem('10. ⏰ Install / Verify Scheduled Refreshes', 'installGuildAuditTriggers')
       .addToUi();
 }
 

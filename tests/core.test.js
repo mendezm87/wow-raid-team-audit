@@ -268,3 +268,80 @@ test('the Blizzard item id is read from the cell note, and legacy lead-ins still
   assert.equal(context.lootItemIdNote_(268230), 'Blizzard ID: 268230');
   assert.equal(context.lootItemIdNote_(null), '');
 });
+
+test('percent cells parse whether Sheets hands back text or the number it stores', () => {
+  const { context } = loadAppsScript();
+  // Sheets coerces the '100%' string the attendance sync writes into the number 1.
+  assert.equal(context.parsePercentFraction_(1), 1);
+  assert.equal(context.parsePercentFraction_(0.33), 0.33);
+  assert.equal(context.parsePercentFraction_('83%'), 0.83);
+  assert.equal(context.parsePercentFraction_('83'), 0.83);
+  assert.equal(context.parsePercentFraction_(83), 0.83);
+  assert.equal(context.parsePercentFraction_('N/A'), null);
+  assert.equal(context.parsePercentFraction_(''), null);
+  assert.equal(context.parsePercentFraction_(null), null);
+  assert.equal(context.formatPercentLabel_(0.33), '33%');
+  assert.equal(context.formatPercentLabel_(1), '100%');
+  assert.equal(context.formatPercentLabel_('N/A'), null);
+});
+
+test('the Reliability Index actually moves with attendance', () => {
+  const { context } = loadAppsScript();
+  const contextMap = {
+    reliable: { role: '⚔️ Raider', attPct: '100%', onTimePct: '100%', isRaidReady: true },
+    absent: { role: '🛡️ Trial', attPct: '17%', onTimePct: '17%', isRaidReady: true }
+  };
+  const good = context.calculatePriorityScore(10, 'Reliable', false, contextMap);
+  const bad = context.calculatePriorityScore(10, 'Absent', false, contextMap);
+  assert.equal(good.reliabilityFactor, 1);
+  assert.equal(bad.reliabilityFactor, 0.4, 'a 17% attendance raider sits on the 0.40 floor');
+  assert.ok(bad.score < good.score, 'a 17% Trial cannot outrank a 100% raider on the same upgrade');
+});
+
+test('attendance is read from the leaderboard only, not the kill counts in the ledger', () => {
+  const gas = loadAppsScript();
+  const att = gas.spreadsheet.insertSheet('Attendance & History');
+  const rows = [
+    ['🏛️ GUILD RAID ATTENDANCE', '', '', '', ''],
+    ['', '', '', '', ''],
+    ['Rank', 'Raider Name', 'Assigned Spec', 'Attendance %', 'On-Time %'],
+    // Sheets stores these percent-formatted cells as numbers, which is what broke the old parse.
+    [1, 'Ainocee', 'Fury', 1, 1],
+    [2, 'Tungris', 'Blood', 0.58, 0.5],
+    [3, 'scylus', 'Havoc', 0.08, 'N/A'],
+    ['', '', '', '', ''],
+    ['📜 HISTORICAL GUILD RAID NIGHT LEDGER', '', '', '', ''],
+    ['Raid Date', 'Raid Title', 'Bosses Defeated', 'Kills', 'Guild Raiders'],
+    ['Sep 22, 2026', 'The Venomous Abyss', 'Nek\'zali', 8, 'Ainocee, Tungris']
+  ];
+  att.getRange(1, 1, rows.length, 5).setValues(rows);
+
+  const map = gas.context.getRosterContextMap(gas.spreadsheet);
+  assert.equal(map['ainocee'].attPct, '100%');
+  assert.equal(map['tungris'].attPct, '58%');
+  assert.equal(map['scylus'].attPct, '8%');
+  assert.equal(map['scylus'].onTimePct, 'N/A');
+  assert.equal(map['raid date'], undefined, 'ledger rows are not read as raiders');
+  assert.equal(map['raider name'], undefined, 'the header row is not read as a raider');
+});
+
+test('three socket counters collapse into one cell that stays quiet when clean', () => {
+  const { context } = loadAppsScript();
+  assert.equal(context.formatSocketSummary_(5, 0, 0), '5');
+  assert.equal(context.formatSocketSummary_(5, 1, 0), '5 · 1 empty');
+  assert.equal(context.formatSocketSummary_(5, 1, 2), '5 · 1 empty · 2 imperfect');
+  assert.equal(context.formatSocketSummary_(0, 0, 0), '0');
+});
+
+test('installing scheduled refreshes is idempotent and leaves other triggers alone', () => {
+  const { context } = loadAppsScript();
+  const plan = context.planTriggerInstall_([
+    { handlerFunction: 'updateAllCharacterDataWithBonuses' },
+    { handlerFunction: 'updateAllCharacterDataWithBonuses' },
+    { handlerFunction: 'someoneElsesTrigger' }
+  ]);
+  assert.deepEqual(Array.from(plan.create), ['syncWarcraftLogsSeasonAttendance']);
+  assert.equal(plan.remove.length, 1, 'the duplicate is removed, the original kept');
+  assert.equal(plan.remove[0].handlerFunction, 'updateAllCharacterDataWithBonuses');
+  assert.deepEqual(context.planTriggerInstall_([]).create.length, 2);
+});

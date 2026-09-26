@@ -100,6 +100,7 @@ Every week before raid night (or after weekly reset):
 | `7. Set Warcraft Logs API Credentials` | WCL **V2** Client ID / Secret (shared for all officers) |
 | `8. 🪑 Mark Bench & Standby Raiders` | Awards bench credit for a raid night |
 | `9. 📄 Publish Guides to Google Docs` | Replaces the guild's shared Google Docs guides with the latest versions (same links; old versions stay in each Doc's *File → Version history*) |
+| `10. ⏰ Install / Verify Scheduled Refreshes` | Installs the time-driven triggers that refresh the sheet on their own, and clears duplicates. Safe to run any time — it reports what is already running |
 
 ---
 
@@ -156,6 +157,7 @@ The age comes from the sim report's own date, recorded per character when it is 
 
 ### 🧭 Reading the Sheet:
 * **Column order**: readiness first (tier, sockets, gems, enchants), then crafted items and embellishments, then per-slot gear, then the Great Vault.
+* **Sockets column**: one cell instead of three. It shows the socket total on its own (`5`) when every socket is filled with a current gem, and spells out only the problems: `5 · 1 empty` (red) or `5 · 1 empty · 2 imperfect` (amber).
 * **Collapsible sections**: Enchants, Gear and Great Vault are column groups — click the **−** / **+** above the header to fold a section away. The next audit refresh opens them all again.
 * **Short gear cells**: each gear slot shows `◆ 334 Myth 6/6` (item level + upgrade track). **◆** = current-season tier piece, **◇** = previous-season tier. **Hover the cell** to see the full item name.
 * **Short enchant cells**: `✓ Rank 2` (green), `✓ Rank 1` (amber), `✓` for Death Knight runes, `Missing` (red), `N/A` (grey, e.g. shields and off-hands). Hover for the enchant name.
@@ -224,7 +226,7 @@ $$\text{Priority Score} = \text{Raw Upgrade Gain} \times \text{Reliability Index
   * 👑 **`👑 Veteran` ($1.10\times$)**: $+10\%$ priority bonus for proven multi-season loyalty.
   * ⚔️ **`⚔️ Raider` ($1.00\times$)**: Core standard baseline.
   * 🛡️ **`🛡️ Trial` ($0.80\times$)**: $-20\%$ modifier until trial graduation.
-* **Reliability Index**: Scaled from active season attendance and on-time punctuality: $(0.85 \times \text{Att \%}) + (0.15 \times \text{On-Time \%})$.
+* **Reliability Index**: Scaled from active season attendance and on-time punctuality: $(0.85 \times \text{Att \%}) + (0.15 \times \text{On-Time \%})$. Floored at $0.40$, so nobody's score falls below $40\%$ of their raw upgrade. A raider with no row on `Attendance & History` is treated as $100\%$ and shows `No att data` in place of a percentage.
 * **Raid Preparation Factor (Gems & Enchants)**:
   * 🟢 **`READY` ($1.00\times$)**: Fully gemmed and enchanted.
   * ⚠️ **Missing Enchants / Sockets ($0.90\times$)**: $-10\%$ preparation penalty until gear is properly gemmed/enchanted.
@@ -310,17 +312,18 @@ Because Warcraft Logs only records raiders inside the instance, bench raiders st
 
 ## 9. ⏰ Automatic Updates (Triggers)
 
-You can have Google run updates on a schedule, so nobody has to click the menu:
+Google can run the updates on a schedule, so nobody has to click the menu.
 
-1. Open the spreadsheet → **Extensions → Apps Script** → **Triggers** (⏰ clock icon in the left sidebar) → **Add Trigger**.
-2. Recommended triggers:
+**Click `Guild Audit` → `10. ⏰ Install / Verify Scheduled Refreshes`.** That installs both triggers below, removes any duplicates from an earlier run, and tells you what is already running. It is safe to click at any time.
 
-| Function | Event source | Schedule | Purpose |
-| :--- | :--- | :--- | :--- |
-| `updateAllCharacterDataWithBonuses` | Time-driven | Hour timer / every few hours | Gear audit, talents & loot sheet |
-| `syncWarcraftLogsSeasonAttendance` | Time-driven | Day timer, 11 PM–midnight | Attendance after raid |
+| Function | Schedule | Purpose |
+| :--- | :--- | :--- |
+| `updateAllCharacterDataWithBonuses` | Every 6 hours | Gear audit, talents & loot sheet |
+| `syncWarcraftLogsSeasonAttendance` | Daily at 11 PM | Attendance after raid |
 
-3. Save and click **Allow** on Google's permission prompt.
+The schedules are declared in `src/Triggers.gs`, so they survive a redeploy or a copy of the spreadsheet — install them once on the new copy and they match.
+
+> **Triggers belong to the officer who installs them.** They run as that Google account, and Google emails *that* account when one fails. If that officer leaves, have someone else click menu 10 and delete the old triggers under *Extensions → Apps Script → Triggers*.
 
 * Triggers run as the officer who created them, using the shared credentials.
 * If a scheduled run fails, the trigger is marked **Failed** and Google emails the trigger's owner. See [the FAQ](#q-a-scheduled-trigger-failed--how-do-i-see-why) for how to see why.

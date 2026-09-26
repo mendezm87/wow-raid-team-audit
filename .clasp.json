@@ -5,6 +5,7 @@
     "src/Season.gs",
     "src/Constants.gs",
     "src/Menu.gs",
+    "src/Triggers.gs",
     "src/Config.gs",
     "src/BlizzardApi.gs",
     "src/Audit.gs",

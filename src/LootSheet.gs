@@ -34,17 +34,27 @@ function getRosterContextMap(ss) {
   const attSheet = ss.getSheetByName('Attendance & History');
   if (attSheet && attSheet.getLastRow() >= 4) {
     const attValues = attSheet.getDataRange().getValues();
+    // Only the leaderboard section carries attendance. The ledger below it has a kill *count* in the
+    // same column, so the rows are scoped between the 'Rank' header and the blank row that ends it.
+    let inLeaderboard = false;
     attValues.forEach(row => {
+      const first = (row[0] === null || row[0] === undefined) ? '' : row[0].toString().trim();
+      if (first === 'Rank') { inLeaderboard = true; return; }
+      if (!inLeaderboard) return;
+      if (!/^\d+$/.test(first)) { inLeaderboard = false; return; }
+
       const name = (row[1] || '').toString().trim();
-      const attStr = (row[3] || '').toString().trim(); // Attendance %
-      const onTimeStr = (row[4] || '').toString().trim(); // On-Time %
-      if (name && attStr.includes('%')) {
+      // Sheets turns the '100%' string written by the attendance sync into the number 1, so these
+      // cells come back as numbers, not text. parsePercentFraction_ accepts either.
+      const attPct = formatPercentLabel_(row[3]);
+      const onTimePct = formatPercentLabel_(row[4]);
+      if (name && attPct !== null) {
         const lower = name.toLowerCase();
         if (!contextMap[lower]) {
           contextMap[lower] = { name: name, role: '⚔️ Raider', attPct: null, onTimePct: null, isRaidReady: true };
         }
-        contextMap[lower].attPct = attStr;
-        contextMap[lower].onTimePct = onTimeStr;
+        contextMap[lower].attPct = attPct;
+        contextMap[lower].onTimePct = onTimePct === null ? 'N/A' : onTimePct;
       }
     });
   }
@@ -197,17 +207,12 @@ function calculatePriorityScore(rawGain, charName, isSim, contextMap) {
   if (role.includes('Veteran') || role.includes('👑')) roleMult = 1.10;
   else if (role.includes('Trial') || role.includes('🛡️')) roleMult = 0.80;
 
-  let attVal = 1.00;
-  if (ctx.attPct) {
-    const parsedAtt = parseFloat(ctx.attPct.replace('%', ''));
-    if (!isNaN(parsedAtt)) attVal = parsedAtt / 100;
-  }
+  const parsedAtt = parsePercentFraction_(ctx.attPct);
+  const attVal = parsedAtt === null ? 1.00 : parsedAtt;
 
-  let onTimeVal = 1.00;
-  if (ctx.onTimePct && ctx.onTimePct !== 'N/A') {
-    const parsedOnTime = parseFloat(ctx.onTimePct.replace('%', ''));
-    if (!isNaN(parsedOnTime)) onTimeVal = parsedOnTime / 100;
-  }
+  // With no punctuality figure, fall back to attendance rather than a free 100%.
+  const parsedOnTime = parsePercentFraction_(ctx.onTimePct);
+  const onTimeVal = parsedOnTime === null ? attVal : parsedOnTime;
 
   // Composite Reliability Index: 85% Attendance + 15% On-Time Punctuality
   const reliabilityFactor = Math.min(1.0, Math.max(0.40, (0.85 * attVal) + (0.15 * onTimeVal)));
@@ -222,8 +227,8 @@ function calculatePriorityScore(rawGain, charName, isSim, contextMap) {
     rawGain: numGain,
     role: role,
     roleMult: roleMult,
-    attPct: ctx.attPct || '100%',
-    onTimePct: ctx.onTimePct || '100%',
+    attPct: ctx.attPct || 'No att data',
+    onTimePct: ctx.onTimePct || 'N/A',
     reliabilityFactor: Number(reliabilityFactor.toFixed(2)),
     isRaidReady: isReady,
     prepMult: prepMult
