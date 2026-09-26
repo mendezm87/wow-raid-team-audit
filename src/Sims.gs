@@ -248,6 +248,9 @@ function ingestRaidbotsSims_(input) {
   const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
   const hasRunnersColumn = lootRowHasRunnersColumn_(values);
   const equippedNotes = new Array(values.length).fill('');
+  // Item ids live in the Notes column's cell notes; older sheets still have them in the text
+  const lootIdNotes = sheet.getRange(2, 13, values.length, 1).getNotes();
+  const lootItemIds = values.map((row, i) => parseLootItemId_(row[12], (lootIdNotes[i] || [])[0]));
 
   // Only raiders listed as mains on the Config sheet count for loot
   const rosterNames = getRosterMainNamesSet(ss);
@@ -618,6 +621,7 @@ function ingestRaidbotsSims_(input) {
   sheet.getRange(2, 7, values.length, 2).setHorizontalAlignment('left');
   sheet.getRange(2, 13, values.length, hasRunnersColumn ? 2 : 1).setHorizontalAlignment('left');
   sheet.getRange(2, 8, values.length, 1).setNotes(equippedNotes.map(text => [text || '']));
+  sheet.getRange(2, 13, values.length, 1).setNotes(lootItemIds.map(id => [lootItemIdNote_(id)]));
 
   // Apply Rich Text Class Colors to Top Contender and Notes
   const richTopContenders = [];
@@ -720,6 +724,9 @@ function ingestQELiveReport_(reportUrlOrId) {
   const values = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
   const hasRunnersColumn = lootRowHasRunnersColumn_(values);
   const equippedNotes = new Array(values.length).fill('');
+  // Item ids live in the Notes column's cell notes; older sheets still have them in the text
+  const lootIdNotes = sheet.getRange(2, 13, values.length, 1).getNotes();
+  const lootItemIds = values.map((row, i) => parseLootItemId_(row[12], (lootIdNotes[i] || [])[0]));
 
   // Read itemUpgradeMap from existing sheet rows
   const itemUpgradeMap = {};
@@ -756,11 +763,8 @@ function ingestQELiveReport_(reportUrlOrId) {
   // Match items to sheet rows by Blizzard ID in Column 13 (Notes)
   let totalMatches = 0;
   raidUpgrades.forEach(up => {
-    let matchedRow = values.find(row => {
-      const notes = (row[12] || '').toString();
-      const idMatch = notes.match(/Blizzard ID:\s*(\d+)/i);
-      return idMatch && parseInt(idMatch[1], 10) === up.itemId;
-    });
+    const matchedIdx = lootItemIds.findIndex(id => id === up.itemId);
+    const matchedRow = matchedIdx > -1 ? values[matchedIdx] : null;
 
     if (matchedRow) {
       const sheetItemName = matchedRow[1];
@@ -873,6 +877,7 @@ function ingestQELiveReport_(reportUrlOrId) {
   sheet.getRange(2, 7, values.length, 2).setHorizontalAlignment('left');
   sheet.getRange(2, 13, values.length, hasRunnersColumn ? 2 : 1).setHorizontalAlignment('left');
   sheet.getRange(2, 8, values.length, 1).setNotes(equippedNotes.map(text => [text || '']));
+  sheet.getRange(2, 13, values.length, 1).setNotes(lootItemIds.map(id => [lootItemIdNote_(id)]));
 
   // Apply Rich Text Class Colors to Top Contender and Notes
   const richTopContenders = [];
@@ -1050,13 +1055,12 @@ function lootRowHasRunnersColumn_(values) {
 
 /** Full ranked contender list for a row, however it is split across the two columns. */
 function lootRowContenderText_(row) {
-  return [(row[12] || '').toString(), (row[13] || '').toString()].filter(Boolean).join(' | ');
+  return [stripLootItemId_(row[12]), (row[13] || '').toString()].filter(Boolean).join(' | ');
 }
 
-/** Writes a ranked list back across Notes / Runners-Up, keeping any "Blizzard ID:" lead-in. */
+/** Writes a ranked list back across Notes / Runners-Up. The item id lives in the cell note, not the text. */
 function writeLootContenderColumns_(row, hasRunners, prefix, entries) {
-  const idMatch = (row[12] || '').toString().match(/Blizzard ID:\s*\d+/i);
-  const leadIn = [idMatch ? idMatch[0] : '', prefix].filter(Boolean).join(' \u00b7 ');
+  const leadIn = prefix || '';
   if (hasRunners) {
     row[12] = [leadIn, entries[0] || ''].filter(Boolean).join(' ').trim();
     row[13] = entries.slice(1).join(' | ');

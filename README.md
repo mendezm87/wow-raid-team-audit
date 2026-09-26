@@ -91,7 +91,7 @@ Raiders can post either **Raidbots** (DPS/Tanks) or **QE Live** (Healers) links 
 
 1. **Live Character Gear & Vault Audit**:
    - Item level, 4pc tier set check, sockets, gems, enchants.
-   - Great Vault tracking. Reward ilvls in `Season.gs` are cross-checked against method.gg, timesaver.gg and wowaudit's live season data, and validated against the Hero / Myth / Veteran upgrade-track steps so a wrong ilvl can't pass the test suite.
+   - Great Vault tracking. Reward ilvls in `Season.gs` are cross-checked against method.gg, timesaver.gg and wowaudit's live season data, and validated against the Hero / Myth / Veteran upgrade-track steps so a wrong ilvl can't pass the test suite. Delve tiers 1–11 are modelled but never populated: Blizzard's character API exposes no delve progress.
    - **Sim Status** column: who has no Droptimizer, and whose sim has gone stale.
    - **Roster drift flag**: anyone on `Config` no longer in the Blizzard guild roster is marked `⚠️ Not in guild`.
    - `Raid Ready` badge with automatic **Off-Spec Logout Alerts**.

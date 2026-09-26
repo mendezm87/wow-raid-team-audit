@@ -116,8 +116,10 @@ The `Config` sheet establishes the roster, official raid specs, alt-to-main assi
   * `Time Zone`: Interactive dropdown with standard IANA time zones (`America/Los_Angeles (Pacific PT)`, `America/Chicago (Central CT)`, `America/New_York (Eastern ET)`, etc.)
 * **Top Right (Rows 1–5, Columns F–I):** `⏰ RAID DAYS (TOGGLE ACTIVE NIGHTS)`
   * Interactive **Checkbox Toggles** for all 7 days (`Tue`, `Wed`, `Thu`, `Mon`, `Fri`, `Sat`, `Sun`). Check the active raid nights—no code edits required!
-* **Main Characters (Columns A–D, Row 8+):**
-  * `👑 Main Character Name` (190px) | `Assigned Raid Spec ▼` (220px) | `Realm (If not in guild)` (190px merged across `C:D`)
+* **Main Characters (Columns A–D, Rows 9–45):**
+  * `👑 Main Character Name` (A) | `Assigned Raid Spec ▼` (B) | `Roster Role ▼` (C) | `Realm (If not in guild)` (D)
+  * `Roster Role` is the dropdown that marks each raider as `👑 Veteran`, `⚔️ Raider` or `🔰 Trial`. It feeds the Role badge shown beside contenders on the Loot sheet and in the attendance leaderboard.
+  * **Roster capacity is 37 mains** (rows 9–45). Names below row 45 are not read by the audit.
 * **Divider (Column E):** 30px clean divider spacing
 * **Alt Characters (Columns F–I, Row 8+):**
   * `🔄 Alt Character Name` (190px) | `Main Character (Owner ▼)` (240px) | `Assigned Spec ▼` (220px) | `Realm (If not in guild)` (180px)
@@ -160,6 +162,7 @@ The age comes from the sim report's own date, recorded per character when it is 
 * **Class colours**: the `Name` cell carries the class colour; `Class` and `Spec` use class-coloured text. `M+ Rating` is a pale tint of the Raider.IO rating colour.
 * **Last refreshed**: the small `↻` time under the `Name` header shows when the audit last ran (same on `Talents & Builds` and `Loot & Chase Items`).
 * **Alts band**: mains and alts are separated by a single dark `───── ALTS ─────` row. Everything below it is an alt and is excluded from loot scoring.
+* **Great Vault**: the raid and Mythic+ reward item levels come from the season table in `Season.gs`. Delve tiers 1–11 are in that table too, but the columns stay empty — Blizzard's character API exposes no delve progress, so there is nothing to read.
 * **Formatting lives in the code**: every refresh rebuilds colours, widths and layout, so changes made by hand in Sheets are wiped on the next run.
 
 ### 🏛️ Upgrade Track & Vault Formatting:
@@ -229,7 +232,7 @@ $$\text{Priority Score} = \text{Raw Upgrade Gain} \times \text{Reliability Index
 ### 👑 Contender Display Badges:
 * **Prepared Raider (Column G):** `Summzr [Score: 4.62] (+4.20% DPS • 👑 Veteran • 100% Att)`
 * **Un-enchanted Raider (Column G):** `Summzr [Score: 4.16] (+4.20% DPS • 👑 Veteran • 100% Att • ⚠️ Missing Enchants)`
-* **Loot Council Notes (Column M):** the **top pick only** — `Blizzard ID: 268230 · Sim Upgrades: 1. Summzr [Score: 4.62] (+4.20% | 👑 Veteran | 100%)`
+* **Loot Council Notes (Column M):** the **top pick only** — `Sim Upgrades: 1. Summzr [Score: 4.62] (+4.20% | 👑 Veteran | 100%)`. The Blizzard item id that sim imports match on is kept in the **cell note** (hover the cell), not in the text.
 * **Runners-Up (Column N):** everyone behind them — `2. Unready [Score: 3.60] (+4.00% | ⚔️ Raider | 100% | ⚠️ Unenchanted) | 3. …`
 * **Current Equipped Item (Column H):** the short `◆ 321 Hero 6/6` badge, same as Guild Audit. **Hover the cell** for the full item name.
 

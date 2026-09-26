@@ -38,6 +38,7 @@ This tab automatically synchronizes with Blizzard's live Armory to check your ch
 * 🔴 **`1 Enchant missing` / `2 Sockets empty`**: Counts how many of your slots are missing an enchant or a gem. Hover the enchant columns to see which ones. Please enchant/gem these before raid time!
 * 🟡 **`Tier 0/5` – `Tier 3/5`**: You have fewer than 4 of the 5 current-season tier pieces, so no 4-piece bonus yet.
 * 🏛️ **Weekly Great Vault Progress**: Columns on the far right track how many raid and Mythic+ vault slots you have unlocked for the week.
+* 🧪 **`Sim Status`**: `✅ Sim 3d old` means your Droptimizer is current, `⚠️ Sim 12d old` means it is over a week old, and `❌ No sim` means none has ever been imported for you — **and while it says that you never show up as a contender on `Loot & Chase Items`**. Post a Droptimizer (or QE Live) link in the Discord sim channel to fix it.
 * 🔎 **Gear & enchant cells are short**: a gear slot reads like `◆ 334 Myth 6/6` (**◆** = tier piece) and an enchant reads `✓ Rank 2` or `Missing`. **Hover over a cell** to see the full item or enchant name.
 * ➕ **Hidden columns?** Enchants, Gear and Great Vault can be folded away — click the **+** above the header to open a section.
 

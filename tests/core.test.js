@@ -255,3 +255,16 @@ test('findLegacyAltHeaderRow only matches a stacked-alt header, never a characte
   const withHeader = new Array(8).fill(['']).concat([['Rawria'], ['Alts to Track'], ['Waffleztotem']]);
   assert.equal(context.findLegacyAltHeaderRow(withHeader), 9);
 });
+
+test('the Blizzard item id is read from the cell note, and legacy lead-ins still parse', () => {
+  const { context } = loadAppsScript();
+  // New layout: the note carries the id and the cell text is council notes only
+  assert.equal(context.parseLootItemId_('1. Ainocee [Score: 1.43]', 'Blizzard ID: 268230'), 268230);
+  // Legacy sheets keep it inside the text
+  assert.equal(context.parseLootItemId_('Blizzard ID: 268230 - 1. Ainocee', ''), 268230);
+  assert.equal(context.parseLootItemId_('1. Ainocee', ''), null);
+  assert.equal(context.stripLootItemId_('Blizzard ID: 268230 - 1. Ainocee'), '1. Ainocee');
+  assert.equal(context.stripLootItemId_('1. Ainocee'), '1. Ainocee');
+  assert.equal(context.lootItemIdNote_(268230), 'Blizzard ID: 268230');
+  assert.equal(context.lootItemIdNote_(null), '');
+});

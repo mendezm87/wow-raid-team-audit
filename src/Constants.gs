@@ -325,3 +325,25 @@ function lootUniformColumns(headers, rows) {
   });
   return { hidden: hidden, label: labels.join(' · ') };
 }
+
+/**
+ * The Blizzard item id used to match sim results to Loot sheet rows.
+ * It lives in a cell note on "Loot Council Notes" so the visible text stays readable;
+ * older sheets carry it as a "Blizzard ID: <id>" lead-in inside the cell text.
+ */
+function parseLootItemId_(text, note) {
+  const fromNote = (note || '').toString().match(/Blizzard ID:\s*(\d+)/i);
+  if (fromNote) return parseInt(fromNote[1], 10);
+  const fromText = (text || '').toString().match(/Blizzard ID:\s*(\d+)/i);
+  return fromText ? parseInt(fromText[1], 10) : null;
+}
+
+/** Removes a legacy "Blizzard ID: <id>" lead-in from cell text. */
+function stripLootItemId_(text) {
+  return (text || '').toString().replace(/Blizzard ID:\s*\d+\s*[·|:\-]?\s*/i, '').trim();
+}
+
+/** The note written on a Loot Council Notes cell for a given item id. */
+function lootItemIdNote_(id) {
+  return id ? `Blizzard ID: ${id}` : '';
+}

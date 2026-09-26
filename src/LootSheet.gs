@@ -328,6 +328,11 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
   const lootDifficulty = getLootDifficulty();
   chaseItemsCatalog = applyLootDifficultyToCatalog(chaseItemsCatalog, lootDifficulty);
 
+  // The Blizzard item id moves out of the notes text and into a cell note on the same column,
+  // so "Loot Council Notes" reads as council text and sim matching still has the id.
+  const lootItemIds = chaseItemsCatalog.map(row => parseLootItemId_(row[12], ''));
+  chaseItemsCatalog.forEach(row => { row[12] = stripLootItemId_(row[12]); });
+
   // Catalog rows are authored 13 wide; pad them for the Runners-Up column and replace the
   // placeholder "Raid Drop" priority with a band derived from the slot the item drops in.
   chaseItemsCatalog = chaseItemsCatalog.map(row => {
@@ -451,9 +456,9 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
         };
         existingSimDataByName[normName] = entry;
 
-        const idMatch = notes.match(/Blizzard ID:\s*(\d+)/i);
-        if (idMatch) {
-          existingSimDataById[parseInt(idMatch[1], 10)] = entry;
+        const existingId = parseLootItemId_(notes, ((existingNotes[rowOffset + 1] || [])[cNotes] || ''));
+        if (existingId) {
+          existingSimDataById[existingId] = entry;
         }
       }
     });
@@ -482,8 +487,7 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
       const dropIlvl = Number(row[4]) || lootDifficulty.ilvl;
       const targetRole = (row[5] || '').toLowerCase();
       const baseNotes = row[12] || '';
-      const idMatch = baseNotes.match(/Blizzard ID:\s*(\d+)/i);
-      const blizzardId = idMatch ? parseInt(idMatch[1], 10) : null;
+      const blizzardId = lootItemIds[rowIdx];
 
       // 1. PRIORITIZE SIMS: Check by normalized name, Blizzard ID, or fuzzy match
       let preservedSim = existingSimDataByName[normItemName];
@@ -533,8 +537,7 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
             const pPrep = (!c.priority.isRaidReady) ? ' | ⚠️ Unenchanted' : '';
             return `${i + 1}. ${c.name} [Score: ${c.priority.score}] (+${c.pct}%${pRole}${pAtt}${pPrep})`;
           });
-          const simLeadIn = [blizzardId ? `Blizzard ID: ${blizzardId}` : '', prefix].filter(Boolean).join(' ');
-          writeContenderColumns(row, simLeadIn, topList);
+          writeContenderColumns(row, prefix, topList);
 
           // Update live equipped item & ilvl for the top contender
           const topNameMatch = (row[6] || '').match(/^([A-Za-z0-9\u00C0-\u024F]+)/);
@@ -652,6 +655,7 @@ function buildLootAndChaseItemsSheet_(mainCharacterData) {
     sheet.getRange(2, 1, dataRows, 1).setFontColor('#94a3b8');
 
     sheet.getRange(2, 8, dataRows, 1).setNotes(equippedFullText.map(text => [text]));
+    sheet.getRange(2, NOTES_COL, dataRows, 1).setNotes(lootItemIds.map(id => [lootItemIdNote_(id)]));
   }
 
   // Priority Column Conditional Formatting (Soft Badges)
