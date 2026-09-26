@@ -63,6 +63,19 @@ function parseCharacterAndRealm(nameRaw, realmRaw) {
 }
 
 /**
+ * Index (0-based) of a legacy stacked-alt header in column A, or -1 when the sheet uses the
+ * current side-by-side layout. Rows 9-45 of column A are the mains table, so a stacked alt
+ * block can only be identified by its own header row.
+ */
+function findLegacyAltHeaderRow(data) {
+  for (let r = 8; r < data.length; r++) {
+    const label = (data[r][0] || '').toString().trim().toLowerCase();
+    if (label.includes('alt character') || label.includes('alts to track')) return r;
+  }
+  return -1;
+}
+
+/**
  * Applies Google Sheets interactive dropdown validation for WoW specs, Roster Roles, Main Character Owners, Times, Time Zones, and Checkboxes on Config.
  * Formats Main Characters (Cols A-D) and Alt Characters (Cols F-I) side-by-side for a clean executive layout.
  */
@@ -229,8 +242,11 @@ function applyConfigDropdowns(sheet) {
   sheet.setColumnWidth(8, 210); // Assigned Spec (Alts) / Thursday / Sunday
   sheet.setColumnWidth(9, 170); // Realm (Alts) / Monday
 
-  // Auto-migrate legacy stacked Alts in row 35+ to side-by-side columns F-I if detected
-  for (let r = 30; r < data.length; r++) {
+  // Auto-migrate legacy stacked Alts to side-by-side columns F-I if detected.
+  // Only rows BELOW a legacy 'Alt Character'/'Alts to Track' header in column A are alts. Column A rows
+  // 9-45 are the mains table, so without this guard a main added low in the list gets moved to the alts.
+  const legacyAltHeaderRow = findLegacyAltHeaderRow(data);
+  for (let r = legacyAltHeaderRow + 1; legacyAltHeaderRow >= 0 && r < data.length; r++) {
     const row0 = (data[r][0] || '').toString().trim();
     if (row0 && !row0.toLowerCase().includes('alt') && !row0.toLowerCase().includes('main')) {
       const { name: altName, realm: parsedRealm } = parseCharacterAndRealm(row0, data[r][3] || data[r][2] || '');
@@ -356,8 +372,9 @@ function getConfigurationFromSheet() {
     }
   }
 
-  // 3. Fallback: Check legacy stacked rows 35+ if present
-  for (let r = 35; r < data.length; r++) {
+  // 3. Fallback: legacy stacked alt rows, only below their own header (column A rows 9-45 are mains)
+  const legacyAltHeaderRow = findLegacyAltHeaderRow(data);
+  for (let r = legacyAltHeaderRow + 1; legacyAltHeaderRow >= 0 && r < data.length; r++) {
     const altName = (data[r][0] || '').toString().trim();
     if (altName && !altName.toLowerCase().includes('alt') && !altName.toLowerCase().includes('main')) {
       if (!alts.some(a => a.name.toLowerCase() === altName.toLowerCase())) {

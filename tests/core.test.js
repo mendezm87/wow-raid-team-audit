@@ -219,3 +219,39 @@ test('recordSimTimestamps_ keeps the newest time per character', () => {
   assert.ok(stamps['nodate'] > 0 && stamps['nodate'] <= Date.now());
   assert.ok(stamps['future'] <= Date.now());
 });
+
+test('a main added low in the Config list stays a main and is not read as an alt', () => {
+  const { context, sheets, spreadsheet } = loadAppsScript();
+  const sheet = spreadsheet.insertSheet('Config');
+  const rows = [
+    ['Configuration', 'Hour', 'Minute', 'AM/PM', '', 'Raid Days', '', '', ''],
+    ['Region', 'us', '', '', '', 'Tuesday', 'Wednesday', 'Thursday', 'Monday'],
+    ['Realm Slug', 'kiljaeden', '', '', '', true, true, false, false],
+    ['Guild Slug', 'prey', '', '', '', 'Friday', 'Saturday', 'Sunday', '—'],
+    ['Raid Start Time', 7, ':00', 'PM', '', false, false, false, ''],
+    ['Raid End Time', 10, ':00', 'PM', '', '', '', '', ''],
+    ['Time Zone', 'America/Los_Angeles (Pacific PT)', '', '', '', '', '', '', ''],
+    ['Main Character Name', 'Assigned Raid Spec (Dropdown)', 'Roster Role (Dropdown)', 'Realm (If not in guild)', '',
+     'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If not in guild)']
+  ];
+  // 24 mains fills rows 9-32, well past the old row-31 cutoff that swallowed them into the alt table.
+  for (let i = 1; i <= 24; i++) rows.push(['Main' + i, 'Fire', '⚔️ Raider', '', '', '', '', '', '']);
+  rows[8][5] = 'Alty';      // one real side-by-side alt on the first roster row
+  rows[8][6] = 'Main1';
+  rows[8][7] = 'Frost';
+  sheet.getRange(1, 1, rows.length, 9).setValues(rows);
+
+  const config = context.getConfigurationFromSheet();
+  assert.equal(config.MEMBERS_TO_TRACK.length, 24);
+  assert.equal(config.MEMBERS_TO_TRACK[23].name, 'Main24');
+  assert.deepEqual(Array.from(config.ALTS_TO_TRACK.map(a => a.name)), ['Alty']);
+  assert.equal(sheets.Config, sheet);
+});
+
+test('findLegacyAltHeaderRow only matches a stacked-alt header, never a character name', () => {
+  const { context } = loadAppsScript();
+  const mains = [['Main Character Name'], ['Rawria'], ['Nimidk']];
+  assert.equal(context.findLegacyAltHeaderRow(new Array(8).fill(['']).concat(mains.slice(1))), -1);
+  const withHeader = new Array(8).fill(['']).concat([['Rawria'], ['Alts to Track'], ['Waffleztotem']]);
+  assert.equal(context.findLegacyAltHeaderRow(withHeader), 9);
+});

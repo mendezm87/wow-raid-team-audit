@@ -19,6 +19,15 @@ function readConcatenatedSource() {
 
 // ---------- Google service mocks ----------
 
+/** 'F9' -> { row: 9, col: 6 }. Column letters only, which is all the Apps Script code uses. */
+function parseA1Cell(a1) {
+  const m = /^([A-Z]+)(\d+)$/.exec(a1.trim().toUpperCase());
+  if (!m) throw new Error('Unsupported A1 notation in test mock: ' + a1);
+  let col = 0;
+  for (const ch of m[1]) col = col * 26 + (ch.charCodeAt(0) - 64);
+  return { row: Number(m[2]), col };
+}
+
 function createSheet(name) {
   let data = [];
   let notes = [];
@@ -35,7 +44,29 @@ function createSheet(name) {
     setFrozenRows() { return sheet; },
     getDataRange() { return sheet.getRange(1, 1, Math.max(data.length, 1), Math.max(1, ...data.map(r => r.length))); },
     getRange(row, col, numRows = 1, numCols = 1) {
+      // A1 notation ('B2', 'F9:I9') as well as (row, col, numRows, numCols).
+      if (typeof row === 'string') {
+        const cells = row.split(':').map(parseA1Cell);
+        const end = cells[1] || cells[0];
+        numRows = end.row - cells[0].row + 1;
+        numCols = end.col - cells[0].col + 1;
+        col = cells[0].col;
+        row = cells[0].row;
+      }
       const range = {
+        getValue() { return range.getValues()[0][0]; },
+        setValue(v) { return range.setValues([[v]]); },
+        merge() { return range; },
+        setDataValidation() { return range; },
+        insertCheckboxes() { return range; },
+        clearContent() { return range.setValues(Array.from({ length: numRows }, () => new Array(numCols).fill(''))); },
+        clearFormat() { return range; },
+        clearDataValidations() { return range; },
+        setFontWeight() { return range; },
+        setFontColor() { return range; },
+        setFontSize() { return range; },
+        setBackground() { return range; },
+        setHorizontalAlignment() { return range; },
         setNumberFormat() { return range; },
         setValues(values) {
           for (let i = 0; i < numRows; i++) {
