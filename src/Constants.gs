@@ -370,6 +370,59 @@ function parsePercentFraction_(value) {
   return num <= 1 ? num : num / 100;
 }
 
+/**
+ * Attendance below this many eligible official nights is too small a sample to judge on: a raider
+ * who joined last Tuesday and showed up is 100%, which is as misleading as 8% in the other direction.
+ */
+const MIN_ATTENDANCE_SAMPLE = 3;
+
+/**
+ * Neutral reliability used for a raider below MIN_ATTENDANCE_SAMPLE, so a 1/1 newcomer is neither
+ * buried on the 0.40 floor nor vaulted over a veteran on a perfect-but-meaningless percentage.
+ */
+const NEW_JOINER_RELIABILITY = 0.85;
+
+/** yyyy-MM-dd for a Date, matching the Attendance Archive's date keys. */
+function dateToArchiveKey_(d) {
+  const pad = (n) => (n < 10 ? '0' + n : '' + n);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/**
+ * The optional Config "Joined" cell as a yyyy-MM-dd key. Sheets hands back a Date for a real date
+ * cell and a string for free text, so both are accepted. Returns null when there is nothing usable.
+ */
+function parseJoinedDateKey_(value) {
+  if (value === null || value === undefined || value === '') return null;
+  if (value instanceof Date || (value && typeof value.getTime === 'function')) {
+    return isNaN(value.getTime()) ? null : dateToArchiveKey_(value);
+  }
+  const text = value.toString().trim();
+  if (!text) return null;
+  const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const parsed = new Date(text);
+  return isNaN(parsed.getTime()) ? null : dateToArchiveKey_(parsed);
+}
+
+/** "Aug 23" for a yyyy-MM-dd key, for the "since <date>" suffix on the leaderboard. */
+function formatJoinedLabel_(dateKey) {
+  const m = (dateKey || '').toString().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[Number(m[2]) - 1]} ${Number(m[3])}`;
+}
+
+/**
+ * The denominator out of a "Raids Attended" cell ("10 / 12" or "3 / 3 \u00b7 since Sep 16" -> 12 / 3),
+ * i.e. how many official nights the raider was actually eligible for. null when unreadable.
+ */
+function parseAttendanceSample_(value) {
+  if (value === null || value === undefined) return null;
+  const m = value.toString().match(/(\d+)\s*\/\s*(\d+)/);
+  return m ? Number(m[2]) : null;
+}
+
 /** "83%" for anything parsePercentFraction_ understands, or null. */
 function formatPercentLabel_(value) {
   const frac = parsePercentFraction_(value);

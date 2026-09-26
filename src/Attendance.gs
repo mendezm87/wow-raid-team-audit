@@ -382,7 +382,12 @@ function syncWarcraftLogsSeasonAttendance() {
       raidsAttended: 0,
       onTimeCount: 0,
       lateCount: 0,
-      totalBossKillsAttended: 0
+      totalBossKillsAttended: 0,
+      // Mid-season joiners are measured from when they arrived, not from the season start.
+      joined: parseJoinedDateKey_(m.joined),
+      firstSeenKey: null,
+      eligibleFrom: null,
+      eligibleRaids: 0
     };
   });
 
@@ -548,6 +553,29 @@ function syncWarcraftLogsSeasonAttendance() {
     return;
   }
 
+  // 3a. Eligibility window. A raider who joined three weeks in was being measured against nights
+  // that pre-dated them, which reads as no-shows and (since attendance drives the loot Priority
+  // Score) parks them on the 0.40 reliability floor for their first month. Each raider's first
+  // night is derived from the archive's own attendee lists, so nothing has to be hand-maintained.
+  // An explicit Config "Joined" date wins, because inference flatters a recruit who missed their
+  // first two weeks and is stale for a raider who was here, vanished, and came back.
+  const noteFirstSeen = (pName, dateKey) => {
+    const mainName = resolveToMain(pName);
+    const stat = mainName && playerStats[mainName];
+    if (!stat) return;
+    if (!stat.firstSeenKey || dateKey < stat.firstSeenKey) stat.firstSeenKey = dateKey;
+  };
+  allRecords.forEach(session => {
+    session.attendees.forEach(pName => noteFirstSeen(pName, session.dateKey));
+    // Bench credit counts as attendance, so a benched night has to count as being on the roster too -
+    // otherwise the raider is credited for a night that falls outside their own denominator.
+    (benchByDateKey[session.dateKey] || []).forEach(bName => noteFirstSeen(bName, session.dateKey));
+  });
+  Object.keys(playerStats).forEach(n => {
+    playerStats[n].eligibleFrom = playerStats[n].joined || playerStats[n].firstSeenKey || null;
+  });
+  let firstOfficialKey = '';
+
   // 3. Evaluate every archived raid night against the CURRENT roster, alts, raid days and bench records
   allRecords.forEach(session => {
     const reportLinks = session.reportCodes.map(code => `https://www.warcraftlogs.com/reports/${code}`);
@@ -597,6 +625,12 @@ function syncWarcraftLogsSeasonAttendance() {
 
     if (isOfficial) {
       officialRaidCount++;
+      if (!firstOfficialKey || session.dateKey < firstOfficialKey) firstOfficialKey = session.dateKey;
+      // Each raider's own denominator: the official nights on or after they joined.
+      Object.keys(playerStats).forEach(n => {
+        const p = playerStats[n];
+        if (!p.eligibleFrom || session.dateKey >= p.eligibleFrom) p.eligibleRaids++;
+      });
       // Increment Attendance exactly ONCE per canonical main for official raid nights
       uniqueSessionMains.forEach(canonical => {
         playerStats[canonical].raidsAttended++;
@@ -655,11 +689,19 @@ function syncWarcraftLogsSeasonAttendance() {
 
   // 3. Build Leaderboard Data
   const leaderboard = Object.values(playerStats).map(p => {
-    const attPct = totalOfficialRaids > 0 ? Math.round((p.raidsAttended / totalOfficialRaids) * 100) : 0;
+    // Denominator is the raider's own eligible nights, falling back to the season total for anyone
+    // with no archive history at all (a brand-new name that has never appeared in a log).
+    // Never fewer eligible nights than nights actually credited: attendance over 100% would be a
+    // nonsense figure, and it feeds the loot score.
+    const eligibleRaids = Math.max(p.eligibleRaids > 0 ? p.eligibleRaids : totalOfficialRaids, p.raidsAttended);
+    const attPct = eligibleRaids > 0 ? Math.round((p.raidsAttended / eligibleRaids) * 100) : 0;
     const onTimePct = p.raidsAttended > 0 ? Math.round((p.onTimeCount / p.raidsAttended) * 100) : 0;
-    
+    const isNewJoiner = eligibleRaids > 0 && eligibleRaids < MIN_ATTENDANCE_SAMPLE;
+    const joinedMidSeason = !!(p.eligibleFrom && firstOfficialKey && p.eligibleFrom > firstOfficialKey);
+
     let reliabilityRating = '⭐⭐⭐⭐⭐ Punctual Core';
-    if (attPct === 0) reliabilityRating = '⚠️ Inactive / Absent';
+    if (isNewJoiner) reliabilityRating = `🆕 New (${eligibleRaids} raid${eligibleRaids === 1 ? '' : 's'})`;
+    else if (attPct === 0) reliabilityRating = '⚠️ Inactive / Absent';
     else if (attPct < 60) reliabilityRating = '⚠️ Inconsistent';
     else if (attPct < 80) reliabilityRating = '⭐ Standby / Bench';
     else if (onTimePct < 80) reliabilityRating = '🟡 Frequent Tardy';
@@ -669,7 +711,11 @@ function syncWarcraftLogsSeasonAttendance() {
       name: p.name,
       spec: p.spec,
       raidsAttended: p.raidsAttended,
-      totalRaids: totalOfficialRaids,
+      totalRaids: eligibleRaids,
+      seasonRaids: totalOfficialRaids,
+      eligibleFrom: p.eligibleFrom || '',
+      joinedMidSeason: joinedMidSeason,
+      isNewJoiner: isNewJoiner,
       attendancePct: attPct,
       onTimePct: onTimePct,
       onTimeDisplay: p.raidsAttended > 0 ? `${onTimePct}%` : 'N/A',
@@ -678,7 +724,9 @@ function syncWarcraftLogsSeasonAttendance() {
       bossKills: p.totalBossKillsAttended,
       rating: reliabilityRating
     };
-  }).sort((a, b) => b.attendancePct - a.attendancePct || b.onTimePct - a.onTimePct || b.bossKills - a.bossKills);
+    // Small-sample raiders sort below equally-rated full-sample ones rather than on top of them.
+  }).sort((a, b) => (a.isNewJoiner === b.isNewJoiner ? 0 : (a.isNewJoiner ? 1 : -1))
+    || b.attendancePct - a.attendancePct || b.onTimePct - a.onTimePct || b.bossKills - a.bossKills);
 
   // 4. Write onto "Attendance & History" sheet
   createAttendanceAndHistorySheet(leaderboard, raidLedger, totalOfficialRaids);
@@ -737,7 +785,8 @@ function createAttendanceAndHistorySheet(leaderboard, raidLedger, totalRaids) {
       p.spec || 'Main Spec',
       `${p.attendancePct}%`,
       p.onTimeDisplay,
-      `${p.raidsAttended} / ${p.totalRaids}`,
+      `${p.raidsAttended} / ${p.totalRaids}`
+        + (p.joinedMidSeason ? ` · since ${formatJoinedLabel_(p.eligibleFrom)}` : ''),
       p.lateCount,
       p.bossKills,
       p.rating,

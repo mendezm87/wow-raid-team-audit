@@ -51,6 +51,7 @@ Tracks official guild raid attendance and boss progression across the entire sea
 
 ### 🌟 Key Highlights:
 * 📈 **Attendance %**: Percentage of official guild raid nights you were present for (🟢 90%+, 🟡 75–89%, 🔴 under 75%; same colours for On-Time %).
+* 🆕 **Joined part-way through the season?** You are only measured from your first raid night onwards — nights that happened before you joined are never counted against you. Your `Raids Attended` cell shows the window, e.g. `7 / 7 · since Sep 2`. Until you have **3 nights** behind you, you are tiered `🆕 New` and your loot Reliability starts from a neutral baseline instead of your percentage, so a perfect first night does not flatter you and a single miss does not bury you.
 * ⏰ **On-Time %**: Percentage of raid nights you were present for the **first boss pull of the night** (kill or wipe).
 * ⚔️ **Season Boss Kills**: Total number of unique raid boss encounters defeated across all difficulties.
 * 🔄 **Playing an Alt?**: If an officer has your alt linked to your main character on the `Config` tab, **all attendance, on-time percentage, and boss kill credits automatically combine onto your main character!**
@@ -143,6 +144,7 @@ $$\text{Priority Score} = \text{Raw Upgrade Gain} \times \text{Reliability Index
 2. **Reliability Index**:
    * Combines **$85\%$ Season Attendance** $+ \mathbf{15\%}$ **On-Time Punctuality** (being ready for the first pull).
    * Floored at $0.40$ — showing up matters, but missing raids never zeroes you out. Your percentages are the ones on the `Attendance & History` leaderboard, so if they look wrong there, they are wrong here too.
+   * If you have fewer than 3 raid nights on the roster, this starts at a neutral $0.85$ instead of your percentage, and your badge reads `1 raid · new`.
 3. **Raid Preparation (Gems & Enchants)**:
    * 🟢 **`READY` ($1.00\times$)**: Full priority credit.
    * ⚠️ **Missing Enchants / Sockets ($0.90\times$)**: $-10\%$ modifier and `⚠️ Missing Enchants` badge until gear is enchanted.

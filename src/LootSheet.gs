@@ -48,6 +48,9 @@ function getRosterContextMap(ss) {
       // cells come back as numbers, not text. parsePercentFraction_ accepts either.
       const attPct = formatPercentLabel_(row[3]);
       const onTimePct = formatPercentLabel_(row[4]);
+      // "Raids Attended" carries the raider's own eligible-night count, which is how a mid-season
+      // joiner's small sample is recognised here.
+      const attSample = parseAttendanceSample_(row[5]);
       if (name && attPct !== null) {
         const lower = name.toLowerCase();
         if (!contextMap[lower]) {
@@ -55,6 +58,7 @@ function getRosterContextMap(ss) {
         }
         contextMap[lower].attPct = attPct;
         contextMap[lower].onTimePct = onTimePct === null ? 'N/A' : onTimePct;
+        contextMap[lower].attSample = attSample;
       }
     });
   }
@@ -207,6 +211,12 @@ function calculatePriorityScore(rawGain, charName, isSim, contextMap) {
   if (role.includes('Veteran') || role.includes('👑')) roleMult = 1.10;
   else if (role.includes('Trial') || role.includes('🛡️')) roleMult = 0.80;
 
+  // Below the minimum sample the measured percentage says nothing: 1/1 is 100% and 0/1 is 0%, and
+  // either would move this score further than a veteran's real season figure. Use a neutral
+  // baseline instead, so a new recruit is neither buried nor vaulted over the rest of the roster.
+  const sample = (typeof ctx.attSample === 'number' && isFinite(ctx.attSample)) ? ctx.attSample : null;
+  const belowSample = sample !== null && sample < MIN_ATTENDANCE_SAMPLE;
+
   const parsedAtt = parsePercentFraction_(ctx.attPct);
   const attVal = parsedAtt === null ? 1.00 : parsedAtt;
 
@@ -215,7 +225,15 @@ function calculatePriorityScore(rawGain, charName, isSim, contextMap) {
   const onTimeVal = parsedOnTime === null ? attVal : parsedOnTime;
 
   // Composite Reliability Index: 85% Attendance + 15% On-Time Punctuality
-  const reliabilityFactor = Math.min(1.0, Math.max(0.40, (0.85 * attVal) + (0.15 * onTimeVal)));
+  const measured = Math.min(1.0, (0.85 * attVal) + (0.15 * onTimeVal));
+
+  // Below the minimum sample the measured figure is pulled towards the neutral baseline in
+  // proportion to how little evidence there is, and capped at it: a newcomer starts as an average
+  // member of the roster and can only move down from there, on nights they were actually eligible for.
+  const reliabilityFactor = Math.min(1.0, Math.max(0.40, belowSample
+    ? Math.min(NEW_JOINER_RELIABILITY,
+        ((sample * measured) + (MIN_ATTENDANCE_SAMPLE * NEW_JOINER_RELIABILITY)) / (sample + MIN_ATTENDANCE_SAMPLE))
+    : measured));
 
   // Raid Preparation Factor: 1.00x if READY, 0.90x (-10% penalty) if missing enchants / gems
   const isReady = (ctx.isRaidReady !== false);
@@ -227,7 +245,7 @@ function calculatePriorityScore(rawGain, charName, isSim, contextMap) {
     rawGain: numGain,
     role: role,
     roleMult: roleMult,
-    attPct: ctx.attPct || 'No att data',
+    attPct: belowSample ? `${sample} raid${sample === 1 ? '' : 's'} · new` : (ctx.attPct || 'No att data'),
     onTimePct: ctx.onTimePct || 'N/A',
     reliabilityFactor: Number(reliabilityFactor.toFixed(2)),
     isRaidReady: isReady,

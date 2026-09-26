@@ -121,7 +121,9 @@ The `Config` sheet establishes the roster, official raid specs, alt-to-main assi
   * `👑 Main Character Name` (A) | `Assigned Raid Spec ▼` (B) | `Roster Role ▼` (C) | `Realm (If not in guild)` (D)
   * `Roster Role` is the dropdown that marks each raider as `👑 Veteran`, `⚔️ Raider` or `🔰 Trial`. It feeds the Role badge shown beside contenders on the Loot sheet and in the attendance leaderboard.
   * **Roster capacity is 37 mains** (rows 9–45). Names below row 45 are not read by the audit.
-* **Divider (Column E):** 30px clean divider spacing
+* **`Joined` (Column E, optional):** the date a raider became eligible for raid nights.
+  * **Leave it blank normally.** Attendance infers each raider's first night from the `Attendance Archive`, so mid-season joiners are measured from when they arrived without anyone maintaining a field.
+  * **Fill it in for the two cases inference gets wrong:** a recruit who was on the roster but missed their first couple of weeks (inference flatters them), and a returning raider who was here in week one, vanished, and came back (inference gives them a stale early date). An explicit date always wins.
 * **Alt Characters (Columns F–I, Row 8+):**
   * `🔄 Alt Character Name` (190px) | `Main Character (Owner ▼)` (240px) | `Assigned Spec ▼` (220px) | `Realm (If not in guild)` (180px)
 
@@ -227,6 +229,7 @@ $$\text{Priority Score} = \text{Raw Upgrade Gain} \times \text{Reliability Index
   * ⚔️ **`⚔️ Raider` ($1.00\times$)**: Core standard baseline.
   * 🛡️ **`🛡️ Trial` ($0.80\times$)**: $-20\%$ modifier until trial graduation.
 * **Reliability Index**: Scaled from active season attendance and on-time punctuality: $(0.85 \times \text{Att \%}) + (0.15 \times \text{On-Time \%})$. Floored at $0.40$, so nobody's score falls below $40\%$ of their raw upgrade. A raider with no row on `Attendance & History` is treated as $100\%$ and shows `No att data` in place of a percentage.
+* **New raiders (under 3 eligible nights)** are not judged on their measured percentage — `1/1` is $100\%$ and `0/1` is $0\%$, and neither means anything. Their index starts at a neutral $0.85$ baseline and is pulled down in proportion to the nights they have actually missed, so a newcomer sits mid-pack rather than on the floor or above your core. They show `1 raid · new` instead of a percentage beside their score. Note that $0.85$ sits fractionally above a raider on $83\%$: any fixed baseline outranks someone below it, and the Roster Role multiplier (a Trial is $\times 0.80$) is what separates them in practice.
 * **Raid Preparation Factor (Gems & Enchants)**:
   * 🟢 **`READY` ($1.00\times$)**: Fully gemmed and enchanted.
   * ⚠️ **Missing Enchants / Sockets ($0.90\times$)**: $-10\%$ preparation penalty until gear is properly gemmed/enchanted.
@@ -285,6 +288,10 @@ The spreadsheet features full **Warcraft Logs v2 GraphQL API integration** to au
 2. The script reads your guild's most recent Warcraft Logs reports and merges multiple uploaders of the same night into one raid night.
 3. It generates/refreshes the **`Attendance & History`** tab with:
    * **Leaderboard:** Raider Attendance %, On-Time %, Raids Attended, Tardies, Boss Kills, and Reliability Tier. Attendance % and On-Time % are coloured 🟢 90%+, 🟡 75–89%, 🔴 under 75%.
+   * **Each raider has their own denominator.** Attendance % counts only the official nights **on or after the raider joined**, so someone recruited three weeks into the season is not measured against nights that pre-date them. Their `Raids Attended` cell reads `10 / 10 · since Aug 23`; a raider present since the first night just reads `12 / 12`.
+   * The join date is derived from the raider's first appearance in the `Attendance Archive` (bench credit counts too), or taken from the optional `Joined` column on `Config` when you have filled one in.
+   * A raider with fewer than **3 eligible nights** is tiered `🆕 New (1 raid)` and sorted below the raiders with a real record, rather than topping the leaderboard on a perfect `1/1`.
+   * **Caveat:** the archive only reaches as far back as the Warcraft Logs reports it has ingested. If it does not cover the season start, the earliest archived night is treated as the start for everyone who was already there — which is the same denominator they had before, so nobody is misjudged by it.
    * **Ledger:** Complete historical timeline of every raid night, bosses defeated (or progression wipes), roster present, bench list, and direct Warcraft Logs links.
 
 ### 🗄️ Season History is Permanent (Attendance Archive)

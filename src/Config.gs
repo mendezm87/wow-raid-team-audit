@@ -213,6 +213,10 @@ function applyConfigDropdowns(sheet) {
   sheet.getRange('B8').setValue('Assigned Raid Spec (Dropdown)').setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
   sheet.getRange('C8').setValue('Roster Role (Dropdown)').setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
   sheet.getRange('D8').setValue('Realm (If not in guild)').setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
+  // Optional per-raider eligibility date. Left blank, attendance infers it from the raider's first
+  // night in the Attendance Archive; filled in, this wins.
+  sheet.getRange('E8').setValue('Joined (optional)').setFontWeight('bold').setBackground('#1e293b').setFontColor('#f8fafc').setHorizontalAlignment('center');
+  sheet.getRange('E9:E45').setHorizontalAlignment('center').setFontSize(9).setFontColor('#475569');
 
   sheet.getRange('F8:I8').setValues([[
     'Alt Character Name', 'Main Character (Owner - Dropdown)', 'Assigned Spec (Dropdown)', 'Realm (If not in guild)'
@@ -236,7 +240,7 @@ function applyConfigDropdowns(sheet) {
   sheet.setColumnWidth(2, 210); // Assigned Spec (Mains) / Hour
   sheet.setColumnWidth(3, 130); // Roster Role (Col C) / Minute
   sheet.setColumnWidth(4, 160); // Realm (Col D) / AM-PM
-  sheet.setColumnWidth(5, 30);  // Spacing Divider
+  sheet.setColumnWidth(5, 120); // Joined (optional, mains) / Spacing Divider
   sheet.setColumnWidth(6, 180); // Alt Character Name / Tuesday / Friday
   sheet.setColumnWidth(7, 230); // Main Character (Owner - Dropdown) / Wednesday / Saturday
   sheet.setColumnWidth(8, 210); // Assigned Spec (Alts) / Thursday / Sunday
@@ -353,7 +357,8 @@ function getConfigurationFromSheet() {
         name: name,
         expectedSpec: normalizeSpecName(data[r][1] ? data[r][1].toString().trim() : ''),
         role: roleVal,
-        realm: parsedRealm || (data[r][3] ? data[r][3].toString().trim() : '')
+        realm: parsedRealm || (data[r][3] ? data[r][3].toString().trim() : ''),
+        joined: data[r][4] === undefined ? '' : data[r][4]
       });
     }
   }

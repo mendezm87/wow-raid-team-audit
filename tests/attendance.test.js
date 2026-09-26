@@ -47,7 +47,7 @@ function setup(opts = {}) {
   let captured = null;
   gas.context.getConfigurationFromSheet = () => ({
     REGION: 'us', GUILD_NAME_SLUG: 'prey', GUILD_REALM_SLUG: 'kiljaeden', RAID_DAYS: 'Tuesday, Wednesday',
-    MEMBERS_TO_TRACK: ROSTER, ALT_TO_MAIN_MAP: { raiderzeroalt: 'Raider0' }
+    MEMBERS_TO_TRACK: opts.roster || ROSTER, ALT_TO_MAIN_MAP: { raiderzeroalt: 'Raider0' }
   });
   gas.context.createAttendanceAndHistorySheet = (leaderboard, ledger, total) => { captured = { leaderboard, ledger, total }; };
   const sync = () => { gas.context.syncWarcraftLogsSeasonAttendance(); return captured; };
@@ -145,4 +145,87 @@ test('full audit reports problems without calling getUi when run from a trigger'
   gas.context.getConfigurationFromSheet = () => ({ REGION: 'us', GUILD_REALM_SLUG: 'kiljaeden', GUILD_NAME_SLUG: 'prey', MEMBERS_TO_TRACK: [], ALTS_TO_TRACK: [] });
   gas.context.fetchBlizzardEndpoint = () => null; // roster fetch fails
   assert.throws(() => gas.context.updateAllCharacterDataWithBonuses(), /Roster Fetch Failed/);
+});
+
+test('mid-season joiners are measured from the night they arrived, not the season start', () => {
+  // Four official nights. Raider12 first appears on the last one, Raider13 on the second.
+  const { wcl, sync, player } = setup();
+  const nights = ['2026-09-01', '2026-09-02', '2026-09-08', '2026-09-09'];
+  nights.forEach((day, i) => {
+    const code = 'N' + i;
+    const roster = TWELVE.concat(i >= 1 ? ['Raider13'] : []).concat(i === 3 ? ['Raider12'] : []);
+    wcl.attendees[code] = roster;
+    wcl.firstPull[code] = roster;
+  });
+  wcl.reports = nights.map((day, i) => makeReport('N' + i, day, 2));
+
+  const result = sync();
+  assert.equal(result.total, 4);
+
+  const veteran = player('Raider0');
+  assert.equal(veteran.totalRaids, 4, 'a raider present from the first night keeps the full denominator');
+  assert.equal(veteran.attendancePct, 100);
+  assert.equal(veteran.joinedMidSeason, false);
+
+  const joinedLate = player('Raider13');
+  assert.equal(joinedLate.raidsAttended, 3);
+  assert.equal(joinedLate.totalRaids, 3, 'nights before they joined are not counted against them');
+  assert.equal(joinedLate.attendancePct, 100, 'was 75% when measured against the whole season');
+  assert.equal(joinedLate.joinedMidSeason, true);
+  assert.equal(joinedLate.isNewJoiner, false, 'three nights is a usable sample');
+
+  const brandNew = player('Raider12');
+  assert.equal(brandNew.totalRaids, 1);
+  assert.equal(brandNew.isNewJoiner, true, 'one night is not enough to judge on');
+  assert.match(brandNew.rating, /New \(1 raid\)/);
+  // A perfect 1/1 must not sit above the raiders with a real record behind them.
+  assert.equal(result.leaderboard[result.leaderboard.length - 1].name, 'Raider12');
+
+  // Someone who never appears in any log keeps the season-wide denominator.
+  const absent = player('Benchy');
+  assert.equal(absent.totalRaids, 4);
+  assert.equal(absent.attendancePct, 0);
+});
+
+test('an explicit Config Joined date overrides the inferred first night', () => {
+  // Raider13 is inferred to have joined on night 2, but was actually recruited before night 1
+  // and missed it - inference flatters them, the explicit date does not.
+  const roster = ROSTER.map(r => (r.name === 'Raider13' ? { ...r, joined: '2026-09-01' } : r));
+  const { wcl, sync, player } = setup({ roster });
+  const nights = ['2026-09-01', '2026-09-02', '2026-09-08', '2026-09-09'];
+  nights.forEach((day, i) => {
+    const code = 'N' + i;
+    const present = TWELVE.concat(i >= 1 ? ['Raider13'] : []);
+    wcl.attendees[code] = present;
+    wcl.firstPull[code] = present;
+  });
+  wcl.reports = nights.map((day, i) => makeReport('N' + i, day, 2));
+
+  sync();
+  const p = player('Raider13');
+  assert.equal(p.totalRaids, 4, 'the explicit join date wins over the first night seen in a log');
+  assert.equal(p.raidsAttended, 3);
+  assert.equal(p.attendancePct, 75);
+  assert.equal(p.joinedMidSeason, false, 'they joined on the first official night');
+});
+
+test('bench credit on an early night counts towards eligibility, so attendance cannot exceed 100%', () => {
+  const { gas, wcl, sync, player } = setup();
+  const nights = ['2026-09-01', '2026-09-02', '2026-09-08'];
+  nights.forEach((day, i) => {
+    const code = 'B' + i;
+    wcl.attendees[code] = TWELVE;
+    wcl.firstPull[code] = TWELVE;
+  });
+  wcl.reports = nights.map((day, i) => makeReport('B' + i, day, 2));
+  // Benchy never appears in a log; they are benched on every night, including the first.
+  gas.scriptProps.setProperty('bench_records', JSON.stringify({
+    'Tue, Sep 1, 2026': ['Benchy'], 'Wed, Sep 2, 2026': ['Benchy'], 'Tue, Sep 8, 2026': ['Benchy']
+  }));
+
+  sync();
+  const p = player('Benchy');
+  assert.equal(p.raidsAttended, 3);
+  assert.equal(p.totalRaids, 3);
+  assert.equal(p.attendancePct, 100, 'not 150% from being credited for nights outside their denominator');
 });

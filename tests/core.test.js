@@ -298,6 +298,50 @@ test('the Reliability Index actually moves with attendance', () => {
   assert.ok(bad.score < good.score, 'a 17% Trial cannot outrank a 100% raider on the same upgrade');
 });
 
+test('join dates and eligible-night samples parse out of the cells they live in', () => {
+  const { context } = loadAppsScript();
+  assert.equal(context.parseJoinedDateKey_('2026-09-02'), '2026-09-02');
+  assert.equal(context.parseJoinedDateKey_(new Date(2026, 8, 2)), '2026-09-02');
+  assert.equal(context.parseJoinedDateKey_('9/2/2026'), '2026-09-02');
+  assert.equal(context.parseJoinedDateKey_(''), null);
+  assert.equal(context.parseJoinedDateKey_('not a date'), null);
+  assert.equal(context.formatJoinedLabel_('2026-08-23'), 'Aug 23');
+  assert.equal(context.formatJoinedLabel_(''), '');
+  // The denominator is the raider's own eligible nights, not the season total.
+  assert.equal(context.parseAttendanceSample_('10 / 12'), 12);
+  assert.equal(context.parseAttendanceSample_('3 / 3 \u00b7 since Sep 16'), 3);
+  assert.equal(context.parseAttendanceSample_(''), null);
+});
+
+test('a raider below the minimum sample gets the neutral baseline, not their measured percentage', () => {
+  const { context } = loadAppsScript();
+  const contextMap = {
+    veteran: { role: '\u2694\ufe0f Raider', attPct: '83%', onTimePct: '83%', attSample: 12, isRaidReady: true },
+    // One night, attended: 100% is as meaningless as the 0% of someone who missed their only night.
+    newbie: { role: '\u2694\ufe0f Raider', attPct: '100%', onTimePct: '100%', attSample: 1, isRaidReady: true },
+    newbieabsent: { role: '\u2694\ufe0f Raider', attPct: '0%', onTimePct: 'N/A', attSample: 1, isRaidReady: true }
+  };
+  const vet = context.calculatePriorityScore(10, 'Veteran', false, contextMap);
+  const fresh = context.calculatePriorityScore(10, 'Newbie', false, contextMap);
+  const freshAbsent = context.calculatePriorityScore(10, 'NewbieAbsent', false, contextMap);
+
+  assert.equal(fresh.reliabilityFactor, 0.85, 'a perfect 1/1 is capped at the baseline, not 1.00');
+  assert.ok(freshAbsent.reliabilityFactor > 0.4 && freshAbsent.reliabilityFactor < 0.85,
+    'a 0/1 is pulled below the baseline but not onto the 0.40 floor');
+  assert.equal(fresh.attPct, '1 raid \u00b7 new', 'the badge says new rather than pretending to a season figure');
+  assert.ok(fresh.score < context.calculatePriorityScore(10, 'Reliable', false,
+    { reliable: { role: '\u2694\ufe0f Raider', attPct: '100%', onTimePct: '100%', attSample: 12, isRaidReady: true } }).score,
+    'a one-night newcomer cannot reach a full-attendance raider');
+  assert.ok(freshAbsent.score > context.calculatePriorityScore(10, 'Absent', false,
+    { absent: { role: '\u2694\ufe0f Raider', attPct: '0%', onTimePct: '0%', attSample: 12, isRaidReady: true } }).score,
+    'but a genuine season-long absentee still scores below them');
+
+  // A full sample is still judged on its real numbers.
+  assert.equal(vet.reliabilityFactor, 0.83);
+  assert.ok(fresh.reliabilityFactor > vet.reliabilityFactor,
+    'the baseline sits just above an 83% veteran - a fixed baseline always will, for someone below it');
+});
+
 test('attendance is read from the leaderboard only, not the kill counts in the ledger', () => {
   const gas = loadAppsScript();
   const att = gas.spreadsheet.insertSheet('Attendance & History');
