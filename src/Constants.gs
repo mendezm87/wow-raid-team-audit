@@ -125,6 +125,8 @@ const AUDIT_VAULT_COLUMNS = ['GV Raid 1', 'GV Raid 2', 'GV Raid 3', 'GV M+ 1', '
 
 // Raid Ready text for a character the Blizzard Armory didn't return (left the guild, renamed, transferred)
 const ARMORY_LOOKUP_FAILED = '⚠️ Armory lookup failed';
+// Shown on the Guild Audit sheet when a Config roster name is no longer in the Blizzard guild roster
+const NOT_IN_GUILD = '⚠️ Not in guild';
 
 // Related tabs share a colour: gear (Audit + Talents), attendance, loot, setup
 const TAB_COLORS = {

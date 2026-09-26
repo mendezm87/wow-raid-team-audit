@@ -91,7 +91,9 @@ Raiders can post either **Raidbots** (DPS/Tanks) or **QE Live** (Healers) links 
 
 1. **Live Character Gear & Vault Audit**:
    - Item level, 4pc tier set check, sockets, gems, enchants.
-   - Great Vault tracking updated to the official Patch 12.1 reward table.
+   - Great Vault tracking, cross-checked against wowaudit's live Season 2 reward table (raid, keystone and delve ilvls in `Season.gs`).
+   - **Sim Status** column: who has no Droptimizer, and whose sim has gone stale.
+   - **Roster drift flag**: anyone on `Config` no longer in the Blizzard guild roster is marked `⚠️ Not in guild`.
    - `Raid Ready` badge with automatic **Off-Spec Logout Alerts**.
 
 2. **Talents & Builds Sheet**:

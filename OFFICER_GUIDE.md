@@ -142,6 +142,15 @@ Tracks equipped item levels, tier set bonuses, gems, enchants, and weekly Great 
 * ⚠️ **`Off-Spec → Protection`**: Warns officers if a raider logged out in a spec other than the one assigned on `Config`. The arrow points at the **assigned** spec.
 * Issues are joined with ` · `, e.g. `Off-Spec → Vengeance · Tier 2/5 · 1 Enchant missing`.
 * ⚪ **`⚠️ Armory lookup failed`** (whole row greyed out): Blizzard's Armory didn't return the character — usually they left the guild, renamed, or transferred. Check the name on `Config`, or remove them.
+* 🔴 **`⚠️ Not in guild`**: the character still exists on the Armory but is no longer in the Blizzard guild roster, so they have almost certainly left. Cross-realm names (`Name-Realm`) are never flagged. Remove them from `Config` once you have confirmed it.
+
+### 🧪 Sim Status column
+Sits next to `M+ Rating` and answers "who has actually simmed":
+* 🟢 **`✅ Sim today` / `✅ Sim 3d old`**: a Droptimizer or QE Live report was imported for them recently.
+* 🟡 **`⚠️ Sim 12d old`**: older than 7 days, so their loot upgrade percentages are stale.
+* 🔴 **`❌ No sim`**: nothing has ever been imported for them, which is why they never appear as a contender on `Loot & Chase Items`. Ask them to post a Droptimizer link in Discord.
+
+The age comes from the sim report's own date, recorded per character when it is imported. Raiders simmed before this column existed show `✅ Simmed` with no age until their next import.
 
 ### 🧭 Reading the Sheet:
 * **Column order**: readiness first (tier, sockets, gems, enchants), then crafted items and embellishments, then per-slot gear, then the Great Vault.

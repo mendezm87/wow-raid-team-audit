@@ -1,4 +1,91 @@
 /**
+ * Per-character sim freshness, so the Guild Audit sheet can show who has no sim
+ * and whose sim has gone stale. Stored as a Script Property so it survives
+ * rebuilds of the Loot sheet: { "charnamelower": <epoch ms of newest sim> }.
+ */
+const SIM_TIMESTAMPS_PROPERTY = 'sim_timestamps';
+const SIM_STALE_DAYS = 7;
+const SIM_STATUS_NONE = '\u274c No sim';
+
+function getSimTimestamps_() {
+  try {
+    const raw = PropertiesService.getScriptProperties().getProperty(SIM_TIMESTAMPS_PROPERTY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return (parsed && typeof parsed === 'object') ? parsed : {};
+  } catch (err) {
+    Logger.log('Could not read sim timestamps: ' + err);
+    return {};
+  }
+}
+
+/**
+ * Merges newly imported sim times in, keeping the newest per character.
+ * `entries` is an array of { name, time } (time in epoch ms).
+ */
+function recordSimTimestamps_(entries) {
+  if (!entries || !entries.length) return;
+  const stamps = getSimTimestamps_();
+  const now = Date.now();
+  entries.forEach(e => {
+    if (!e || !e.name) return;
+    const key = e.name.toString().toLowerCase().trim();
+    if (!key) return;
+    let time = Number(e.time) || 0;
+    // A missing or future sim date means "imported just now" rather than "unknown"
+    if (time <= 0 || time > now) time = now;
+    if (!stamps[key] || time > stamps[key]) stamps[key] = time;
+  });
+  try {
+    PropertiesService.getScriptProperties().setProperty(SIM_TIMESTAMPS_PROPERTY, JSON.stringify(stamps));
+  } catch (err) {
+    Logger.log('Could not save sim timestamps: ' + err);
+  }
+}
+
+/**
+ * The Guild Audit "Sim Status" cell for one character.
+ * `stamps` comes from getSimTimestamps_(); `simmedNames` is a fallback set of
+ * lower-cased names that already appear as contenders on the Loot sheet, used
+ * for sims imported before timestamps were recorded.
+ */
+function simStatusText_(name, stamps, simmedNames, nowMs) {
+  const key = (name || '').toString().toLowerCase().trim();
+  if (!key) return '';
+  const now = nowMs || Date.now();
+  const time = stamps ? stamps[key] : 0;
+  if (time) {
+    const days = Math.max(0, Math.floor((now - time) / 86400000));
+    if (days > SIM_STALE_DAYS) return `\u26a0\ufe0f Sim ${days}d old`;
+    return days <= 0 ? '\u2705 Sim today' : `\u2705 Sim ${days}d old`;
+  }
+  // No recorded date, but they do appear in the sim-derived contender lists
+  if (simmedNames && simmedNames.has(key)) return '\u2705 Simmed';
+  return SIM_STATUS_NONE;
+}
+
+/**
+ * Lower-cased names that appear as sim contenders on the Loot sheet. Used only as
+ * a fallback for characters simmed before per-character times were recorded.
+ */
+function getSimmedNamesFromLootSheet_(ss) {
+  const names = new Set();
+  try {
+    const sheet = (ss || SpreadsheetApp.getActiveSpreadsheet()).getSheetByName(LOOT_SHEET_NAME);
+    if (!sheet || sheet.getLastRow() < 2) return names;
+    const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+    values.forEach(row => {
+      parseSimUpgradeNotes_(lootRowContenderText_(row), null).forEach(e => {
+        if (e && e.name) names.add(e.name.toLowerCase().trim());
+      });
+    });
+  } catch (err) {
+    Logger.log('Could not read simmed names from the Loot sheet: ' + err);
+  }
+  return names;
+}
+
+/**
  * Reads the contender rankings an earlier import wrote into a Loot sheet notes cell, e.g.
  * "Raidbots Sim Upgrades: 1. Name [Score: 4.62] (+4.20% [Tier Catalyzed] | 👑 Veteran | 100%) | 2. ..."
  * (also the "Sim / QE Live Upgrades:" form), so a new import merges with everyone's earlier sims
@@ -235,6 +322,9 @@ function ingestRaidbotsSims_(input) {
       };
     }
   });
+
+  // Remember when each character last simmed, for the Guild Audit Sim Status column
+  recordSimTimestamps_(Object.keys(latestSimsByPlayer).map(k => ({ name: k, time: latestSimsByPlayer[k].time })));
 
   const dedupedSimDataList = Object.values(latestSimsByPlayer).map(e => e.simData);
   if (dedupedSimDataList.length === 0) {
@@ -620,6 +710,7 @@ function ingestQELiveReport_(reportUrlOrId) {
   const now = new Date();
   const dateStr = Utilities.formatDate(now, Session.getScriptTimeZone() || 'GMT', 'MMM d, yyyy');
   const simStatusBadge = `✅ QE Live (${dateStr})`;
+  recordSimTimestamps_([{ name: playerName, time: now.getTime() }]);
 
   // Read existing sheet rows
   const lastRow = sheet.getLastRow();

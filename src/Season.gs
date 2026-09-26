@@ -1,19 +1,31 @@
-// --- VAULT & SEASON CONFIGURATION (Midnight Season 2 - Patch 12.1 Verified) ---
+// --- VAULT & SEASON CONFIGURATION (Midnight Season 2 - Patch 12.1) ---
+// Great Vault reward ilvls, cross-checked against wowaudit's live season table
+// (https://wowaudit.com/, `page_info.currentSeason.great_vault`) on 2026-09-26.
+// These are the VAULT reward ilvls, not the end-of-dungeon / end-of-boss drop ilvls,
+// which are lower. Verify this block against wowaudit at the start of every season.
 const VAULT_MAPPING = {
   raid: {
-      mythic: 334, // Mythic boss drops & vault are 334 (344 is personal loot only, not boss/raid loot)
-      heroic: 318, // Heroic Raid Vault is 318
-      normal: 305, // Normal Raid Vault is 305
-      lfr: 292     // LFR Raid Vault is 292
+      mythic: 334, // Mythic raid vault (344 is personal loot only, not boss/raid loot)
+      heroic: 318, // Heroic raid vault
+      normal: 305, // Normal raid vault
+      lfr: 292     // LFR raid vault
   },
   mplus: {
       20: 318, 19: 318, 18: 318, 17: 318, 16: 318, 15: 318, 14: 318,
-      13: 318, 12: 318, 11: 318, 10: 318, // Caps at 318 for M+ 10 and above
-      9: 315, 8: 315, 7: 315,             // 315 for M+ 7 to 9
-      6: 311,                             // 311 for M+ 6
-      5: 308, 4: 308,                     // 308 for M+ 4 to 5
-      3: 305, 2: 305,                     // 305 for M+ 2 to 3
-      0: 302                              // 302 for Mythic 0 / M0
+      13: 318, 12: 318, 11: 318, 10: 318, // Caps at 318 for keystone 10 and above
+      9: 311, 8: 311, 7: 311, 6: 311,     // 311 for keystones 6-9
+      5: 308, 4: 308,                     // 308 for keystones 4-5
+      3: 305, 2: 305,                     // 305 for keystones 2-3
+      1: 302,                             // 302 for keystone 1
+      0: 289                              // 289 for Mythic 0
+  },
+  // Delve vault slots (tiers 1-11). Not populated today: the Blizzard character API
+  // exposes no delve progress, so nothing fills these. Kept here so the reward ilvls
+  // are recorded in one place if a source ever appears.
+  delve: {
+      11: 305, 10: 305, 9: 305, 8: 305,
+      7: 302, 6: 298, 5: 292,
+      4: 289, 3: 285, 2: 282, 1: 272
   }
 };
 

@@ -141,14 +141,19 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
       filteredRoster.push({
         name: match.character.name,
         realmSlug: match.character.realm.slug,
-        expectedSpec: expectedSpec
+        expectedSpec: expectedSpec,
+        inGuildRoster: true
       });
     } else {
       // If not found in guild roster directly (e.g. cross-realm alt or trial), add directly
+      // A same-realm character missing from the roster has almost certainly left the guild,
+      // so flag it rather than letting it sit on the sheet as a silent ghost row.
       filteredRoster.push({
         name: targetName,
         realmSlug: targetRealm || config.GUILD_REALM_SLUG,
-        expectedSpec: expectedSpec
+        expectedSpec: expectedSpec,
+        inGuildRoster: false,
+        crossRealm: !!targetRealm && targetRealm !== (config.GUILD_REALM_SLUG || '').toLowerCase()
       });
     }
   });
@@ -229,6 +234,11 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
   const seasonMinSetIdThreshold = globalMaxSetId > 0 ? (globalMaxSetId - 15) : 0;
 
   // --- PASS 2: Process Character Rows ---
+  // Read the sim-freshness data once for the whole batch rather than per character
+  const simStamps = getSimTimestamps_();
+  const simmedNames = getSimmedNamesFromLootSheet_(SpreadsheetApp.getActiveSpreadsheet());
+  const auditNow = Date.now();
+
   const characterDataObjects = [];
   for (const item of batchedPayloads) {
     const { character, profileData, equipmentData, reputationsData, mplusData, raidData, specializationsData, raiderIoData } = item;
@@ -242,6 +252,7 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
       'iLvl': 0,
       'Raid Ready': 'Checking...',
       'M+ Rating': 0,
+      'Sim Status': '',
       'Tier Set': '0/5',
       'Total Sockets': 0,
       'Empty Sockets': 0,
@@ -600,6 +611,19 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
       charRow['Raid Ready'] = calculateRaidReadyStatus(charRow);
     }
 
+    // Sim freshness, so a raider with no sim isn't silently absent from every contender list.
+    // Left blank when the Armory returned nothing, so the quiet grey row stays quiet.
+    charRow['Sim Status'] = profileData
+      ? simStatusText_(charName, simStamps, simmedNames, auditNow)
+      : '';
+
+    // Roster drift: on the sheet but no longer in the Blizzard guild roster
+    if (character.inGuildRoster === false && !character.crossRealm) {
+      charRow['Raid Ready'] = charRow['Raid Ready'] === ARMORY_LOOKUP_FAILED
+        ? charRow['Raid Ready']
+        : `${NOT_IN_GUILD} \u00b7 ${charRow['Raid Ready']}`;
+    }
+
     characterDataObjects.push(charRow);
     Logger.log(`Processed ${charName}`);
   }
@@ -629,7 +653,7 @@ function updateAllCharacterDataWithBonuses() {
   // Readiness first (sockets, gems, enchants), then crafted gear, then the per-slot gear and Great Vault detail.
   // Enchants, Gear and Great Vault are collapsible groups, so each needs an ungrouped column between it and the next.
   const outputHeaders = [
-    'Name', 'Class', 'Spec', 'iLvl', 'Raid Ready', 'M+ Rating',
+    'Name', 'Class', 'Spec', 'iLvl', 'Raid Ready', 'M+ Rating', 'Sim Status',
     'Tier Set', 'Total Sockets', 'Empty Sockets', 'Imperfect Gems',
     ...AUDIT_ENCHANT_COLUMNS,
     'Crafted Items', 'Embellishment 1', 'Embellishment 2',
@@ -848,11 +872,20 @@ function applyFormatting(sheet, headers, characterDataObjects) {
   // 7. Raid Ready Column Rules (Soft Modern Pills)
   if (raidReadyCol > 0) {
     const rrRange = columnRanges(['Raid Ready']);
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(NOT_IN_GUILD).setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(rrRange).build());
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("READY").setBackground("#d1fae5").setFontColor("#065f46").setRanges(rrRange).build());
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Enchant").setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(rrRange).build());
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Socket").setBackground("#ffe4e6").setFontColor("#9f1239").setRanges(rrRange).build());
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Off-Spec").setBackground("#fef3c7").setFontColor("#92400e").setRanges(rrRange).build());
     rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains("Tier").setBackground("#fef3c7").setFontColor("#92400e").setRanges(rrRange).build());
+  }
+
+  // 7b. Sim Status: green when fresh, amber when stale, red when there is no sim at all
+  const simStatusRanges = columnRanges(['Sim Status']);
+  if (simStatusRanges.length > 0) {
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains(SIM_STATUS_NONE).setBackground('#ffe4e6').setFontColor('#9f1239').setRanges(simStatusRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('old').setBackground('#fef3c7').setFontColor('#92400e').setRanges(simStatusRanges).build());
+    rules.push(SpreadsheetApp.newConditionalFormatRule().whenTextContains('Sim').setBackground('#d1fae5').setFontColor('#065f46').setRanges(simStatusRanges).build());
   }
 
   // 8. Upgrade Tracks & Gear Slots (Modern Tailwind Badges)
@@ -945,7 +978,7 @@ function applyFormatting(sheet, headers, characterDataObjects) {
   // Column widths: gear and enchant cells hold short badges now (full names are in the notes)
   const columnWidths = {
     'Name': 120, 'Class': 100, 'Spec': 110, 'iLvl': 55,
-    'Raid Ready': 260, 'M+ Rating': 75, 'Tier Set': 95,
+    'Raid Ready': 260, 'M+ Rating': 75, 'Sim Status': 100, 'Tier Set': 95,
     'Total Sockets': 75, 'Empty Sockets': 75, 'Imperfect Gems': 80, 'Crafted Items': 75,
     'Embellishment 1': 165, 'Embellishment 2': 165,
     'GV Slots Unlocked': 80

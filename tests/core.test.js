@@ -143,3 +143,62 @@ test('webhook failures include an `error` field so the Discord bot shows the rea
   assert.equal(post({ urls: ['x'] }).error, undefined);
   assert.match(post({}).error, /No Raidbots or QE Live URL/);
 });
+
+test('Great Vault ilvls match wowaudit\'s live Season 2 table', () => {
+  const { get } = loadAppsScript();
+
+  // Raid vault
+  assert.equal(get('VAULT_MAPPING.raid.mythic'), 334);
+  assert.equal(get('VAULT_MAPPING.raid.heroic'), 318);
+  assert.equal(get('VAULT_MAPPING.raid.normal'), 305);
+  assert.equal(get('VAULT_MAPPING.raid.lfr'), 292);
+
+  // Dungeon vault: 318 at 10+, then 311 / 308 / 305 / 302 / 289 stepping down
+  const mplus = get('VAULT_MAPPING.mplus');
+  assert.equal(mplus[10], 318);
+  [9, 8, 7, 6].forEach(k => assert.equal(mplus[k], 311, `keystone ${k}`));
+  [5, 4].forEach(k => assert.equal(mplus[k], 308, `keystone ${k}`));
+  [3, 2].forEach(k => assert.equal(mplus[k], 305, `keystone ${k}`));
+  assert.equal(mplus[1], 302);
+  assert.equal(mplus[0], 289);
+
+  // Every keystone from 0 to 20 resolves, so no slot falls through to a guessed value
+  for (let k = 0; k <= 20; k++) assert.equal(typeof mplus[k], 'number', `keystone ${k} missing`);
+
+  // Delve vault reward ilvls are recorded even though nothing populates them yet
+  const delve = get('VAULT_MAPPING.delve');
+  assert.equal(delve[11], 305);
+  assert.equal(delve[1], 272);
+});
+
+test('simStatusText_ reports fresh, stale and missing sims', () => {
+  const { context, get } = loadAppsScript();
+  const none = get('SIM_STATUS_NONE');
+  const now = Date.UTC(2026, 8, 26, 0, 0, 0);
+  const day = 86400000;
+  const stamps = { fresh: now - 2 * day, stale: now - 12 * day, today: now - 1000 };
+
+  assert.equal(context.simStatusText_('Fresh', stamps, null, now), '\u2705 Sim 2d old');
+  assert.equal(context.simStatusText_('Today', stamps, null, now), '\u2705 Sim today');
+  assert.equal(context.simStatusText_('Stale', stamps, null, now), '\u26a0\ufe0f Sim 12d old');
+  assert.equal(context.simStatusText_('Nobody', stamps, null, now), none);
+
+  // Falls back to the Loot sheet's contender names when no date was ever recorded
+  const simmed = new Set(['legacy']);
+  assert.equal(context.simStatusText_('Legacy', stamps, simmed, now), '\u2705 Simmed');
+  assert.equal(context.simStatusText_('', stamps, simmed, now), '');
+});
+
+test('recordSimTimestamps_ keeps the newest time per character', () => {
+  const { context } = loadAppsScript();
+  const now = Date.now();
+  context.recordSimTimestamps_([{ name: 'Ainocee', time: now - 5000 }]);
+  context.recordSimTimestamps_([{ name: 'ainocee', time: now - 100000 }]);
+  assert.equal(context.getSimTimestamps_()['ainocee'], now - 5000);
+
+  // A missing or future date is treated as "imported now" rather than "unknown"
+  context.recordSimTimestamps_([{ name: 'Nodate', time: 0 }, { name: 'Future', time: now + 1e9 }]);
+  const stamps = context.getSimTimestamps_();
+  assert.ok(stamps['nodate'] > 0 && stamps['nodate'] <= Date.now());
+  assert.ok(stamps['future'] <= Date.now());
+});
