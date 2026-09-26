@@ -316,6 +316,8 @@ Google can run the updates on a schedule, so nobody has to click the menu.
 
 **Click `Guild Audit` → `10. ⏰ Install / Verify Scheduled Refreshes`.** That installs both triggers below, removes any duplicates from an earlier run, and tells you what is already running. It is safe to click at any time.
 
+The first time you click it, Google shows an authorization screen: managing triggers needs a permission the sheet did not previously ask for. Approve it and click menu 10 again. If it reports “One more approval needed” instead, reload the spreadsheet and click it once more — a reload is what makes Sheets re-request permissions.
+
 | Function | Schedule | Purpose |
 | :--- | :--- | :--- |
 | `updateAllCharacterDataWithBonuses` | Every 6 hours | Gear audit, talents & loot sheet |

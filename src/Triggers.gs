@@ -41,9 +41,40 @@ function planTriggerInstall_(existing) {
   return { create: create, remove: remove, kept: Object.keys(keep) };
 }
 
+/**
+ * True when a failure is Apps Script refusing the trigger API because the sheet still holds an
+ * older authorization that predates the script.scriptapp scope in appsscript.json.
+ */
+function isTriggerScopeError_(err) {
+  const msg = String((err && err.message) || err || '');
+  return msg.indexOf('script.scriptapp') > -1 ||
+    (msg.indexOf('permissions are not sufficient') > -1 && msg.indexOf('Trigger') > -1) ||
+    msg.indexOf('getProjectTriggers') > -1;
+}
+
 /** Installs any missing scheduled refresh and clears duplicates. Safe to run repeatedly. */
 function installGuildAuditTriggers() {
-  const plan = planTriggerInstall_(ScriptApp.getProjectTriggers());
+  let existing;
+  try {
+    existing = ScriptApp.getProjectTriggers();
+  } catch (err) {
+    if (!isTriggerScopeError_(err)) throw err;
+    notifyUser('⏰ One more approval needed', [
+      'This sheet is still running under an authorization granted before the script could manage',
+      'scheduled refreshes, so Google is blocking the trigger API.',
+      '',
+      'To clear it:',
+      '  1. Reload the spreadsheet (⌘R).',
+      '  2. Run Guild Audit → 10 again.',
+      '  3. Google will show an authorization screen — approve it.',
+      '',
+      'If no authorization screen appears, run Extensions → Apps Script → Run (installGuildAuditTriggers)',
+      'once in the editor; that always prompts.'
+    ].join('\n'), false);
+    return;
+  }
+
+  const plan = planTriggerInstall_(existing);
 
   plan.remove.forEach(t => ScriptApp.deleteTrigger(t));
 
