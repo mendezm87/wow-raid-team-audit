@@ -100,7 +100,7 @@ Every week before raid night (or after weekly reset):
 | `7. Set Warcraft Logs API Credentials` | WCL **V2** Client ID / Secret (shared for all officers) |
 | `8. 🪑 Mark Bench & Standby Raiders` | Awards bench credit for a raid night |
 | `9. 📄 Publish Guides to Google Docs` | Replaces the guild's shared Google Docs guides with the latest versions (same links; old versions stay in each Doc's *File → Version history*) |
-| `10. ⏰ Install / Verify Scheduled Refreshes` | Installs the time-driven triggers that refresh the sheet on their own, and clears duplicates. Safe to run any time — it reports what is already running |
+| `10. ⏰ Install / Verify Scheduled Refreshes` | Installs the time-driven triggers that refresh the sheet on their own — including a Warcraft Logs sync 10 minutes into each raid night — and clears duplicates. Safe to run any time — it reports what is already running |
 
 ---
 
@@ -321,16 +321,21 @@ Because Warcraft Logs only records raiders inside the instance, bench raiders st
 
 Google can run the updates on a schedule, so nobody has to click the menu.
 
-**Click `Guild Audit` → `10. ⏰ Install / Verify Scheduled Refreshes`.** That installs both triggers below, removes any duplicates from an earlier run, and tells you what is already running. It is safe to click at any time.
+**Click `Guild Audit` → `10. ⏰ Install / Verify Scheduled Refreshes`.** That installs every trigger below, removes any duplicates from an earlier run, and tells you what is already running. It is safe to click at any time.
 
 The first time you click it, Google shows an authorization screen: managing triggers needs a permission the sheet did not previously ask for. Approve it and click menu 10 again. If it reports “One more approval needed” instead, reload the spreadsheet and click it once more — a reload is what makes Sheets re-request permissions.
 
 | Function | Schedule | Purpose |
 | :--- | :--- | :--- |
 | `updateAllCharacterDataWithBonuses` | Every 6 hours | Gear audit, talents & loot sheet |
+| `syncRaidNightAttendance` | Each raid night, 10 minutes after the configured start time | Picks up the night's Warcraft Logs report while you are still pulling |
 | `syncWarcraftLogsSeasonAttendance` | Daily at 11 PM | Attendance after raid |
 
-The schedules are declared in `src/Triggers.gs`, so they survive a redeploy or a copy of the spreadsheet — install them once on the new copy and they match.
+**The raid-night syncs follow the Config sheet.** One is installed per ticked raid day, at the start time in `Config!B5:D5` plus 10 minutes — with the default Tue/Wed 7:00 PM schedule that is Tuesday and Wednesday at about 7:10 PM. Change the raid days or the start time and click menu 10 again to move them; the installer rebuilds them to match. If the raid schedule can't be read, it says so and installs the other two.
+
+> **Google's timing is approximate.** A timed trigger runs *within about 15 minutes* of its slot, so the raid-night sync can land anywhere from raid start to roughly 25 minutes in. If it runs before the log is uploaded it simply finds nothing and does no harm — the 11 PM sync is the backstop.
+
+The schedules are declared in `src/Triggers.gs`, so they survive a redeploy or a copy of the spreadsheet — install them once on the new copy and they match. The installer records each trigger's id in Script Properties, which is how it tells the two raid-night triggers apart — they share one handler, and Google's trigger API can't report a trigger's schedule.
 
 > **Triggers belong to the officer who installs them.** They run as that Google account, and Google emails *that* account when one fails. If that officer leaves, have someone else click menu 10 and delete the old triggers under *Extensions → Apps Script → Triggers*.
 

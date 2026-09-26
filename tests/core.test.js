@@ -379,13 +379,72 @@ test('three socket counters collapse into one cell that stays quiet when clean',
 
 test('installing scheduled refreshes is idempotent and leaves other triggers alone', () => {
   const { context } = loadAppsScript();
+  const specs = context.scheduledRefreshSpecs_(null);
+  const tracked = { 'audit-6h': 'id-audit' };
   const plan = context.planTriggerInstall_([
-    { handlerFunction: 'updateAllCharacterDataWithBonuses' },
-    { handlerFunction: 'updateAllCharacterDataWithBonuses' },
-    { handlerFunction: 'someoneElsesTrigger' }
-  ]);
-  assert.deepEqual(Array.from(plan.create), ['syncWarcraftLogsSeasonAttendance']);
-  assert.equal(plan.remove.length, 1, 'the duplicate is removed, the original kept');
-  assert.equal(plan.remove[0].handlerFunction, 'updateAllCharacterDataWithBonuses');
-  assert.deepEqual(context.planTriggerInstall_([]).create.length, 2);
+    { id: 'id-audit', handlerFunction: 'updateAllCharacterDataWithBonuses' },
+    { id: 'id-dupe', handlerFunction: 'updateAllCharacterDataWithBonuses' },
+    { id: 'id-theirs', handlerFunction: 'someoneElsesTrigger' }
+  ], specs, tracked);
+  assert.deepEqual(Array.from(plan.create).map(s => s.key), ['wcl-nightly']);
+  assert.equal(plan.remove.length, 1, 'the untracked duplicate is removed, the tracked one kept');
+  assert.equal(plan.remove[0].id, 'id-dupe');
+  assert.equal(context.planTriggerInstall_([], specs, {}).create.length, 2);
+});
+
+test('planTriggerInstall_ reads real Trigger getters, not plain fields', () => {
+  const { context } = loadAppsScript();
+  const specs = context.scheduledRefreshSpecs_(null);
+  const trigger = {
+    getUniqueId: () => 'id-audit',
+    getHandlerFunction: () => 'updateAllCharacterDataWithBonuses'
+  };
+  const plan = context.planTriggerInstall_([trigger], specs, { 'audit-6h': 'id-audit' });
+  assert.deepEqual(Array.from(plan.kept), ['audit-6h']);
+  assert.equal(plan.remove.length, 0);
+});
+
+test('each configured raid day gets a sync a few minutes after raid start', () => {
+  const { context } = loadAppsScript();
+  const specs = context.scheduledRefreshSpecs_({
+    RAID_DAYS: 'Tuesday, Wednesday',
+    RAID_HOURS: '7:00 PM - 10:00 PM'
+  });
+  const nights = specs.filter(s => s.handler === 'syncRaidNightAttendance');
+  assert.deepEqual(Array.from(nights.map(s => s.key)), ['raid-night-TUESDAY', 'raid-night-WEDNESDAY']);
+  nights.forEach(s => {
+    assert.equal(s.atHour, 19);
+    assert.equal(s.nearMinute, 10);
+  });
+  assert.equal(nights[0].weekDay, 'TUESDAY');
+  assert.match(nights[0].label, /Tuesday ~7:10 PM/);
+
+  // Both raid nights share one handler, so the plan must key off the recorded trigger ids.
+  const plan = context.planTriggerInstall_([
+    { id: 'id-tue', handlerFunction: 'syncRaidNightAttendance' },
+    { id: 'id-wed', handlerFunction: 'syncRaidNightAttendance' }
+  ], specs, { 'raid-night-TUESDAY': 'id-tue', 'raid-night-WEDNESDAY': 'id-wed' });
+  assert.equal(plan.remove.length, 0, 'two triggers on the same handler are both kept');
+  assert.deepEqual(Array.from(plan.create.map(s => s.key)), ['audit-6h', 'wcl-nightly']);
+});
+
+test('a raid-night sync that crosses midnight lands on the following day', () => {
+  const { context } = loadAppsScript();
+  const specs = context.scheduledRefreshSpecs_({
+    RAID_DAYS: 'Saturday',
+    RAID_HOURS: '11:55 PM - 2:00 AM'
+  });
+  const night = specs.filter(s => s.handler === 'syncRaidNightAttendance')[0];
+  assert.equal(night.weekDay, 'SUNDAY');
+  assert.equal(night.atHour, 0);
+  assert.equal(night.nearMinute, 5);
+  assert.equal(night.key, 'raid-night-SATURDAY', 'the key still names the raid day');
+});
+
+test('an unreadable raid schedule installs the fixed refreshes and no raid-night sync', () => {
+  const { context } = loadAppsScript();
+  assert.equal(context.scheduledRefreshSpecs_({ RAID_DAYS: '', RAID_HOURS: 'whenever' }).length, 2);
+  assert.equal(context.parseRaidStartTime_('7:00 PM - 10:00 PM').hour, 19);
+  assert.equal(context.parseRaidStartTime_('12:30 AM - 3:00 AM').hour, 0);
+  assert.deepEqual(Array.from(context.parseRaidDays_('Tuesday, Funday')), ['TUESDAY']);
 });
