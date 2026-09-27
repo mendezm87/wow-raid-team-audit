@@ -53,6 +53,11 @@ function createSheet(name) {
     getMaxRows: () => Math.max(1, data.length),
     deleteColumns() { return sheet; },
     insertColumnsAfter() { return sheet; },
+    // Real Sheets cannot setValues past the grid; growing it is what insertRowsAfter is for.
+    insertRowsAfter(afterRow, count) {
+      for (let i = 0; i < count; i++) data.splice(afterRow + i, 0, []);
+      return sheet;
+    },
     getDataRange() { return sheet.getRange(1, 1, Math.max(data.length, 1), Math.max(1, ...data.map(r => r.length))); },
     getRange(row, col, numRows = 1, numCols = 1) {
       // A1 notation ('B2', 'F9:I9') as well as (row, col, numRows, numCols).

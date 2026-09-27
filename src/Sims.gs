@@ -618,6 +618,7 @@ function ingestRaidbotsSims_(input) {
   });
 
   // Newly registered items are pushed as short rows; square everything to the sheet's width first
+  ensureLootRowCapacity_(sheet, values.length);
   padLootRows_(values, lootColCount);
   padRowArray_(equippedNotes, values.length, '');
   padRowArray_(lootItemIds, values.length, '');
@@ -879,6 +880,7 @@ function ingestQELiveReport_(reportUrlOrId) {
   });
 
   // Save back all updated values
+  ensureLootRowCapacity_(sheet, values.length);
   padLootRows_(values, lastCol);
   padRowArray_(equippedNotes, values.length, '');
   padRowArray_(lootItemIds, values.length, '');
@@ -1052,6 +1054,16 @@ function syncLatestSimsFromDiscord() {
   } catch (err) {
     ui.alert('❌ Sync Error', `Failed to sync sims from Discord: ${err.message}`, ui.ButtonSet.OK);
   }
+}
+
+/**
+ * A sim can register items the catalog does not have, so the rows to write can outnumber the
+ * sheet's grid. setValues cannot grow a sheet, so make room before writing.
+ */
+function ensureLootRowCapacity_(sheet, rowCount) {
+  const needed = rowCount + 1 - sheet.getMaxRows();
+  if (needed > 0) sheet.insertRowsAfter(sheet.getMaxRows(), needed);
+  return sheet;
 }
 
 /**
