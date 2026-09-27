@@ -245,7 +245,8 @@ function ingestRaidbotsSims_(input) {
   if (lastRow <= 1) {
     createLootAndChaseItemsSheet();
   }
-  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  const lootColCount = sheet.getLastColumn();
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, lootColCount).getValues();
   const hasRunnersColumn = lootRowHasRunnersColumn_(values);
   const equippedNotes = new Array(values.length).fill('');
   // Item ids live in the Notes column's cell notes; older sheets still have them in the text
@@ -504,9 +505,9 @@ function ingestRaidbotsSims_(input) {
           lootDifficulty.ilvl,
           'All Eligible',
           '', '', '', '',
-          'Raid Drop',
+          lootPriorityTier(simItem.slot || 'Gear'),
           simStatusBadge,
-          ''
+          '', ''
         ]);
       }
 
@@ -616,8 +617,13 @@ function ingestRaidbotsSims_(input) {
     }
   });
 
+  // Newly registered items are pushed as short rows; square everything to the sheet's width first
+  padLootRows_(values, lootColCount);
+  padRowArray_(equippedNotes, values.length, '');
+  padRowArray_(lootItemIds, values.length, '');
+
   // Save back all updated and newly registered items
-  sheet.getRange(2, 1, values.length, values[0].length).setValues(values);
+  sheet.getRange(2, 1, values.length, lootColCount).setValues(values);
   sheet.getRange(2, 7, values.length, 2).setHorizontalAlignment('left');
   sheet.getRange(2, 13, values.length, hasRunnersColumn ? 2 : 1).setHorizontalAlignment('left');
   sheet.getRange(2, 8, values.length, 1).setNotes(equippedNotes.map(text => [text || '']));
@@ -873,7 +879,10 @@ function ingestQELiveReport_(reportUrlOrId) {
   });
 
   // Save back all updated values
-  sheet.getRange(2, 1, values.length, values[0].length).setValues(values);
+  padLootRows_(values, lastCol);
+  padRowArray_(equippedNotes, values.length, '');
+  padRowArray_(lootItemIds, values.length, '');
+  sheet.getRange(2, 1, values.length, lastCol).setValues(values);
   sheet.getRange(2, 7, values.length, 2).setHorizontalAlignment('left');
   sheet.getRange(2, 13, values.length, hasRunnersColumn ? 2 : 1).setHorizontalAlignment('left');
   sheet.getRange(2, 8, values.length, 1).setNotes(equippedNotes.map(text => [text || '']));
@@ -1043,6 +1052,27 @@ function syncLatestSimsFromDiscord() {
   } catch (err) {
     ui.alert('❌ Sync Error', `Failed to sync sims from Discord: ${err.message}`, ui.ButtonSet.OK);
   }
+}
+
+/**
+ * A sim can register an item the catalog does not have, pushing a row that is narrower than the
+ * sheet. setValues refuses a ragged array, so square every row to the sheet's real column count.
+ */
+function padLootRows_(values, width) {
+  values.forEach(row => {
+    while (row.length < width) row.push('');
+    if (row.length > width) row.length = width;
+  });
+  return values;
+}
+
+/** Keeps a per-row companion array (notes, item ids) the same length as the rows it annotates. */
+function padRowArray_(arr, length, fill) {
+  for (let i = 0; i < length; i++) {
+    if (arr[i] === undefined) arr[i] = fill;
+  }
+  arr.length = length;
+  return arr;
 }
 
 /**

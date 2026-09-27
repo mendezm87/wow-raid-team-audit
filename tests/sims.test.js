@@ -70,3 +70,61 @@ test('QE Live report from someone not on the Config roster is rejected', () => {
   assert.equal(result.success, false);
   assert.match(result.error, /Randomhealer is not a main character on the Config sheet/);
 });
+
+/** Sandbox whose Loot sheet has the current 14-column layout (Runners-Up in N). */
+function setupWideLoot() {
+  const gas = loadAppsScript();
+  const config = gas.spreadsheet.insertSheet('Config');
+  const configRows = Array.from({ length: 8 }, () => new Array(9).fill(''));
+  configRows.push(['Summzr', 'Fire', '', '', '', '', '', '', '']);
+  config.getRange(1, 1, configRows.length, 9).setValues(configRows);
+
+  const loot = gas.spreadsheet.insertSheet('Loot & Chase Items');
+  const blank = new Array(14).fill('');
+  const header = ['Boss / Source', 'Chase Item / Drop', 'Slot', 'Difficulty', 'Drop ilvl',
+    'Target Specs / Roles', 'Top Contender (Assigned)', 'Current Equipped Item', 'Equipped ilvl',
+    'Upgrade Delta (+ilvl / %DPS)', 'Loot Priority', 'Sim Status / Last Updated',
+    'Loot Council Notes', 'Runners-Up'];
+  const item = blank.slice();
+  ['Boss 1', 'Soulcoil Siphon', 'Trinket 1', 'Heroic', 318, 'All'].forEach((v, i) => { item[i] = v; });
+  loot.getRange(1, 1, 2, 14).setValues([header, item]);
+  return gas;
+}
+
+function droptimizerFetchAll(player, items) {
+  return () => [{
+    getResponseCode: () => 200,
+    getContentText: () => JSON.stringify({
+      simbot: { player, droptimizer: { items } },
+      sim: { players: [{ name: player }] }
+    })
+  }];
+}
+
+test('a sim item missing from the catalog is added without breaking the 14-column write', () => {
+  const gas = setupWideLoot();
+  gas.context.UrlFetchApp.fetchAll = droptimizerFetchAll('Summzr', [
+    { name: 'Unlisted Band of Tides', pct: 3.2, slot: 'Ring 1' }
+  ]);
+  const result = gas.context.processAndIngestRaidbotsSims('https://www.raidbots.com/simbot/report/hKLdYXNgXqzVc919eAf2vp');
+  assert.equal(result.success, true, result && result.error);
+
+  const data = gas.sheets['Loot & Chase Items'].data;
+  data.forEach((row, i) => assert.equal(row.length, 14, `row ${i + 1} is ${row.length} wide`));
+
+  const added = data.find(row => row[1] === 'Unlisted Band of Tides');
+  assert.ok(added, 'the new item was registered on the sheet');
+  assert.equal(added[10], '💠 Secondary', 'Loot Priority is derived from the slot, not left as raw text');
+});
+
+test('short rows and their note arrays are squared to the sheet width before writing', () => {
+  const { context } = loadAppsScript();
+  const rows = [new Array(14).fill('x'), ['a', 'b'], new Array(16).fill('y')];
+  context.padLootRows_(rows, 14);
+  assert.deepEqual(rows.map(r => r.length), [14, 14, 14]);
+  assert.equal(rows[1][13], '', 'padding is blank, not undefined');
+
+  const notes = ['keep'];
+  notes[3] = 'late';
+  assert.deepEqual(context.padRowArray_(notes, 4, ''), ['keep', '', '', 'late']);
+});

@@ -42,6 +42,17 @@ function createSheet(name) {
     getParent: () => sheet._parent,
     clearContents() { data = []; return sheet; },
     setFrozenRows() { return sheet; },
+    showColumns() { return sheet; },
+    hideColumns() { return sheet; },
+    setColumnWidth() { return sheet; },
+    setColumnWidths() { return sheet; },
+    autoResizeColumn() { return sheet; },
+    autoResizeColumns() { return sheet; },
+    getColumnWidth: () => 100,
+    getMaxColumns: () => Math.max(1, ...data.map(r => (r || []).length)),
+    getMaxRows: () => Math.max(1, data.length),
+    deleteColumns() { return sheet; },
+    insertColumnsAfter() { return sheet; },
     getDataRange() { return sheet.getRange(1, 1, Math.max(data.length, 1), Math.max(1, ...data.map(r => r.length))); },
     getRange(row, col, numRows = 1, numCols = 1) {
       // A1 notation ('B2', 'F9:I9') as well as (row, col, numRows, numCols).
@@ -68,7 +79,28 @@ function createSheet(name) {
         setBackground() { return range; },
         setHorizontalAlignment() { return range; },
         setNumberFormat() { return range; },
+        setRichTextValues(values) {
+          // Same size rules as setValues; writes the plain text through so reads stay meaningful
+          if (values.length !== numRows) {
+            throw new Error('The number of rows in the data does not match the number of rows in the range.');
+          }
+          values.forEach(r => {
+            if (!Array.isArray(r) || r.length !== numCols) {
+              throw new Error('The number of columns in the data does not match the number of columns in the range.');
+            }
+          });
+          return range.setValues(values.map(r => r.map(v => (v && v.getText ? v.getText() : v))));
+        },
         setValues(values) {
+          // Sheets rejects a ragged or mis-sized array; mimic that so layout drift fails here, not live.
+          if (values.length !== numRows) {
+            throw new Error('The number of rows in the data does not match the number of rows in the range.');
+          }
+          values.forEach(r => {
+            if (!Array.isArray(r) || r.length !== numCols) {
+              throw new Error('The number of columns in the data does not match the number of columns in the range.');
+            }
+          });
           for (let i = 0; i < numRows; i++) {
             data[row - 1 + i] = data[row - 1 + i] || [];
             for (let j = 0; j < numCols; j++) data[row - 1 + i][col - 1 + j] = values[i][j];
@@ -165,6 +197,26 @@ function loadAppsScript(opts = {}) {
     console, JSON, Date, Math, Object, Array, Set, Map, String, Number, Boolean, RegExp, Error, isNaN, parseInt, parseFloat, Intl,
     SpreadsheetApp: {
       flush() {},
+      // Minimal rich-text builder: keeps the plain text, records the coloured runs
+      newRichTextValue: () => {
+        const runs = [];
+        let text = '';
+        const builder = {
+          setText(t) { text = String(t == null ? '' : t); return builder; },
+          setTextStyle(start, end, style) { runs.push({ start, end, style }); return builder; },
+          build: () => ({ getText: () => text, getRuns: () => runs })
+        };
+        return builder;
+      },
+      newTextStyle: () => {
+        const style = { color: null };
+        const builder = {
+          setForegroundColor(c) { style.color = c; return builder; },
+          setBold() { return builder; },
+          build: () => style
+        };
+        return builder;
+      },
       getActiveSpreadsheet: () => spreadsheet,
       getUi() {
         if (!withUi) throw new Error('Cannot call SpreadsheetApp.getUi() from this context.');
