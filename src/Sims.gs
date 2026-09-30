@@ -191,6 +191,16 @@ function processAndIngestRaidbotsSims(input) {
   return withScriptLock(() => ingestRaidbotsSims_(input));
 }
 
+/** "Rawria's sim was run at Heroic ..." for one or more skipped reports. */
+function wrongDifficultyMessage_(skipped, lootDifficulty) {
+  const list = (skipped || [])
+    .map(s => `${s.name} (${s.difficulty || 'unknown'})`)
+    .join(', ');
+  return `No sims were imported: ${list} ${skipped.length === 1 ? 'was' : 'were'} run at a different raid `
+    + `difficulty than the Loot & Chase Items sheet, which is set to ${lootDifficulty.label}. Re-run with the `
+    + `${lootDifficulty.label} raid preset, or switch the sheet with Guild Audit menu "4b. Toggle Loot Difficulty".`;
+}
+
 function ingestRaidbotsSims_(input) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(LOOT_SHEET_NAME);
@@ -289,6 +299,7 @@ function ingestRaidbotsSims_(input) {
   // 1. Deduplicate by character name: strictly keep only the single most recent sim report per character!
   const latestSimsByPlayer = {};
   const skippedNotOnRoster = [];
+  const skippedWrongDifficulty = [];
   simDataList.forEach(simData => {
     if (!simData) return;
     let playerName = 'Unknown';
@@ -312,6 +323,16 @@ function ingestRaidbotsSims_(input) {
       return;
     }
     
+    // A droptimizer run at another difficulty compares against the wrong drop item level, so its
+    // percentages cannot be ranked beside the rest of the sheet.
+    const simDifficulty = raidbotsReportDifficulty(simData);
+    const difficultyCheck = checkSimDifficulty(simDifficulty, lootDifficulty, playerName);
+    if (!difficultyCheck.ok) {
+      Logger.log(`Skipping ${playerName}'s sim: ${simDifficulty} sim on a ${lootDifficulty.label} sheet`);
+      skippedWrongDifficulty.push({ name: playerName, difficulty: simDifficulty });
+      return;
+    }
+
     let simTime = 0;
     if (simData.sim && simData.sim.timestamp) simTime = simData.sim.timestamp * 1000;
     else if (simData.sim && simData.sim.date) simTime = new Date(simData.sim.date).getTime();
@@ -332,10 +353,13 @@ function ingestRaidbotsSims_(input) {
 
   const dedupedSimDataList = Object.values(latestSimsByPlayer).map(e => e.simData);
   if (dedupedSimDataList.length === 0) {
-    return {
-      success: false,
-      error: skippedNotOnRoster.length > 0 ? notOnRosterMessage_(skippedNotOnRoster) : 'No usable sims found in the report.'
-    };
+    let error = 'No usable sims found in the report.';
+    if (skippedWrongDifficulty.length > 0) {
+      error = wrongDifficultyMessage_(skippedWrongDifficulty, lootDifficulty);
+    } else if (skippedNotOnRoster.length > 0) {
+      error = notOnRosterMessage_(skippedNotOnRoster);
+    }
+    return { success: false, error: error };
   }
 
   dedupedSimDataList.forEach(simData => {
@@ -655,8 +679,12 @@ function ingestRaidbotsSims_(input) {
     itemsMapped: totalMatches,
     topUpgrades: topUpgradesSummary,
     skippedNotOnRoster: skippedNotOnRoster,
+    skippedWrongDifficulty: skippedWrongDifficulty,
     message: `Successfully mapped DPS upgrades for ${processedPlayers.join(', ')} across ${totalMatches} raid items.` +
-      (skippedNotOnRoster.length > 0 ? ` Skipped (not on the Config roster): ${skippedNotOnRoster.join(', ')}.` : '')
+      (skippedNotOnRoster.length > 0 ? ` Skipped (not on the Config roster): ${skippedNotOnRoster.join(', ')}.` : '') +
+      (skippedWrongDifficulty.length > 0
+        ? ` Skipped (not ${lootDifficulty.label}): ${skippedWrongDifficulty.map(x => `${x.name} (${x.difficulty || 'unknown'})`).join(', ')}.`
+        : '')
   };
 }
 
@@ -667,6 +695,71 @@ function ingestRaidbotsSims_(input) {
  */
 function processAndIngestQELiveReport(reportUrlOrId) {
   return withScriptLock(() => ingestQELiveReport_(reportUrlOrId));
+}
+
+/**
+ * Fetches a QE Live upgrade report as JSON.
+ *
+ * questionablyepic.com sits behind Cloudflare, and a WAF rule there answers Apps Script's DEFAULT
+ * user agent -- which contains "+https://script.google.com" -- with a 404 HTML page, even for a report
+ * that exists. That is why every healer import failed with "QE Live API returned status 404" while the
+ * same URL opened fine in a browser. Sending an ordinary browser user agent is what gets a 200 back.
+ */
+function fetchQeLiveReport_(reportId) {
+  const apiUrl = `https://questionablyepic.com/api/getUpgradeReport.php?reportID=${reportId}`;
+  const attempts = [
+    { 'User-Agent': QE_LIVE_USER_AGENT, 'Accept': 'application/json, text/plain, */*' },
+    null
+  ];
+
+  let lastCode = 0;
+  let lastBody = '';
+
+  for (let i = 0; i < attempts.length; i++) {
+    const options = { muteHttpExceptions: true, followRedirects: true };
+    if (attempts[i]) options.headers = attempts[i];
+
+    let resp;
+    try {
+      resp = UrlFetchApp.fetch(apiUrl, options);
+    } catch (err) {
+      lastBody = err && err.message ? err.message : String(err);
+      continue;
+    }
+
+    lastCode = resp.getResponseCode();
+    lastBody = resp.getContentText() || '';
+
+    if (lastCode === 200) {
+      try {
+        let parsed = JSON.parse(lastBody);
+        // The endpoint double-encodes: the body is a JSON string containing the report JSON.
+        if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+        if (parsed && parsed.results) return { success: true, report: parsed };
+        return { success: false, error: 'QE Live report returned no results data.' };
+      } catch (err) {
+        return { success: false, error: `Could not parse the QE Live report JSON: ${err.message}` };
+      }
+    }
+  }
+
+  if (lastCode === 404 && /<(!doctype|html)/i.test(lastBody)) {
+    return {
+      success: false,
+      error: 'QE Live answered with a 404 page rather than the report. The report id looks valid, so this is '
+        + "questionablyepic.com blocking the request, not a missing report. Open the link in a browser to "
+        + 'confirm it loads, then re-post it; if it keeps failing, the sim can be imported with Guild Audit '
+        + 'menu "5. Import Sims" instead.'
+    };
+  }
+  if (lastCode === 404) {
+    return {
+      success: false,
+      error: `QE Live has no report with id ${reportId}. A report can take a moment to save after it is `
+        + 'generated -- open the link in a browser to check it loads, then post it again.'
+    };
+  }
+  return { success: false, error: `QE Live API returned status ${lastCode || 'no response'}.` };
 }
 
 function ingestQELiveReport_(reportUrlOrId) {
@@ -687,19 +780,9 @@ function ingestQELiveReport_(reportUrlOrId) {
     return { success: false, error: 'Could not parse a valid QE Live Report ID from input.' };
   }
 
-  const apiUrl = `https://questionablyepic.com/api/getUpgradeReport.php?reportID=${reportId}`;
-  let reportData = null;
-  try {
-    const resp = UrlFetchApp.fetch(apiUrl, { muteHttpExceptions: true });
-    if (resp.getResponseCode() !== 200) {
-      return { success: false, error: `QE Live API returned status ${resp.getResponseCode()}` };
-    }
-    const raw = resp.getContentText();
-    reportData = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    if (typeof reportData === 'string') reportData = JSON.parse(reportData);
-  } catch (err) {
-    return { success: false, error: `Failed to fetch or parse QE Live report: ${err.message}` };
-  }
+  const fetched = fetchQeLiveReport_(reportId);
+  if (!fetched.success) return fetched;
+  let reportData = fetched.report;
 
   if (!reportData || !reportData.results) {
     return { success: false, error: 'QE Live report returned no results data.' };
@@ -716,6 +799,17 @@ function ingestQELiveReport_(reportUrlOrId) {
     Logger.log(`Skipping QE Live report from ${playerName}: not a main character on the Config sheet`);
     return { success: false, error: notOnRosterMessage_([playerName]) };
   }
+
+  // The catalog is built for one raid difficulty; a sim run at another one measures upgrades against
+  // the wrong drop item level, so it is refused rather than silently ranked.
+  const lootDifficulty = getLootDifficulty();
+  const reportDifficulty = qeReportDifficulty(reportData);
+  const difficultyCheck = checkSimDifficulty(reportDifficulty, lootDifficulty, playerName);
+  if (!difficultyCheck.ok) {
+    Logger.log(`Rejecting QE Live report from ${playerName}: ${reportDifficulty} vs sheet ${lootDifficulty.label}`);
+    return { success: false, error: difficultyCheck.error };
+  }
+  const wantedDifficultyIndex = raidDifficultyIndex(lootDifficulty.label);
 
   const spec = reportData.spec || 'Healer';
   const now = new Date();
@@ -756,6 +850,9 @@ function ingestQELiveReport_(reportUrlOrId) {
   reportData.results.forEach(r => {
     if (r.dropType === 'bonus') return; // Explicitly exclude bonus roll personal loot
     if (r.dropLoc && r.dropLoc.toLowerCase() !== 'raid') return;
+    // A report can contain more than one raid difficulty; keep only the one the sheet is set to.
+    if (wantedDifficultyIndex > -1 && r.dropDifficulty !== undefined && r.dropDifficulty !== null
+        && Number(r.dropDifficulty) !== wantedDifficultyIndex) return;
     if (!r.percDiff || r.percDiff <= 0) return;
 
     const pct = parseFloat(r.percDiff.toFixed(2));

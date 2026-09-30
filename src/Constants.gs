@@ -112,6 +112,11 @@ const ROSTER_ROLES = [
 // ═════════════════════════════════════════════════════════════════════════════════════
 
 // Guild Audit columns (in sheet order within each group). The groups are collapsible on the sheet.
+// questionablyepic.com's Cloudflare rules 404 Apps Script's default user agent (it contains
+// "+https://script.google.com"), so QE Live fetches send an ordinary browser one instead.
+const QE_LIVE_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
+  + '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
+
 const AUDIT_GEAR_COLUMNS = [
   'Head', 'Shoulders', 'Chest', 'Hands', 'Legs',
   'Main Hand', 'Off Hand', 'Trinket 1', 'Trinket 2',

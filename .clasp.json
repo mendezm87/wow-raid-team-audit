@@ -12,6 +12,7 @@
     "src/Audit.gs",
     "src/Talents.gs",
     "src/LootTable.gs",
+    "src/SimDifficulty.gs",
     "src/LootEligibility.gs",
     "src/LootSheet.gs",
     "src/Sims.gs",
