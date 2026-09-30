@@ -35,14 +35,17 @@ function doPost(e) {
     }
 
     const simInput = (payload && (payload.url || payload.urls || payload.report_url || payload.content || payload.text)) || '';
-    if (!simInput) {
+    // questionablyepic.com refuses Apps Script's user agent, so the bot fetches healer reports itself
+    // and forwards the JSON here as `qeReports`. See fetchQeLiveReport_ in Sims.gs.
+    const qeReports = (payload && (payload.qeReports || payload.qe_reports || payload.reports)) || null;
+    if (!simInput && !qeReports) {
       return webhookResponse_({
         status: 'error',
         message: 'No Raidbots or QE Live URL found in request body.'
       });
     }
 
-    const result = processUniversalSimOrReport(simInput);
+    const result = processUniversalSimOrReport(simInput, qeReports);
     return webhookResponse_(result || { success: false, message: 'No result returned.' });
   } catch (error) {
     return webhookResponse_({

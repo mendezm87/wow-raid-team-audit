@@ -270,9 +270,40 @@ test('a 404 HTML page is reported as a block, not as a missing report', () => {
   const gas = setup(() => ({ getResponseCode: () => 404, getContentText: () => '<!DOCTYPE html><html>Page Not Found</html>' }));
   const result = gas.context.processAndIngestQELiveReport('https://questionablyepic.com/live/upgradereport/eytcfyizaxrh');
   assert.equal(result.success, false);
-  assert.match(result.error, /blocking the request, not a missing report/);
+  assert.match(result.error, /will not serve this report to Google Apps Script/);
 
   const missing = setup(() => ({ getResponseCode: () => 404, getContentText: () => '{"error":"Report not found","ErrorCode":"NoSuchKey"}' }));
   const r2 = missing.context.processAndIngestQELiveReport('https://questionablyepic.com/live/upgradereport/eytcfyizaxrh');
   assert.match(r2.error, /has no report with id eytcfyizaxrh/);
+});
+
+test('a healer report forwarded by the bot is ingested without any fetch at all', () => {
+  let fetches = 0;
+  const gas = loadAppsScript({ fetch: () => { fetches++; throw new Error('must not fetch'); } });
+  const config = gas.spreadsheet.insertSheet('Config');
+  const rows = Array.from({ length: 8 }, () => new Array(9).fill(''));
+  rows.push(['Summzr', 'Fire', '', '', '', '', '', '', '']);
+  config.getRange(1, 1, rows.length, 9).setValues(rows);
+  const loot = gas.spreadsheet.insertSheet('Loot & Chase Items');
+  loot.getRange(1, 1, 3, 13).setValues([
+    ['Boss / Source', 'Chase Item / Drop', 'Slot', 'Difficulty', 'Drop ilvl', 'Target', '', '', '', '', '', '', 'Notes'],
+    ['⚔️ BOSS 1', '═══', '', '', '', '', '', '', '', '', '', '', ''],
+    ['Boss 1', 'Soulcoil Siphon', 'Trinket 1', 'Heroic', 318, 'All', '', '', '', '', '', '', '']
+  ]);
+  loot.getRange(3, 13, 1, 1).setNotes([['Blizzard ID: 12345']]);
+
+  const report = {
+    id: 'eytcfyizaxrh', playername: 'Summzr', spec: 'Restoration Shaman',
+    ufSettings: { raid: [2] },
+    results: [{ item: 12345, dropLoc: 'Raid', dropType: 'drop', dropDifficulty: 2, level: 318, percDiff: 3.1 }]
+  };
+
+  // The bot posts both the link and the report it already fetched; the link must not be fetched again.
+  const result = gas.context.processUniversalSimOrReport(
+    ['https://questionablyepic.com/live/upgradereport/eytcfyizaxrh'],
+    [report]
+  );
+  assert.equal(result.success, true, result && result.error);
+  assert.equal(fetches, 0, 'the forwarded id was not re-fetched');
+  assert.match(gas.sheets['Loot & Chase Items'].data[2][12].toString(), /Summzr/);
 });

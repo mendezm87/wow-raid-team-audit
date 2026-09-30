@@ -102,19 +102,79 @@ function extractSimUrls(text) {
   return urls;
 }
 
+// questionablyepic.com's origin serves a 404 page to Apps Script's user agent (it contains
+// "+https://script.google.com") and Apps Script cannot override that header, so every healer import
+// failed with a 404 even though the report existed. We fetch the report here, in Node, where the same
+// request returns 200, and forward the JSON to the sheet instead of the link.
+const QE_REPORT_ID = /(?:questionablyepic\.com|qe-live\.com)\/(?:live|ptr)\/upgradereport\/([A-Za-z0-9_-]{8,35})/i;
+
+async function fetchQeLiveReports(urls) {
+  const reports = [];
+  for (const url of urls) {
+    const m = QE_REPORT_ID.exec(url);
+    if (!m) continue;
+    const id = m[1];
+    try {
+      const resp = await fetch(`https://questionablyepic.com/api/getUpgradeReport.php?reportID=${id}`, {
+        headers: { 'Accept': 'application/json, text/plain, */*' }
+      });
+      const text = await resp.text();
+      if (!resp.ok) {
+        console.error(`❌ QE Live report ${id}: HTTP ${resp.status}`);
+        reports.push({ __error: `QE Live has no report with id ${id} (HTTP ${resp.status}). Open the link in a browser to check it loads, then post it again.` });
+        continue;
+      }
+      // The endpoint double-encodes: the body is a JSON string containing the report JSON.
+      let parsed = JSON.parse(text);
+      if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+      if (!parsed || !parsed.results) {
+        reports.push({ __error: `QE Live report ${id} contained no results.` });
+        continue;
+      }
+      console.log(`📥 Fetched QE Live report ${id} for ${parsed.playername || 'unknown'} (${parsed.results.length} rows)`);
+      reports.push(parsed);
+    } catch (err) {
+      console.error(`❌ Failed to fetch QE Live report ${id}:`, err);
+      reports.push({ __error: `Could not reach QE Live for report ${id}: ${err.message}` });
+    }
+  }
+  return reports;
+}
+
 // Forward sim URLs to Google Sheets Web App
 async function sendToGoogleSheets(urls) {
   try {
+    const qeUrls = urls.filter(u => QE_REPORT_ID.test(u));
+    const otherUrls = urls.filter(u => !QE_REPORT_ID.test(u));
+
+    const fetchedReports = qeUrls.length > 0 ? await fetchQeLiveReports(qeUrls) : [];
+    const qeReports = fetchedReports.filter(r => !r.__error);
+    const qeErrors = fetchedReports.filter(r => r.__error).map(r => r.__error);
+
+    // Nothing left to send: the only links were healer reports we could not retrieve.
+    if (otherUrls.length === 0 && qeReports.length === 0) {
+      return { success: false, error: qeErrors.join(' ') || 'No usable report links were found.' };
+    }
+
     const response = await fetch(GOOGLE_SHEET_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ urls: urls, secret: WEBHOOK_SECRET || undefined }),
+      body: JSON.stringify({
+        urls: otherUrls,
+        qeReports: qeReports.length > 0 ? qeReports : undefined,
+        secret: WEBHOOK_SECRET || undefined
+      }),
       redirect: 'follow'
     });
 
     const text = await response.text();
     try {
-      return JSON.parse(text);
+      const parsed = JSON.parse(text);
+      if (qeErrors.length > 0) {
+        parsed.error = [parsed.error, ...qeErrors].filter(Boolean).join(' ');
+        if (!parsed.success) parsed.success = false;
+      }
+      return parsed;
     } catch (parseErr) {
       if (response.status === 404) {
         return {

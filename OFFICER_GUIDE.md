@@ -298,8 +298,30 @@ The sheet natively supports **both DPS/Tank simulations (Raidbots)** and **Heale
 ### B. Healers (QE Live Upgrade Finder):
 1. Healers run an Upgrade Finder report on [QE Live](https://questionablyepic.com/live).
 2. Copy their upgrade report link: `https://questionablyepic.com/live/upgradereport/abc123xyz`
-3. Paste into Discord `#sims` channel (or in Google Sheets via `5. Import Raidbots / QE Live Sim`).
+3. **Paste into the Discord `#sims` channel.** Healer reports have to come in through the bot — see the box below.
 4. **Bonus Roll Exclusion**: The engine **automatically excludes personal loot / bonus roll items**, mapping only genuine raid drops to the Loot Council sheet with `✅ QE Live` status!
+
+> **⚠️ Healer reports only import through the Discord bot, not the sheet menu.**
+> `questionablyepic.com` refuses requests that carry Google Apps Script's user agent — it answers with a
+> `404 Not Found` page even when the report exists — and Apps Script cannot change that header. So
+> `5. Import Raidbots / QE Live Sim` and `5b. Pull & Sync All Latest Sims from Discord` **cannot** fetch a
+> healer report; they report the block rather than failing silently. The bot is unaffected: it fetches the
+> report itself and posts the data to the sheet. If a healer's link will not import, the fix is to paste it
+> in `#sims`, not to retry from the menu.
+
+### C. ⚔️ Difficulty has to match the sheet
+
+A sim measures each drop against the item level it would arrive at, so a **Heroic sim's percentages mean nothing
+on a Mythic sheet**. Both import paths now check this:
+
+* **Raidbots** states the difficulty in its report title. A sim at the wrong one is **skipped**, and the message
+  names both (`Summzr (Heroic) ... the sheet is set to Mythic`).
+* **QE Live** reports can contain several difficulties at once. Only the rows matching the sheet are kept; if the
+  report has none at the sheet's difficulty, it is refused.
+* Either way the fix is one of two things: re-run the sim at the sheet's difficulty, or switch the sheet with
+  `4b. ⚔️ Toggle Loot Difficulty`.
+* A report whose difficulty cannot be read is **allowed through** — a missing label is not worth blocking an
+  import over, only a wrong one is.
 
 > **Roster only:** sims and QE Live reports are accepted only for **main characters on the `Config` sheet**. Alts and anyone not on the roster are rejected with a message telling them to ask an officer. Earlier rankings from characters no longer on the roster are dropped the next time that item's rankings are updated.
 >

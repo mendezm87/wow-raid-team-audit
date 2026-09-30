@@ -700,16 +700,21 @@ function processAndIngestQELiveReport(reportUrlOrId) {
 /**
  * Fetches a QE Live upgrade report as JSON.
  *
- * questionablyepic.com sits behind Cloudflare, and a WAF rule there answers Apps Script's DEFAULT
- * user agent -- which contains "+https://script.google.com" -- with a 404 HTML page, even for a report
- * that exists. That is why every healer import failed with "QE Live API returned status 404" while the
- * same URL opened fine in a browser. Sending an ordinary browser user agent is what gets a 200 back.
+ * THIS CANNOT SUCCEED FROM APPS SCRIPT, and that is the whole reason healer imports were failing.
+ * questionablyepic.com's origin answers Apps Script's user agent -- which contains
+ * "+https://script.google.com" -- with a 404 HTML page (response carries `vary: User-Agent`), even for a
+ * report that exists. UrlFetchApp will not let us override User-Agent, so the request is blocked whatever
+ * we send. Verified by replaying one failing report id: 200 with a browser UA, 404 with Apps Script's.
+ *
+ * The working path is the Discord bot: it fetches the report in Node and posts the JSON to the web app,
+ * which ingests it via processAndIngestQELiveReportData. This function stays so that the manual and
+ * menu-5b paths fail with an explanation rather than a bare status code, and so that it starts working
+ * again by itself if that rule is ever lifted.
  */
 function fetchQeLiveReport_(reportId) {
   const apiUrl = `https://questionablyepic.com/api/getUpgradeReport.php?reportID=${reportId}`;
   const attempts = [
-    { 'User-Agent': QE_LIVE_USER_AGENT, 'Accept': 'application/json, text/plain, */*' },
-    null
+    { 'User-Agent': QE_LIVE_USER_AGENT, 'Accept': 'application/json, text/plain, */*' }
   ];
 
   let lastCode = 0;
@@ -746,10 +751,10 @@ function fetchQeLiveReport_(reportId) {
   if (lastCode === 404 && /<(!doctype|html)/i.test(lastBody)) {
     return {
       success: false,
-      error: 'QE Live answered with a 404 page rather than the report. The report id looks valid, so this is '
-        + "questionablyepic.com blocking the request, not a missing report. Open the link in a browser to "
-        + 'confirm it loads, then re-post it; if it keeps failing, the sim can be imported with Guild Audit '
-        + 'menu "5. Import Sims" instead.'
+      error: 'QE Live will not serve this report to Google Apps Script: it answered with a 404 page rather '
+        + 'than the report, even though the id is valid. This is not a missing report and not something the '
+        + 'sheet can retry. Post the link in the Discord sims channel instead -- the bot fetches healer '
+        + 'reports itself and is not blocked.'
     };
   }
   if (lastCode === 404) {
@@ -782,7 +787,37 @@ function ingestQELiveReport_(reportUrlOrId) {
 
   const fetched = fetchQeLiveReport_(reportId);
   if (!fetched.success) return fetched;
-  let reportData = fetched.report;
+  return ingestQeReportData_(fetched.report, sheet);
+}
+
+/**
+ * Ingests an ALREADY-FETCHED QE Live report object.
+ *
+ * Split out from ingestQELiveReport_ because Apps Script cannot fetch these reports at all: see
+ * fetchQeLiveReport_. The Discord bot fetches the JSON in Node, where the request is not blocked, and
+ * posts the report object here instead of the link.
+ */
+function processAndIngestQELiveReportData(reportData) {
+  return withScriptLock(() => {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(LOOT_SHEET_NAME);
+    if (!sheet) {
+      createLootAndChaseItemsSheet();
+      sheet = ss.getSheetByName(LOOT_SHEET_NAME);
+    }
+    let parsed = reportData;
+    // The bot may forward the endpoint's raw double-encoded body rather than a parsed object.
+    try {
+      if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+      if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+    } catch (err) {
+      return { success: false, error: `Could not parse the forwarded QE Live report: ${err.message}` };
+    }
+    return ingestQeReportData_(parsed, sheet);
+  });
+}
+
+function ingestQeReportData_(reportData, sheet) {
 
   if (!reportData || !reportData.results) {
     return { success: false, error: 'QE Live report returned no results data.' };
@@ -1020,7 +1055,10 @@ function ingestQELiveReport_(reportUrlOrId) {
  * Universal router for incoming sim/report submissions (Raidbots or QE Live).
  * Seamlessly handles arrays, mixed batches, and single links.
  */
-function processUniversalSimOrReport(input) {
+function processUniversalSimOrReport(input, qeReports) {
+  // Reports the bot already fetched for us (Apps Script cannot fetch them itself; see fetchQeLiveReport_).
+  const forwarded = Array.isArray(qeReports) ? qeReports : (qeReports ? [qeReports] : []);
+  const forwardedResults = forwarded.map(r => processAndIngestQELiveReportData(r));
   let urls = [];
   if (Array.isArray(input)) {
     urls = input;
@@ -1028,8 +1066,15 @@ function processUniversalSimOrReport(input) {
     urls = (input || '').toString().split(/[\s,;]+/).filter(u => u.trim());
   }
 
-  const qeUrls = urls.filter(u => u.includes('questionablyepic.com') || u.includes('qe-live.com') || u.includes('upgradereport'));
-  const rbUrls = urls.filter(u => !qeUrls.includes(u));
+  // A QE link the bot already fetched and forwarded must not be fetched again here: that request is
+  // blocked, and a second failure would mask a successful import.
+  const forwardedIds = forwarded
+    .map(r => (r && r.id ? r.id.toString().toLowerCase() : ''))
+    .filter(Boolean);
+  const qeUrls = urls
+    .filter(u => u.includes('questionablyepic.com') || u.includes('qe-live.com') || u.includes('upgradereport'))
+    .filter(u => !forwardedIds.some(id => u.toLowerCase().indexOf(id) > -1));
+  const rbUrls = urls.filter(u => !/questionablyepic\.com|qe-live\.com|upgradereport/.test(u));
 
   let rbResult = null;
   let qeResult = null;
@@ -1043,15 +1088,27 @@ function processUniversalSimOrReport(input) {
     });
   }
 
-  if (rbResult && qeResult) {
-    return {
-      success: true,
-      reportsProcessed: (rbResult.reportsProcessed || 0) + qeUrls.length,
-      players: [...(rbResult.players || []), ...(qeResult.players || [])],
-      message: `Successfully processed ${rbResult.reportsProcessed || 0} Raidbots sims and ${qeUrls.length} QE Live reports.`
-    };
+  const all = [].concat(forwardedResults, rbResult ? [rbResult] : [], qeResult ? [qeResult] : []);
+  const ok = all.filter(r => r && r.success);
+  const bad = all.filter(r => r && !r.success);
+
+  if (ok.length === 0) {
+    if (bad.length > 0) return bad[0];
+    return { success: false, message: 'No valid sim or report URLs provided.', error: 'No valid sim or report URLs provided.' };
   }
-  return rbResult || qeResult || { success: false, message: 'No valid sim or report URLs provided.' };
+
+  const players = ok.reduce((acc, r) => acc.concat(r.players || []), []);
+  const messages = ok.map(r => r.message).filter(Boolean);
+  return {
+    success: true,
+    reportsProcessed: ok.reduce((n, r) => n + (r.reportsProcessed || 0), 0),
+    players: players,
+    itemsMapped: ok.reduce((n, r) => n + (r.itemsMapped || 0), 0),
+    topUpgrades: ok.reduce((acc, r) => acc.concat(r.topUpgrades || []), []),
+    platform: ok.length === 1 ? ok[0].platform : undefined,
+    message: messages.join(' ')
+      + (bad.length > 0 ? ` Not imported: ${bad.map(r => r.error || r.message).join(' ')}` : '')
+  };
 }
 
 /**

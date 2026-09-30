@@ -116,13 +116,13 @@ Because Raidbots does not model healing throughput, healers use **Questionably E
 1. Open [QE Live (questionablyepic.com/live)](https://questionablyepic.com/live).
 2. Import your character using your in-game `/simc` string.
 3. **`☑ Upgrade ALL to Max Level`** *(CRITICAL: Check this box when importing your gear so all calculations reflect max-upgraded gear tracks!)*
-4. In the top navigation, click **Upgrade Finder** $\rightarrow$ **Raid** (*The Venomous Abyss*) at the same difficulty the loot sheet uses (Heroic or Mythic).
+4. In the top navigation, click **Upgrade Finder** $\rightarrow$ **Raid** (*The Venomous Abyss*) at the same difficulty the loot sheet uses (Heroic or Mythic). **This has to match**, or the report is refused — the percentages would be measured against the wrong item level. The difficulty the sheet is on is shown under the `Loot & Chase Items` header, e.g. `Mythic · 334 ilvl`.
 5. Click **Run Upgrade Finder**.
 6. Once complete, copy the report URL from your browser address bar:
    ```text
    https://questionablyepic.com/live/upgradereport/vuakucejkfyc
    ```
-7. **Paste the link into the `#sims` Discord channel** (or type `/sim report_url:<link>`).
+7. **Paste the link into the `#sims` Discord channel** (or type `/sim report_url:<link>`). Healer reports have to go through Discord — QE Live will not serve them to the spreadsheet itself, so an officer importing your link from the sheet menu gets a 404.
 8. The bot will react with `✅` and confirm:
    > `🩺 QE Live Healer Report Imported for CharacterName (Spec)`  
    *(Personal loot / bonus roll items are automatically excluded)*
