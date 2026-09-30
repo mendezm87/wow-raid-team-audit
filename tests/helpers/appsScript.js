@@ -31,6 +31,7 @@ function parseA1Cell(a1) {
 function createSheet(name) {
   let data = [];
   let notes = [];
+  let backgrounds = [];
   let hidden = false;
   const sheet = {
     name,
@@ -81,7 +82,21 @@ function createSheet(name) {
         setFontWeight() { return range; },
         setFontColor() { return range; },
         setFontSize() { return range; },
-        setBackground() { return range; },
+        setBackground(color) {
+          return range.setBackgrounds(Array.from({ length: numRows }, () => new Array(numCols).fill(color)));
+        },
+        setBackgrounds(values) {
+          for (let i = 0; i < numRows; i++) {
+            backgrounds[row - 1 + i] = backgrounds[row - 1 + i] || [];
+            for (let j = 0; j < numCols; j++) backgrounds[row - 1 + i][col - 1 + j] = values[i][j];
+          }
+          return range;
+        },
+        getBackgrounds() {
+          return Array.from({ length: numRows }, (_, i) =>
+            Array.from({ length: numCols }, (_, j) => ((backgrounds[row - 1 + i] || [])[col - 1 + j]) || '#ffffff'));
+        },
+        getBackground() { return range.getBackgrounds()[0][0]; },
         setHorizontalAlignment() { return range; },
         setNumberFormat() { return range; },
         setRichTextValues(values) {
@@ -129,6 +144,9 @@ function createSheet(name) {
           }
           return range;
         },
+        setNote(value) {
+          return range.setNotes(Array.from({ length: numRows }, () => new Array(numCols).fill(value)));
+        },
         getNotes() {
           return Array.from({ length: numRows }, (_, i) =>
             Array.from({ length: numCols }, (_, j) => ((notes[row - 1 + i] || [])[col - 1 + j]) ?? ''));
@@ -147,7 +165,8 @@ function createPropertyStore(initial = {}) {
     getProperty: k => (k in store ? store[k] : null),
     setProperty: (k, v) => { store[k] = String(v); },
     setProperties: obj => { Object.entries(obj).forEach(([k, v]) => { store[k] = String(v); }); },
-    deleteProperty: k => { delete store[k]; }
+    deleteProperty: k => { delete store[k]; },
+    getKeys: () => Object.keys(store)
   };
 }
 
@@ -178,6 +197,7 @@ function loadAppsScript(opts = {}) {
   const sheets = {};
   const spreadsheet = {
     getSheetByName: n => sheets[n] || null,
+    getSpreadsheetTimeZone: () => 'America/Los_Angeles',
     insertSheet: n => { sheets[n] = createSheet(n); sheets[n]._parent = spreadsheet; return sheets[n]; }
   };
   const alerts = [];

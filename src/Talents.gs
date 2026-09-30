@@ -83,7 +83,10 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   };
 
   const finalRows = [];
+  // Same order as finalRows, so applySpecHoldMarkers can line notes up with the rows it is marking
+  const rowObjects = [];
   finalRows.push(...mainCharacterData.map((c, i) => formatTalentRow(c, i)));
+  rowObjects.push(...mainCharacterData);
 
   if (altCharacterData && altCharacterData.length > 0) {
     const bandRow = Array(talentHeaders.length).fill('');
@@ -91,6 +94,7 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
     finalRows.push(bandRow);
     const startAltIdx = mainCharacterData.length + 1;
     finalRows.push(...altCharacterData.map((c, i) => formatTalentRow(c, startAltIdx + i)));
+    rowObjects.push({ isAltsBand: true }, ...altCharacterData);
   }
 
   const outputData = [talentHeaders, ...finalRows];
@@ -121,7 +125,7 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
   const headerRange = sheet.getRange(1, 1, 1, talentHeaders.length);
   headerRange.setBackground('#1e293b').setFontColor('#f8fafc').setFontWeight('bold').setFontSize(10);
   sheet.setRowHeight(1, 40);
-  stampHeaderCell(sheet, talentHeaders[0]);
+  stampHeaderCell(sheet, talentHeaders[0], specHoldStampText(rowObjects));
 
   const loadoutColIdx = talentHeaders.indexOf('Loadout Code') + 1;
 
@@ -156,6 +160,9 @@ function updateTalentsSheet(mainCharacterData, altCharacterData) {
       .setFontColor('#94a3b8')
       .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
   }
+  // Held rows: a 📌 note and an amber fill on the Active Spec cell (see SpecHold.gs)
+  applySpecHoldMarkers(sheet, talentHeaders, rowObjects, 'Active Spec');
+
   sheet.getRange(1, loadoutColIdx).setNote('Click a cell and copy it (Ctrl/Cmd+C). The whole import string is copied, even though the column only shows the start of it.');
 
   const rules = [];

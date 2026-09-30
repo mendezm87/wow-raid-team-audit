@@ -144,10 +144,40 @@ Tracks equipped item levels, tier set bonuses, gems, enchants, and weekly Great 
 * 🟢 **`READY`**: Fully enchanted, all sockets filled with current gems, and has at least 4pc current season tier.
 * 🔴 **`1 Enchant missing` / `2 Sockets empty`**: Counts the missing enchants and un-socketed slots.
 * 🟡 **`Tier 0/5` – `Tier 3/5`**: Raider has fewer than 4 of the 5 current-season tier pieces, so no 4pc bonus. Counted out of 5, the same as the `Tier Set` column.
-* ⚠️ **`Off-Spec → Protection`**: Warns officers if a raider logged out in a spec other than the one assigned on `Config`. The arrow points at the **assigned** spec.
+* ⚠️ **`Off-Spec → Protection`**: Warns officers if a raider logged out in a spec other than the one assigned on `Config`. The arrow points at the **assigned** spec. With the off-spec gear hold on (the default), this only appears for a raider who has *never* been audited in their assigned spec — see below.
 * Issues are joined with ` · `, e.g. `Off-Spec → Vengeance · Tier 2/5 · 1 Enchant missing`.
 * ⚪ **`⚠️ Armory lookup failed`** (whole row greyed out): Blizzard's Armory didn't return the character — usually they left the guild, renamed, or transferred. Check the name on `Config`, or remove them.
 * 🔴 **`⚠️ Not in guild`**: the character still exists on the Armory but is no longer in the Blizzard guild roster, so they have almost certainly left. Cross-realm names (`Name-Realm`) are never flagged. Remove them from `Config` once you have confirmed it.
+
+### 📌 Off-Spec Gear Hold
+
+Blizzard's Armory only ever reports the spec and gear a character **logged out in**. A raider who last
+logged out in their Mythic+ or PvP spec used to audit as `Off-Spec` with the wrong gear, the wrong enchants
+and a lower item level — none of which said anything about their raid readiness.
+
+So the audit now **holds** it. Every time a raider is seen in their assigned raid spec, that part of their
+row is saved. If the next audit finds them in a different spec, the saved row is used instead:
+
+* Their `Spec` cell is tinted **amber**, and hovering it says which spec the data is from, when it was
+  saved, and which spec they are currently logged out in. The same marker appears on `Talents & Builds`.
+* The header stamp counts them, e.g. `↻ Sep 29, 5:40 PM · 2 rows 📌 held off-spec`.
+* **Held:** gear, enchants, item level, tier set, sockets, crafted items, embellishments, talent loadout
+  and hero talents — plus the Wowhead and Archon links, which follow the held spec.
+* **Still live:** Great Vault, M+ rating, Sim Status, attendance and the Loot sheet's contender scoring.
+
+The row heals itself the next time they log out in their raid spec. Nothing is held when:
+
+* they have no `Assigned Raid Spec` on `Config` (there is nothing to be off-spec *from*);
+* they have never yet been audited in that spec;
+* you changed their assigned spec on `Config`, which makes the saved row the **wrong** spec rather than an
+  old one — it is discarded and the live read is used until they are next seen in the new spec;
+* the saved row is more than **45 days** old, which is far enough behind to be worse than the live read;
+* the Armory returned nothing at all, so the quiet `⚠️ Armory lookup failed` row still wins.
+
+**Menu 3b. 📌 Toggle Off-Spec Gear Hold** turns it off, if you would rather always see the live logged-out
+spec. Saved rows are kept, so turning it back on restores them. **Menu 3c. 🧹 Clear Saved Main-Spec Gear
+Snapshots** deletes them outright — use it if a raider's saved gear is wrong and you want the audit to
+start over from live reads. Either way, run the Full Audit afterwards to apply it.
 
 ### 🧪 Sim Status column
 Sits next to `M+ Rating` and answers "who has actually simmed":

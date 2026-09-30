@@ -138,6 +138,9 @@ const TAB_COLORS = {
   'Config': '#64748b'
 };
 
+// Spec cell fill for a row whose gear is held from the last main-spec audit (see SpecHold.gs)
+const SPEC_HOLD_BACKGROUND = '#fef3c7';
+
 // Alternating data-row fills
 const ZEBRA_COLORS = ['#ffffff', '#f8fafc'];
 
@@ -241,6 +244,19 @@ function wowheadGuideUrl(className, spec) {
   const specSlug = slug(spec);
   if (!classSlug || !specSlug) return '';
   return `https://www.wowhead.com/guide/classes/${classSlug}/${specSlug}/overview`;
+}
+
+/**
+ * Archon raid build URL for a spec, e.g. .../builds/unholy/death-knight/raid/overview/mythic/all-bosses.
+ * The Talents sheet builds its own version as a formula so the boss dropdown can drive the last segment.
+ */
+function archonBuildUrl(className, spec, difficulty, bossSlug) {
+  const slug = v => (v || '').toString().trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const classSlug = slug(className);
+  const specSlug = slug(spec);
+  if (!classSlug || !specSlug) return '';
+  const diff = slug(difficulty) || 'heroic';
+  return `https://www.archon.gg/wow/builds/${specSlug}/${classSlug}/raid/overview/${diff}/${bossSlug || 'all-bosses'}`;
 }
 
 /**

@@ -7,6 +7,8 @@ function onOpen() {
       .addItem('2. Create Config Sheet', 'createConfigSheet')
       .addSeparator()
       .addItem('3. Run Full Audit & Talents', 'updateAllCharacterDataWithBonuses')
+      .addItem('3b. 📌 Toggle Off-Spec Gear Hold', 'toggleOffSpecGearHold')
+      .addItem('3c. 🧹 Clear Saved Main-Spec Gear Snapshots', 'clearOffSpecGearHoldSnapshots')
       .addItem('4. Create/Refresh Loot & Chase Items Sheet', 'createLootAndChaseItemsSheet')
       .addItem('4b. ⚔️ Toggle Loot Difficulty (Heroic ↔ Mythic)', 'toggleLootDifficulty')
       .addItem('4c. 🔄 Re-download Loot Table from Blizzard', 'refreshLootTableFromBlizzard')

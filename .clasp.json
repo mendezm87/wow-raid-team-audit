@@ -8,6 +8,7 @@
     "src/Triggers.gs",
     "src/Config.gs",
     "src/BlizzardApi.gs",
+    "src/SpecHold.gs",
     "src/Audit.gs",
     "src/Talents.gs",
     "src/LootTable.gs",

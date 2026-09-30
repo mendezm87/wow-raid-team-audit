@@ -238,6 +238,7 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
   const simStamps = getSimTimestamps_();
   const simmedNames = getSimmedNamesFromLootSheet_(SpreadsheetApp.getActiveSpreadsheet());
   const auditNow = Date.now();
+  const holdOffSpecGear = specHoldEnabled();
 
   const characterDataObjects = [];
   for (const item of batchedPayloads) {
@@ -313,8 +314,8 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
     const specSlug = (charRow['Spec'] || '').toLowerCase().replace(/\s+/g, '-');
     if (classSlug && specSlug) {
       wowheadGuideLink = `https://www.wowhead.com/guide/classes/${classSlug}/${specSlug}/overview`;
-      archonHeroicLink = `https://www.archon.gg/wow/builds/${specSlug}/${classSlug}/raid/overview/heroic/all-bosses`;
-      archonMythicLink = `https://www.archon.gg/wow/builds/${specSlug}/${classSlug}/raid/overview/mythic/all-bosses`;
+      archonHeroicLink = archonBuildUrl(charRow['Class'], charRow['Spec'], 'heroic');
+      archonMythicLink = archonBuildUrl(charRow['Class'], charRow['Spec'], 'mythic');
     }
 
     // Use the character's exact realm slug from their Blizzard profile / roster data
@@ -598,6 +599,12 @@ function processCharacterSet(characterNames, guildRosterMembers, config, token, 
       if (embellishments[1]) charRow['Embellishment 2'] = embellishments[1];
     }
 
+    // --- 3b. Off-Spec Gear Hold ---
+    // The Armory only reports the spec they logged out in. Carry the last assigned-spec read forward
+    // instead, so an M+ or PvP logout doesn't audit as Off-Spec with the wrong gear. Runs before the
+    // readiness verdict below, which is then calculated from the held gear.
+    applySpecHold(charRow, !!profileData, holdOffSpecGear, auditNow);
+
     // --- 4. Calculate Raid Ready Summary ---
     if (!profileData) {
       // No Armory profile (left the guild, renamed, transferred): one quiet row instead of nine "Missing" enchants
@@ -797,7 +804,7 @@ function applyFormatting(sheet, headers, characterDataObjects) {
     if (first > 0) sheet.getRange(1, first, 1, group.length).setBackground(color);
   });
   sheet.setRowHeight(1, 40);
-  stampHeaderCell(sheet, headers[0]);
+  stampHeaderCell(sheet, headers[0], specHoldStampText(characterDataObjects));
 
   // 2. Body: regular weight with Name and Raid Ready bold; text left, numbers right, badges centred.
   // Alternating row fills, with the blank gap between mains and alts left white.
@@ -839,6 +846,10 @@ function applyFormatting(sheet, headers, characterDataObjects) {
       sheet.getRange(2, first, notes.length, group.length).setNotes(notes);
     });
   }
+
+  // 3b. Held rows: a 📌 note and an amber fill on the Spec cell. No cell text changes -- the Loot sheet
+  // and the sim importers read the Spec column back, so a marker in it would leak into spec matching.
+  applySpecHoldMarkers(sheet, headers, characterDataObjects, 'Spec');
 
   // 4. Collapsible Enchants / Gear / Great Vault column groups. Groups survive sheet.clear(), so drop the old ones first.
   try {
